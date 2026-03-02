@@ -14,15 +14,20 @@ Vue 3 component for viewing DXF files in the browser. Built-in DXF parser, Three
 
 ## Features
 
-- **16 DXF entity types** rendered: LINE, CIRCLE, ARC, ELLIPSE, SPLINE, POLYLINE, LWPOLYLINE, TEXT, MTEXT, DIMENSION, HATCH, INSERT, SOLID, 3DFACE, LEADER, MULTILEADER
+- **16 DXF entity types** rendered: LINE, CIRCLE, ARC, ELLIPSE, SPLINE, POLYLINE, LWPOLYLINE, TEXT, MTEXT, DIMENSION, HATCH, INSERT, SOLID, 3DFACE, LEADER, MULTILEADER — plus ATTRIB within INSERT blocks
 - **Linetype rendering** — DASHED, HIDDEN, CENTER, PHANTOM, DOT, DASHDOT and other DXF line patterns with entity/layer/block resolution and LTSCALE support
+- **Hatch patterns** — 25 built-in AutoCAD patterns (ANSI31–38, BRICK, DOTS, NET, HEX, GOST_* etc.) with scale, angle, dot elements, multi-boundary even-odd clipping
+- **OCS support** — Arbitrary Axis Algorithm for correct rendering of mirrored/rotated entities
 - **Built-in DXF parser** — no external parser dependencies, custom scanner with full type casting
 - **Parser-only entry point** — use `dxf-vuer/parser` in Node.js, React, or any JS/TS project (zero dependencies)
 - **TypeScript** — strict types, full `.d.ts` declarations
 - **Composables** — build custom viewers with `useDXFRenderer`, `useThreeScene`, `useCamera`, etc.
 - **CSS custom properties** — theme with `--dxf-vuer-*` variables, no global resets
-- **Layer panel** — toggle layer visibility with color indicators
-- **Lightweight** — ~75 KB main bundle, ~40 KB parser chunk (minified)
+- **Layer panel** — toggle layer visibility with color indicators; frozen/locked layer support
+- **Paper space filtering** — paper space entities (title blocks, borders) automatically excluded
+- **World coordinates** — optional cursor position display in drawing units
+- **Fullscreen mode** — built-in fullscreen button in the viewer toolbar
+- **Lightweight** — ~89 KB main bundle, ~41 KB parser chunk (minified)
 
 ## Installation
 
@@ -92,6 +97,7 @@ async function loadFile(file) {
 | `fileName` | `string` | `""` | File name shown in the top-left corner |
 | `showResetButton` | `boolean` | `false` | Show a reset-view button |
 | `autoFit` | `boolean` | `true` | Auto-fit camera to content |
+| `showCoordinates` | `boolean` | `false` | Show world coordinates at cursor position |
 
 ### Events
 
@@ -153,6 +159,8 @@ import { resolveEntityColor } from 'dxf-vuer'
 ## Supported DXF Entities
 
 **Rendered** (16 types): LINE, CIRCLE, ARC, ELLIPSE, POINT, POLYLINE, LWPOLYLINE, SPLINE, TEXT, MTEXT, DIMENSION, INSERT, SOLID, 3DFACE, HATCH, LEADER, MULTILEADER
+
+**Rendered within INSERT**: ATTRIB (attribute text with alignment, rotation, individual color)
 
 **Parsed but not rendered**: ATTDEF, VIEWPORT, IMAGE, WIPEOUT
 
