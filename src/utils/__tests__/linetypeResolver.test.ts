@@ -382,6 +382,22 @@ describe("computeAutoLtScale", () => {
     expect(computeAutoLtScale(header)).toBe(40);
   });
 
+  it("returns 1 for uninitialized extents (min > max, AutoCAD default 1E+20 / -1E+20)", () => {
+    const header = {
+      "$EXTMIN": { x: 1e20, y: 1e20, z: 1e20 },
+      "$EXTMAX": { x: -1e20, y: -1e20, z: -1e20 },
+    };
+    expect(computeAutoLtScale(header)).toBe(1);
+  });
+
+  it("returns 1 when extents are equal (zero-size drawing)", () => {
+    const header = {
+      "$EXTMIN": { x: 5, y: 5, z: 0 },
+      "$EXTMAX": { x: 5, y: 5, z: 0 },
+    };
+    expect(computeAutoLtScale(header)).toBe(1);
+  });
+
   it("never returns less than 1", () => {
     const header = {
       "$EXTMIN": { x: 0, y: 0, z: 0 },

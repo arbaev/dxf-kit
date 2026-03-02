@@ -229,8 +229,11 @@ export function computeAutoLtScale(
 
   if (!extMin || !extMax) return 1;
 
-  const width = Math.abs(extMax.x - extMin.x);
-  const height = Math.abs(extMax.y - extMin.y);
+  // Invalid extents: min > max means uninitialized (AutoCAD default 1E+20 / -1E+20)
+  if (extMin.x >= extMax.x || extMin.y >= extMax.y) return 1;
+
+  const width = extMax.x - extMin.x;
+  const height = extMax.y - extMin.y;
   const maxExtent = Math.max(width, height);
 
   if (maxExtent < AUTO_LTSCALE_MIN_EXTENT) return 1;
