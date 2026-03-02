@@ -279,6 +279,7 @@ const loadDXFFromText = (dxfText: string) => {
         lastLoadedDxf = dxf;
         const unsupportedEntities = displayDXF(dxf);
         initLayersFromDXF(dxf);
+        applyLayerVisibility(visibleLayerNames.value);
         emit("dxf-loaded", true);
         emit("dxf-data", dxf);
 
@@ -302,6 +303,7 @@ const loadDXFFromData = (dxfData: DxfData) => {
   try {
     const unsupportedEntities = displayDXF(dxfData);
     initLayersFromDXF(dxfData);
+    applyLayerVisibility(visibleLayerNames.value);
     emit("dxf-loaded", true);
     emit("dxf-data", dxfData);
 

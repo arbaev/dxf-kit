@@ -8,6 +8,7 @@ export interface ILayer {
   colorIndex: number;
   color: number;
   frozen: boolean;
+  locked?: boolean;
   lineType?: string;
 }
 
@@ -146,12 +147,15 @@ function parseLayers(scanner: DxfScanner): Record<string, ILayer> {
         layer.color = getAcadColor(layer.colorIndex);
         curr = scanner.next();
         break;
-      case 70:
+      case 70: {
         // Bits 1 and 2: frozen and frozen by default in new viewports
-        layer.frozen =
-          ((curr.value as number) & 1) !== 0 || ((curr.value as number) & 2) !== 0;
+        const flags = curr.value as number;
+        layer.frozen = (flags & 1) !== 0 || (flags & 2) !== 0;
+        // Bit 4 (0x04): locked
+        layer.locked = (flags & 4) !== 0;
         curr = scanner.next();
         break;
+      }
       case 0:
         if (curr.value === "LAYER") {
           layers[layerName!] = layer;

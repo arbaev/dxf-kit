@@ -75,6 +75,69 @@ describe("parseTables", () => {
       expect(layers.FrozenLayer.frozen).toBe(true);
     });
 
+    it("marks layer as locked when bit 4 is set in code 70", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "LAYER",
+        "70", "1",
+        "0", "LAYER",
+        "2", "LockedLayer",
+        "62", "5",
+        "70", "4",          // bit 4 = locked
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const layers = tables.layer.layers as Record<string, ILayer>;
+      expect(layers.LockedLayer.locked).toBe(true);
+      expect(layers.LockedLayer.frozen).toBe(false);
+    });
+
+    it("marks layer as both frozen and locked when bits 1+4 are set in code 70", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "LAYER",
+        "70", "1",
+        "0", "LAYER",
+        "2", "FrozenLocked",
+        "62", "5",
+        "70", "5",          // bit 1 (frozen) + bit 4 (locked) = 5
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const layers = tables.layer.layers as Record<string, ILayer>;
+      expect(layers.FrozenLocked.frozen).toBe(true);
+      expect(layers.FrozenLocked.locked).toBe(true);
+    });
+
+    it("sets locked=false for a normal layer (code 70 = 0)", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "LAYER",
+        "70", "1",
+        "0", "LAYER",
+        "2", "NormalLayer",
+        "62", "5",
+        "70", "0",          // no flags
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const layers = tables.layer.layers as Record<string, ILayer>;
+      expect(layers.NormalLayer.locked).toBe(false);
+      expect(layers.NormalLayer.frozen).toBe(false);
+    });
+
     it("parses layer lineType (code 6)", () => {
       const scanner = createScanner(
         "0", "TABLE",

@@ -367,6 +367,7 @@ export interface DxfLayer {
   colorIndex: number;
   color: number; // RGB as number
   frozen: boolean;
+  locked?: boolean;
   lineType?: string;
 }
 
