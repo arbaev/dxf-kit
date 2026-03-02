@@ -7,6 +7,7 @@ export interface LayerState {
   name: string;
   visible: boolean;
   frozen: boolean;
+  locked: boolean;
   color: string;
   entityCount: number;
 }
@@ -32,6 +33,7 @@ export function useLayers() {
         name,
         visible: layer.visible && !layer.frozen,
         frozen: layer.frozen,
+        locked: layer.locked ?? false,
         color,
         entityCount: entityLayerCounts[name] || 0,
       });

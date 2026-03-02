@@ -1,6 +1,6 @@
 {
   "name": "dxf-vuer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Vue 3 DXF file viewer and parser — render AutoCAD DXF drawings in the browser with Three.js. Built-in parser, zero dependencies, TypeScript support.",
   "type": "module",
   "license": "MIT",
@@ -8,7 +8,7 @@
   "homepage": "https://dxf-vuer.netlify.app",
   "repository": {
     "type": "git",
-    "url": "https://github.com/arbaev/dxf-vuer.git"
+    "url": "git+https://github.com/arbaev/dxf-vuer.git"
   },
   "keywords": [
     "vue",

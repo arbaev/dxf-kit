@@ -16,6 +16,7 @@ import {
   isLeaderEntity,
   isMLeaderEntity,
   isAttdefEntity,
+  isAttribEntity,
   type DxfEntity,
 } from "../dxf";
 
@@ -167,6 +168,16 @@ describe("isAttdefEntity", () => {
   });
 });
 
+describe("isAttribEntity", () => {
+  it("returns true for ATTRIB", () => {
+    expect(isAttribEntity(entity("ATTRIB"))).toBe(true);
+  });
+
+  it("returns false for ATTDEF", () => {
+    expect(isAttribEntity(entity("ATTDEF"))).toBe(false);
+  });
+});
+
 // ── Multi-type guards ──────────────────────────────────────────────────
 
 describe("isPolylineEntity", () => {
@@ -218,6 +229,7 @@ describe("cross-guard exclusivity", () => {
     { name: "isLeaderEntity", fn: isLeaderEntity, matches: ["LEADER"] },
     { name: "isMLeaderEntity", fn: isMLeaderEntity, matches: ["MULTILEADER"] },
     { name: "isAttdefEntity", fn: isAttdefEntity, matches: ["ATTDEF"] },
+    { name: "isAttribEntity", fn: isAttribEntity, matches: ["ATTRIB"] },
   ] as const;
 
   // Collect all unique entity type strings

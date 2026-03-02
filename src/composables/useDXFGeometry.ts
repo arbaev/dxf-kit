@@ -30,7 +30,10 @@ import {
   MIN_CATMULL_ROM_SEGMENTS,
   ARROW_SIZE,
 } from "@/constants";
+import { HATCH_PATTERNS } from "@/constants/hatchPatterns";
 import { resolveEntityColor } from "@/utils/colorResolver";
+import { resolveEntityLinetype, computeAutoLtScale } from "@/utils/linetypeResolver";
+import { buildOcsMatrix, transformOcsPoints, transformOcsPoint } from "@/utils/ocsTransform";
 
 import {
   type EntityColorContext,
@@ -40,6 +43,7 @@ import {
   getPointsMaterial,
   createBulgeArc,
   createArrow,
+  createLine,
   setLayerName,
 } from "./geometry/primitives";
 import {
@@ -137,6 +141,9 @@ const createBlockGroup = (
     materialCache: colorCtx.materialCache,
     meshMaterialCache: colorCtx.meshMaterialCache,
     pointsMaterialCache: colorCtx.pointsMaterialCache,
+    lineTypes: colorCtx.lineTypes,
+    globalLtScale: colorCtx.globalLtScale,
+    blockLineType: insertEntity.lineType || colorCtx.blockLineType,
   };
 
   const blockGroup = new THREE.Group();
@@ -178,6 +185,13 @@ const processEntity = (
   depth = 0,
 ): THREE.Object3D | THREE.Object3D[] | null => {
   const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
+  const ltInfo = resolveEntityLinetype(
+    entity,
+    colorCtx.layers,
+    colorCtx.lineTypes,
+    colorCtx.globalLtScale,
+    colorCtx.blockLineType,
+  );
   const lineMaterial = getLineMaterial(entityColor, colorCtx.materialCache);
 
   switch (entity.type) {
@@ -189,14 +203,14 @@ const processEntity = (
           new THREE.Vector3(vertex0.x, vertex0.y, 0),
           new THREE.Vector3(vertex1.x, vertex1.y, 0),
         ];
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        return new THREE.Line(geometry, lineMaterial);
+        return createLine(points, lineMaterial, ltInfo?.pattern);
       }
       break;
     }
 
     case "CIRCLE": {
       if (isCircleEntity(entity)) {
+        const matrix = buildOcsMatrix(entity.extrusionDirection);
         const points: THREE.Vector3[] = [];
         for (let i = 0; i <= CIRCLE_SEGMENTS; i++) {
           const angle = (i / CIRCLE_SEGMENTS) * Math.PI * 2;
@@ -204,18 +218,18 @@ const processEntity = (
             new THREE.Vector3(
               entity.center.x + entity.radius * Math.cos(angle),
               entity.center.y + entity.radius * Math.sin(angle),
-              0,
+              entity.center.z || 0,
             ),
           );
         }
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        return new THREE.Line(geometry, lineMaterial);
+        return createLine(transformOcsPoints(points, matrix), lineMaterial, ltInfo?.pattern);
       }
       break;
     }
 
     case "ARC": {
       if (isArcEntity(entity)) {
+        const matrix = buildOcsMatrix(entity.extrusionDirection);
         const startAngle = entity.startAngle;
         let endAngle = entity.endAngle;
         // Normalize: if endAngle <= startAngle, add a full revolution
@@ -235,18 +249,18 @@ const processEntity = (
             new THREE.Vector3(
               entity.center.x + entity.radius * Math.cos(angle),
               entity.center.y + entity.radius * Math.sin(angle),
-              0,
+              entity.center.z || 0,
             ),
           );
         }
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        return new THREE.Line(geometry, lineMaterial);
+        return createLine(transformOcsPoints(points, matrix), lineMaterial, ltInfo?.pattern);
       }
       break;
     }
 
     case "ELLIPSE": {
       if (isEllipseEntity(entity)) {
+        const matrix = buildOcsMatrix(entity.extrusionDirection);
         const majorX = entity.majorAxisEndPoint.x;
         const majorY = entity.majorAxisEndPoint.y;
 
@@ -285,11 +299,10 @@ const processEntity = (
             entity.center.x + localX * Math.cos(rotation) - localY * Math.sin(rotation);
           const worldY =
             entity.center.y + localX * Math.sin(rotation) + localY * Math.cos(rotation);
-          points.push(new THREE.Vector3(worldX, worldY, 0));
+          points.push(new THREE.Vector3(worldX, worldY, entity.center.z || 0));
         }
 
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        return new THREE.Line(geometry, lineMaterial);
+        return createLine(transformOcsPoints(points, matrix), lineMaterial, ltInfo?.pattern);
       }
       break;
     }
@@ -297,6 +310,7 @@ const processEntity = (
     case "LWPOLYLINE":
     case "POLYLINE": {
       if (isPolylineEntity(entity) && entity.vertices.length > 1) {
+        const matrix = buildOcsMatrix(entity.extrusionDirection);
         const allPoints: THREE.Vector3[] = [];
 
         for (let i = 0; i < entity.vertices.length - 1; i++) {
@@ -335,8 +349,7 @@ const processEntity = (
           }
         }
 
-        const geometry = new THREE.BufferGeometry().setFromPoints(allPoints);
-        return new THREE.Line(geometry, lineMaterial);
+        return createLine(transformOcsPoints(allPoints, matrix), lineMaterial, ltInfo?.pattern);
       }
       break;
     }
@@ -371,10 +384,9 @@ const processEntity = (
               controlPoints.length * NURBS_SEGMENTS_MULTIPLIER,
               MIN_NURBS_SEGMENTS,
             );
-            const interpolatedPoints = curve.getPoints(segments);
+            const interpolatedPoints = curve.getPoints(segments) as THREE.Vector3[];
 
-            const geometry = new THREE.BufferGeometry().setFromPoints(interpolatedPoints);
-            return new THREE.Line(geometry, lineMaterial);
+            return createLine(interpolatedPoints, lineMaterial, ltInfo?.pattern);
           } catch (error) {
             console.warn("NURBS creation error, using fallback:", error);
           }
@@ -394,8 +406,7 @@ const processEntity = (
           );
           const interpolatedPoints = curve.getPoints(segments);
 
-          const geometry = new THREE.BufferGeometry().setFromPoints(interpolatedPoints);
-          return new THREE.Line(geometry, lineMaterial);
+          return createLine(interpolatedPoints, lineMaterial, ltInfo?.pattern);
         }
       }
       break;
@@ -403,6 +414,7 @@ const processEntity = (
 
     case "TEXT": {
       if (isTextEntity(entity)) {
+        const matrix = buildOcsMatrix(entity.extrusionDirection);
         const textPosition = entity.position || entity.startPoint;
         const textContent = entity.text;
         if (!textContent) return new THREE.Group();
@@ -421,7 +433,11 @@ const processEntity = (
             "Arial",
             vAlign,
           );
-          textMesh.position.set(textPosition.x, textPosition.y, 0);
+          const pos = transformOcsPoint(
+            new THREE.Vector3(textPosition.x, textPosition.y, 0),
+            matrix,
+          );
+          textMesh.position.set(pos.x, pos.y, pos.z);
 
           if (entity.rotation) {
             textMesh.rotation.z = degreesToRadians(entity.rotation);
@@ -435,6 +451,7 @@ const processEntity = (
 
     case "MTEXT": {
       if (isTextEntity(entity)) {
+        const matrix = buildOcsMatrix(entity.extrusionDirection);
         const textPosition = entity.position || entity.startPoint;
         const textContent = entity.text;
         if (!textContent) return new THREE.Group();
@@ -472,7 +489,11 @@ const processEntity = (
                   line.fontFamily,
                   vAlign,
                 );
-            textMesh.position.set(textPosition.x, textPosition.y, 0);
+            const pos = transformOcsPoint(
+              new THREE.Vector3(textPosition.x, textPosition.y, 0),
+              matrix,
+            );
+            textMesh.position.set(pos.x, pos.y, pos.z);
 
             if (entity.rotation) {
               textMesh.rotation.z = degreesToRadians(entity.rotation);
@@ -532,7 +553,11 @@ const processEntity = (
             groupYOffset = totalHeight;
           }
 
-          textGroup.position.set(textPosition.x, textPosition.y + groupYOffset, 0);
+          const groupPos = transformOcsPoint(
+            new THREE.Vector3(textPosition.x, textPosition.y + groupYOffset, 0),
+            matrix,
+          );
+          textGroup.position.set(groupPos.x, groupPos.y, groupPos.z);
 
           if (entity.rotation) {
             textGroup.rotation.z = degreesToRadians(entity.rotation);
@@ -557,7 +582,7 @@ const processEntity = (
 
         // Angular dimension (type 2)
         if (baseDimType === 2) {
-          return createAngularDimension(entity, entityColor);
+          return createAngularDimension(entity, entityColor, colorCtx.globalLtScale);
         }
 
         // Diametric dimension (type 3)
@@ -592,6 +617,7 @@ const processEntity = (
           dimData.isRadial,
           entityColor,
           dimAngle,
+          colorCtx.globalLtScale,
         );
 
         const objects: THREE.Object3D[] = [dimGroup];
@@ -618,7 +644,15 @@ const processEntity = (
 
     case "SOLID": {
       if (isSolidEntity(entity)) {
+        const matrix = buildOcsMatrix(entity.extrusionDirection);
         const meshMat = getMeshMaterial(entityColor, colorCtx.meshMaterialCache);
+        if (matrix) {
+          const transformed = entity.points.map((p) => {
+            const v = new THREE.Vector3(p.x, p.y, p.z || 0).applyMatrix4(matrix);
+            return { x: v.x, y: v.y, z: v.z } as DxfVertex;
+          });
+          return createFaceMesh(transformed as [DxfVertex, DxfVertex, DxfVertex, DxfVertex], meshMat);
+        }
         return createFaceMesh(entity.points, meshMat);
       }
       break;
@@ -634,11 +668,13 @@ const processEntity = (
 
     case "POINT": {
       if (isPointEntity(entity)) {
-        const pos = entity.position;
+        const matrix = buildOcsMatrix(entity.extrusionDirection);
+        const pos = transformOcsPoint(
+          new THREE.Vector3(entity.position.x, entity.position.y, entity.position.z || 0),
+          matrix,
+        );
 
-        const geometry = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(pos.x, pos.y, 0),
-        ]);
+        const geometry = new THREE.BufferGeometry().setFromPoints([pos]);
         const pointMat = getPointsMaterial(entityColor, colorCtx.pointsMaterialCache);
         return new THREE.Points(geometry, pointMat);
       }
@@ -646,12 +682,70 @@ const processEntity = (
     }
 
     case "INSERT": {
-      const blockGroup = createBlockGroup(entity, dxf, colorCtx, depth);
-      return blockGroup;
+      if (isInsertEntity(entity)) {
+        const insertMatrix = buildOcsMatrix(entity.extrusionDirection);
+        const blockGroup = createBlockGroup(entity, dxf, colorCtx, depth);
+        if (insertMatrix && blockGroup) {
+          blockGroup.applyMatrix4(insertMatrix);
+        }
+        // Render ATTRIB entities outside block transform (world coordinates)
+        if (entity.attribs && entity.attribs.length > 0) {
+          const objects: THREE.Object3D[] = [];
+          if (blockGroup) objects.push(blockGroup);
+
+          for (const attrib of entity.attribs) {
+            if (attrib.invisible) continue;
+            const text = attrib.text;
+            if (!text) continue;
+
+            const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor);
+            const textHeight = attrib.textHeight || TEXT_HEIGHT;
+            const hAlign = getTextHAlign(attrib.horizontalJustification);
+            const vAlign = getTextVAlign(attrib.verticalJustification);
+
+            // Use endPoint for justified text, startPoint otherwise
+            const hasJustification =
+              (attrib.horizontalJustification && attrib.horizontalJustification > 0) ||
+              (attrib.verticalJustification && attrib.verticalJustification > 0);
+            const posCoord = hasJustification && attrib.endPoint
+              ? attrib.endPoint
+              : attrib.startPoint;
+            if (!posCoord) continue;
+
+            const attribMatrix = buildOcsMatrix(attrib.extrusionDirection);
+            const textMesh = createTextMesh(
+              replaceSpecialChars(text),
+              textHeight,
+              attribColor,
+              false,
+              false,
+              hAlign,
+              "Arial",
+              vAlign,
+            );
+            const pos = transformOcsPoint(
+              new THREE.Vector3(posCoord.x, posCoord.y, 0),
+              attribMatrix,
+            );
+            textMesh.position.set(pos.x, pos.y, pos.z);
+
+            if (attrib.rotation) {
+              textMesh.rotation.z = degreesToRadians(attrib.rotation);
+            }
+
+            objects.push(textMesh);
+          }
+
+          return objects.length > 0 ? objects : null;
+        }
+        return blockGroup;
+      }
+      break;
     }
 
     case "HATCH": {
       if (isHatchEntity(entity) && entity.boundaryPaths.length > 0) {
+        const hatchMatrix = buildOcsMatrix(entity.extrusionDirection);
         if (entity.solid) {
           const shapes: THREE.Shape[] = [];
 
@@ -666,26 +760,55 @@ const processEntity = (
 
           const geometry = new THREE.ShapeGeometry(shapes);
           const meshMat = getMeshMaterial(entityColor, colorCtx.meshMaterialCache);
-          return new THREE.Mesh(geometry, meshMat);
+          const mesh = new THREE.Mesh(geometry, meshMat);
+          if (hatchMatrix) mesh.applyMatrix4(hatchMatrix);
+          return mesh;
         } else {
           const objects: THREE.Object3D[] = [];
 
-          for (const bp of entity.boundaryPaths) {
-            const pts = boundaryPathToLinePoints(bp);
-            if (pts.length > 1) {
-              const geometry = new THREE.BufferGeometry().setFromPoints(pts);
-              objects.push(new THREE.Line(geometry, lineMaterial));
-            }
-          }
+          // Build clipping polygons from all boundary paths
+          const polygons: Point2D[][] = entity.boundaryPaths
+            .map((bp) => boundaryPathToLinePoints(bp).map((v) => ({ x: v.x, y: v.y })))
+            .filter((p) => p.length > 2);
 
-          if (entity.patternLines && entity.patternLines.length > 0) {
-            const boundaryPts = boundaryPathToLinePoints(entity.boundaryPaths[0]);
-            if (boundaryPts.length > 2) {
-              const polygon: Point2D[] = boundaryPts.map((v) => ({ x: v.x, y: v.y }));
-              const segments = generateHatchPattern(entity.patternLines, polygon);
-              for (const seg of segments) {
-                const geometry = new THREE.BufferGeometry().setFromPoints(seg);
-                objects.push(new THREE.Line(geometry, lineMaterial));
+          // Embedded pattern lines are pre-scaled by AutoCAD — don't apply patternScale again.
+          // Fallback dictionary patterns need patternScale applied.
+          const hasEmbedded = entity.patternLines && entity.patternLines.length > 0;
+          const patternLines = hasEmbedded
+            ? entity.patternLines
+            : HATCH_PATTERNS[entity.patternName.toUpperCase()];
+          const effectiveScale = hasEmbedded ? 1 : entity.patternScale;
+          const effectiveAngle = hasEmbedded ? 0 : entity.patternAngle;
+
+          if (patternLines && polygons.length > 0) {
+            const { segments, dots } = generateHatchPattern(
+              patternLines,
+              polygons,
+              effectiveScale,
+              effectiveAngle,
+            );
+            for (const seg of segments) {
+              objects.push(createLine(transformOcsPoints(seg, hatchMatrix), lineMaterial));
+            }
+            if (dots.length > 0) {
+              const dotPositions = new Float32Array(dots.length * 3);
+              for (let i = 0; i < dots.length; i++) {
+                const d = hatchMatrix ? dots[i].clone().applyMatrix4(hatchMatrix) : dots[i];
+                dotPositions[i * 3] = d.x;
+                dotPositions[i * 3 + 1] = d.y;
+                dotPositions[i * 3 + 2] = d.z;
+              }
+              const dotGeometry = new THREE.BufferGeometry();
+              dotGeometry.setAttribute("position", new THREE.BufferAttribute(dotPositions, 3));
+              const pointMat = getPointsMaterial(entityColor, colorCtx.pointsMaterialCache);
+              objects.push(new THREE.Points(dotGeometry, pointMat));
+            }
+          } else {
+            // No pattern lines — draw boundary outlines only
+            for (const bp of entity.boundaryPaths) {
+              const pts = boundaryPathToLinePoints(bp);
+              if (pts.length > 1) {
+                objects.push(createLine(transformOcsPoints(pts, hatchMatrix), lineMaterial, ltInfo?.pattern));
               }
             }
           }
@@ -701,8 +824,7 @@ const processEntity = (
         const points = entity.vertices.map(
           (v) => new THREE.Vector3(v.x, v.y, v.z || 0),
         );
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const leaderLine = new THREE.Line(geometry, lineMaterial);
+        const leaderLine = createLine(points, lineMaterial, ltInfo?.pattern);
 
         if (entity.arrowHeadFlag === 1 && points.length >= 2) {
           const group = new THREE.Group();
@@ -740,8 +862,7 @@ const processEntity = (
               ));
             }
 
-            const geo = new THREE.BufferGeometry().setFromPoints(points);
-            group.add(new THREE.Line(geo, lineMaterial));
+            group.add(createLine(points, lineMaterial, ltInfo?.pattern));
 
             if (entity.hasArrowHead !== false && points.length >= 2) {
               const arrow = createArrow(points[1], points[0], arrowSize, arrowMat);
@@ -809,11 +930,19 @@ export function createThreeObjectsFromDXF(dxf: DxfData): {
     Object.assign(layers, dxf.tables.layer.layers);
   }
 
+  const lineTypes = dxf.tables?.lineType?.lineTypes ?? {};
+  const headerLtScale = (dxf.header?.["$LTSCALE"] as number) ?? 1;
+  const globalLtScale = headerLtScale === 1
+    ? computeAutoLtScale(dxf.header)
+    : headerLtScale;
+
   const colorCtx: EntityColorContext = {
     layers,
     materialCache: new Map(),
     meshMaterialCache: new Map(),
     pointsMaterialCache: new Map(),
+    lineTypes,
+    globalLtScale,
   };
 
   const errors: string[] = [];
@@ -821,6 +950,9 @@ export function createThreeObjectsFromDXF(dxf: DxfData): {
 
   dxf.entities.forEach((entity: DxfEntity, index: number) => {
     try {
+      // Skip paper space entities — they belong to layouts, not model space
+      if (entity.inPaperSpace) return;
+
       const obj = processEntity(entity, dxf, colorCtx, 0);
       if (obj) {
         setLayerName(obj, entity.layer || "0");

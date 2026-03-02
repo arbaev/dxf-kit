@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { useLayers } from "@/composables/dxf/useLayers";
+import { useLayers } from "@/composables/useLayers";
 import type { DxfLayer } from "@/types/dxf";
 
 // Helper to create a minimal DxfLayer object with sensible defaults.
@@ -124,6 +124,47 @@ describe("initLayers", () => {
 
     expect(layers.value.get("Present")!.entityCount).toBe(15);
     expect(layers.value.get("Missing")!.entityCount).toBe(0);
+  });
+});
+
+// ── locked layers ──────────────────────────────────────────────────────────
+
+describe("locked layers", () => {
+  it("propagates locked state from DxfLayer to LayerState", () => {
+    const { initLayers, layers } = useLayers();
+
+    initLayers(
+      {
+        Locked: makeLayer({ name: "Locked", locked: true }),
+        Normal: makeLayer({ name: "Normal", locked: false }),
+        Unset: makeLayer({ name: "Unset" }),
+      },
+      {},
+    );
+
+    expect(layers.value.get("Locked")!.locked).toBe(true);
+    expect(layers.value.get("Normal")!.locked).toBe(false);
+    // undefined locked defaults to false
+    expect(layers.value.get("Unset")!.locked).toBe(false);
+  });
+
+  it("allows toggling a locked layer (locked does not block visibility in viewer)", () => {
+    const { initLayers, toggleLayerVisibility, layers } = useLayers();
+
+    initLayers(
+      { Locked: makeLayer({ name: "Locked", visible: true, frozen: false, locked: true }) },
+      {},
+    );
+
+    expect(layers.value.get("Locked")!.visible).toBe(true);
+
+    toggleLayerVisibility("Locked");
+
+    expect(layers.value.get("Locked")!.visible).toBe(false);
+
+    toggleLayerVisibility("Locked");
+
+    expect(layers.value.get("Locked")!.visible).toBe(true);
   });
 });
 

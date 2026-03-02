@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-02
+
+### Added
+
+- **Linetype rendering** — all DXF line patterns (DASHED, HIDDEN, CENTER, PHANTOM, DOT, DASHDOT etc.) via geometric splitting; resolution chain: entity → ByBlock → ByLayer → LTYPE table; scaling entityScale × $LTSCALE; auto-LTSCALE for large drawings
+- **Hatch pattern rendering** — 25 built-in AutoCAD patterns (ANSI31–38, BRICK, DOTS, NET, HEX, GOST_* etc.); pattern scale/angle, dot elements, multi-boundary even-odd clipping (donut shapes), fallback dictionary
+- **OCS (Object Coordinate System)** — Arbitrary Axis Algorithm for 10 entity types; correct rendering of mirrored/rotated entities
+- **ATTRIB rendering** in INSERT blocks — attribute text with alignment, rotation, individual color
+- **Frozen and locked layer support** — snowflake/lock icons in layer panel
+- **Paper space filtering** — entities with `inPaperSpace` (DXF code 67=1) skipped during rendering
+- **World coordinates display** — new `showCoordinates` prop shows cursor position in drawing units
+- **Fullscreen button** in the viewer toolbar
+- **Test suite** expanded from 379 to 465 cases across 21 files
+
+### Fixed
+
+- Dashed line patterns invisible on large blueprints (auto-LTSCALE from drawing extents)
+- Dimension extension line dashes not scaling with drawing size
+- Hatch pattern lines not reaching boundary when base point is far from polygon
+
+### Changed
+
+- Composables directory restructured from `composables/dxf/` to `composables/`
+- Main bundle size increased from ~75 KB to ~89 KB
+
 ## [1.0.1] - 2026-02-26
 
 ### Added
@@ -55,5 +80,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dual package exports**: `dxf-vuer` (full library) and `dxf-vuer/parser` (parser only), plus `dxf-vuer/style.css`
 - **Demo application** deployed at [dxf-vuer.netlify.app](https://dxf-vuer.netlify.app)
 
+[1.1.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.1.0
 [1.0.1]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.0.1
 [1.0.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.0.0

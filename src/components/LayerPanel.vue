@@ -21,8 +21,30 @@
           :class="{ hidden: !layer.visible, frozen: layer.frozen }"
           @click="!layer.frozen && $emit('toggle-layer', layer.name)"
         >
+          <!-- Frozen: snowflake icon -->
           <svg
-            v-if="layer.visible"
+            v-if="layer.frozen"
+            class="state-icon frozen-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="12" y1="2" x2="12" y2="22" />
+            <line x1="2" y1="12" x2="22" y2="12" />
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+            <line x1="19.07" y1="4.93" x2="4.93" y2="19.07" />
+            <!-- Crossbars -->
+            <line x1="12" y1="2" x2="9" y2="5" />
+            <line x1="12" y1="2" x2="15" y2="5" />
+            <line x1="12" y1="22" x2="9" y2="19" />
+            <line x1="12" y1="22" x2="15" y2="19" />
+          </svg>
+          <!-- Visible: eye open -->
+          <svg
+            v-else-if="layer.visible"
             class="eye-icon"
             width="16"
             height="16"
@@ -34,6 +56,7 @@
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
             <circle cx="12" cy="12" r="3" />
           </svg>
+          <!-- Hidden: eye off -->
           <svg
             v-else
             class="eye-icon off"
@@ -48,6 +71,21 @@
             <line x1="1" y1="1" x2="23" y2="23" />
           </svg>
 
+          <!-- Locked indicator (shown when not frozen) -->
+          <svg
+            v-if="layer.locked && !layer.frozen"
+            class="state-icon lock-icon"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+
           <span class="color-swatch" :style="{ backgroundColor: layer.color }"></span>
           <span class="layer-name" :title="layer.name">{{ layer.name }}</span>
           <span class="layer-count">{{ layer.entityCount }}</span>
@@ -59,7 +97,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import type { LayerState } from "@/composables/dxf/useLayers";
+import type { LayerState } from "@/composables/useLayers";
 
 interface Props {
   layers: LayerState[];
@@ -194,6 +232,18 @@ const isExpanded = ref(true);
 }
 
 .eye-icon.off {
+  color: var(--dxf-vuer-text-secondary, #757575);
+}
+
+.state-icon {
+  flex-shrink: 0;
+}
+
+.frozen-icon {
+  color: #5ba3d9;
+}
+
+.lock-icon {
   color: var(--dxf-vuer-text-secondary, #757575);
 }
 

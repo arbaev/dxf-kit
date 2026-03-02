@@ -1,5 +1,10 @@
 <template>
-  <div ref="dxfContainer" class="dxf-viewer">
+  <div
+    ref="dxfContainer"
+    class="dxf-viewer"
+    @mousemove="handleMouseMove"
+    @mouseleave="handleMouseLeave"
+  >
     <div v-if="!webGLSupported" class="message-overlay">
       <div class="message-content error">
         <svg
@@ -25,25 +30,69 @@
       {{ fileName }}
     </div>
 
-    <button
-      v-if="showResetButton && hasDXFData"
-      class="reset-button-overlay"
-      @click="handleResetView"
-      title="Reset View"
-    >
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
+    <div v-if="hasDXFData" class="toolbar-overlay">
+      <button
+        v-if="showResetButton"
+        class="toolbar-button"
+        @click="handleResetView"
+        title="Fit to View"
       >
-        <polyline points="23 4 23 10 17 10" />
-        <polyline points="1 20 1 14 7 14" />
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-      </svg>
-    </button>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="12" r="7" />
+          <line x1="12" y1="2" x2="12" y2="5" />
+          <line x1="12" y1="19" x2="12" y2="22" />
+          <line x1="2" y1="12" x2="5" y2="12" />
+          <line x1="19" y1="12" x2="22" y2="12" />
+        </svg>
+      </button>
+      <button
+        class="toolbar-button"
+        @click="toggleFullscreen"
+        :title="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'"
+      >
+        <svg
+          v-if="!isFullscreen"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M4 8V4h4" />
+          <path d="M16 4h4v4" />
+          <path d="M20 16v4h-4" />
+          <path d="M4 16v4h4" />
+        </svg>
+        <svg
+          v-else
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M8 4v4H4" />
+          <path d="M16 4v4h4" />
+          <path d="M4 16h4v4" />
+          <path d="M20 16h-4v4" />
+        </svg>
+      </button>
+    </div>
 
     <LayerPanel
       v-if="hasDXFData && layerList.length > 0"
@@ -52,6 +101,10 @@
       @show-all="handleShowAllLayers"
       @hide-all="handleHideAllLayers"
     />
+
+    <div v-if="showCoordinates && isCursorVisible && hasDXFData" class="coordinates-overlay">
+      X: {{ cursorX.toFixed(2) }} &nbsp; Y: {{ cursorY.toFixed(2) }}
+    </div>
 
     <div v-if="isLoading" class="message-overlay loading-overlay">
       <div class="message-content">
@@ -81,8 +134,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
-import { useDXFRenderer } from "@/composables/dxf/useDXFRenderer";
-import { useLayers } from "@/composables/dxf/useLayers";
+import * as THREE from "three";
+import { useDXFRenderer } from "@/composables/useDXFRenderer";
+import { useLayers } from "@/composables/useLayers";
 import type { DxfData, DxfLayer } from "@/types/dxf";
 import LayerPanel from "./LayerPanel.vue";
 
@@ -91,6 +145,7 @@ interface Props {
   fileName?: string;
   showResetButton?: boolean;
   autoFit?: boolean;
+  showCoordinates?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -98,6 +153,7 @@ const props = withDefaults(defineProps<Props>(), {
   fileName: "",
   showResetButton: false,
   autoFit: true,
+  showCoordinates: false,
 });
 
 interface Emits {
@@ -111,6 +167,7 @@ interface Emits {
 const emit = defineEmits<Emits>();
 
 const dxfContainer = ref<HTMLDivElement | null>(null);
+const isFullscreen = ref(false);
 
 const {
   isLoading,
@@ -123,7 +180,46 @@ const {
   resetView,
   applyLayerVisibility,
   cleanup,
+  getCamera,
 } = useDXFRenderer();
+
+// Cursor world coordinates
+const cursorX = ref(0);
+const cursorY = ref(0);
+const isCursorVisible = ref(false);
+
+const handleMouseMove = (e: MouseEvent) => {
+  if (!props.showCoordinates) return;
+  const container = dxfContainer.value;
+  const camera = getCamera();
+  if (!container || !camera) return;
+
+  const rect = container.getBoundingClientRect();
+  const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  const worldPos = new THREE.Vector3(ndcX, ndcY, 0).unproject(camera);
+
+  cursorX.value = worldPos.x;
+  cursorY.value = worldPos.y;
+  isCursorVisible.value = true;
+};
+
+const handleMouseLeave = () => {
+  isCursorVisible.value = false;
+};
+
+const toggleFullscreen = async () => {
+  if (!dxfContainer.value) return;
+  if (!document.fullscreenElement) {
+    await dxfContainer.value.requestFullscreen();
+  } else {
+    await document.exitFullscreen();
+  }
+};
+
+const onFullscreenChange = () => {
+  isFullscreen.value = !!document.fullscreenElement;
+};
 
 const {
   layerList,
@@ -183,6 +279,7 @@ const loadDXFFromText = (dxfText: string) => {
         lastLoadedDxf = dxf;
         const unsupportedEntities = displayDXF(dxf);
         initLayersFromDXF(dxf);
+        applyLayerVisibility(visibleLayerNames.value);
         emit("dxf-loaded", true);
         emit("dxf-data", dxf);
 
@@ -206,6 +303,7 @@ const loadDXFFromData = (dxfData: DxfData) => {
   try {
     const unsupportedEntities = displayDXF(dxfData);
     initLayersFromDXF(dxfData);
+    applyLayerVisibility(visibleLayerNames.value);
     emit("dxf-loaded", true);
     emit("dxf-data", dxfData);
 
@@ -247,6 +345,7 @@ watch(rendererError, (newError) => {
 let resizeObserver: ResizeObserver | null = null;
 
 onMounted(() => {
+  document.addEventListener("fullscreenchange", onFullscreenChange);
   nextTick(() => {
     if (dxfContainer.value) {
       initThreeJS(dxfContainer.value, { enableControls: true });
@@ -264,6 +363,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  document.removeEventListener("fullscreenchange", onFullscreenChange);
   if (resizeObserver) {
     resizeObserver.disconnect();
     resizeObserver = null;
@@ -308,11 +408,16 @@ defineExpose({
   white-space: nowrap;
 }
 
-.reset-button-overlay {
+.toolbar-overlay {
   position: absolute;
   top: var(--dxf-vuer-spacing-sm, 8px);
   right: var(--dxf-vuer-spacing-sm, 8px);
   z-index: 10;
+  display: flex;
+  gap: 4px;
+}
+
+.toolbar-button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -320,8 +425,6 @@ defineExpose({
   color: var(--dxf-vuer-text-color, #212121);
   border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
   border-radius: var(--dxf-vuer-border-radius, 4px);
-  font-weight: 500;
-  font-size: 14px;
   transition: all 0.2s;
   user-select: none;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -329,16 +432,31 @@ defineExpose({
   cursor: pointer;
 }
 
-.reset-button-overlay:hover {
+.toolbar-button:hover {
   border-color: rgb(from var(--dxf-vuer-primary-color, #1040b0) r g b / 0.5);
 }
 
-.reset-button-overlay:active {
+.toolbar-button:active {
   transform: scale(0.94);
 }
 
 .dxf-viewer :deep(canvas) {
   display: block;
+}
+
+.coordinates-overlay {
+  position: absolute;
+  bottom: var(--dxf-vuer-spacing-sm, 8px);
+  right: var(--dxf-vuer-spacing-sm, 8px);
+  z-index: 10;
+  padding: 4px var(--dxf-vuer-spacing-sm, 8px);
+  background-color: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  border-radius: var(--dxf-vuer-border-radius, 4px);
+  font-size: 12px;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .message-overlay {
@@ -410,11 +528,11 @@ defineExpose({
     max-width: calc(100% - 80px);
   }
 
-  .reset-button-overlay {
+  .toolbar-button {
     padding: 6px;
   }
 
-  .reset-button-overlay svg {
+  .toolbar-button svg {
     width: 18px;
     height: 18px;
   }

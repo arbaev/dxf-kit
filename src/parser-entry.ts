@@ -29,6 +29,7 @@ export type {
   MLeaderBranch,
   DxfMLeaderEntity,
   DxfAttdefEntity,
+  DxfAttribEntity,
   DxfUnknownEntity,
   DxfEntity,
   DxfLayer,
@@ -55,4 +56,5 @@ export {
   isLeaderEntity,
   isMLeaderEntity,
   isAttdefEntity,
+  isAttribEntity,
 } from "./types/dxf";

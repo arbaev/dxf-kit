@@ -13,7 +13,9 @@ export interface DxfEntityBase {
   color?: number; // RGB truecolor (DXF code 420)
   lineweight?: number; // -3=Standard, -2=ByLayer, -1=ByBlock, or value in 0.01mm
   lineType?: string;
+  lineTypeScale?: number;
   visible?: boolean;
+  inPaperSpace?: boolean; // code 67: true = paper space entity (not rendered)
 }
 
 export interface DxfLineEntity extends DxfEntityBase {
@@ -25,6 +27,7 @@ export interface DxfCircleEntity extends DxfEntityBase {
   type: "CIRCLE";
   center: DxfVertex;
   radius: number;
+  extrusionDirection?: DxfVertex;
 }
 
 export interface DxfArcEntity extends DxfEntityBase {
@@ -33,12 +36,14 @@ export interface DxfArcEntity extends DxfEntityBase {
   radius: number;
   startAngle: number;
   endAngle: number;
+  extrusionDirection?: DxfVertex;
 }
 
 export interface DxfPolylineEntity extends DxfEntityBase {
   type: "POLYLINE" | "LWPOLYLINE";
   vertices: DxfVertex[];
   shape?: boolean;
+  extrusionDirection?: DxfVertex;
 }
 
 export interface DxfSplineEntity extends DxfEntityBase {
@@ -69,6 +74,7 @@ export interface DxfTextEntity extends DxfEntityBase {
   halign?: number;
   valign?: number;
   attachmentPoint?: number; // MTEXT: 1-9 (TopLeft..BottomRight)
+  extrusionDirection?: DxfVertex;
 }
 
 export interface DxfDimensionEntity extends DxfEntityBase {
@@ -90,6 +96,30 @@ export interface DxfDimensionEntity extends DxfEntityBase {
   arcPoint?: DxfVertex; // code 16
 }
 
+export interface DxfAttribEntity extends DxfEntityBase {
+  type: "ATTRIB";
+  text?: string;
+  tag?: string;
+  textStyle?: string;
+  startPoint?: DxfVertex;
+  endPoint?: DxfVertex;
+  thickness?: number;
+  textHeight?: number;
+  rotation?: number;
+  scale?: number;
+  obliqueAngle?: number;
+  invisible?: boolean;
+  constant?: boolean;
+  verificationRequired?: boolean;
+  preset?: boolean;
+  backwards?: boolean;
+  mirrored?: boolean;
+  horizontalJustification?: number;
+  fieldLength?: number;
+  verticalJustification?: number;
+  extrusionDirection?: DxfVertex;
+}
+
 export interface DxfInsertEntity extends DxfEntityBase {
   type: "INSERT";
   name: string;
@@ -102,11 +132,14 @@ export interface DxfInsertEntity extends DxfEntityBase {
   rowCount?: number;
   columnSpacing?: number;
   rowSpacing?: number;
+  attribs?: DxfAttribEntity[];
+  extrusionDirection?: DxfVertex;
 }
 
 export interface DxfSolidEntity extends DxfEntityBase {
   type: "SOLID";
   points: [DxfVertex, DxfVertex, DxfVertex, DxfVertex];
+  extrusionDirection?: DxfVertex;
 }
 
 export interface DxfEllipseEntity extends DxfEntityBase {
@@ -116,6 +149,7 @@ export interface DxfEllipseEntity extends DxfEntityBase {
   axisRatio: number; // Minor-to-major axis ratio (0 < ratio <= 1)
   startAngle: number; // In radians
   endAngle: number; // In radians
+  extrusionDirection?: DxfVertex;
 }
 
 export interface DxfPointEntity extends DxfEntityBase {
@@ -186,6 +220,9 @@ export interface DxfHatchEntity extends DxfEntityBase {
   solid: boolean; // code 70 = 1 -> solid fill
   boundaryPaths: HatchBoundaryPath[];
   patternLines?: HatchPatternLine[];
+  patternScale?: number;  // code 41 -- pattern fill scale
+  patternAngle?: number;  // code 52 -- pattern fill angle (degrees)
+  extrusionDirection?: DxfVertex;
 }
 
 export interface DxfLeaderEntity extends DxfEntityBase {
@@ -263,6 +300,7 @@ export type DxfEntity =
   | DxfLeaderEntity
   | DxfMLeaderEntity
   | DxfAttdefEntity
+  | DxfAttribEntity
   | DxfUnknownEntity;
 
 export function isLineEntity(entity: DxfEntity): entity is DxfLineEntity {
@@ -329,12 +367,25 @@ export function isAttdefEntity(entity: DxfEntity): entity is DxfAttdefEntity {
   return entity.type === "ATTDEF";
 }
 
+export function isAttribEntity(entity: DxfEntity): entity is DxfAttribEntity {
+  return entity.type === "ATTRIB";
+}
+
 export interface DxfLayer {
   name: string;
   visible: boolean;
   colorIndex: number;
   color: number; // RGB as number
   frozen: boolean;
+  locked?: boolean;
+  lineType?: string;
+}
+
+export interface DxfLineType {
+  name: string;
+  description: string;
+  pattern: number[];
+  patternLength: number;
 }
 
 export interface DxfTables {
@@ -342,6 +393,11 @@ export interface DxfTables {
     handle?: string;
     ownerHandle?: string;
     layers: Record<string, DxfLayer>;
+  };
+  lineType?: {
+    handle?: string;
+    ownerHandle?: string;
+    lineTypes: Record<string, DxfLineType>;
   };
   [key: string]: unknown;
 }
