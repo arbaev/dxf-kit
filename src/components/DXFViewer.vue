@@ -30,25 +30,69 @@
       {{ fileName }}
     </div>
 
-    <button
-      v-if="showResetButton && hasDXFData"
-      class="reset-button-overlay"
-      @click="handleResetView"
-      title="Reset View"
-    >
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
+    <div v-if="hasDXFData" class="toolbar-overlay">
+      <button
+        v-if="showResetButton"
+        class="toolbar-button"
+        @click="handleResetView"
+        title="Fit to View"
       >
-        <polyline points="23 4 23 10 17 10" />
-        <polyline points="1 20 1 14 7 14" />
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-      </svg>
-    </button>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="12" r="7" />
+          <line x1="12" y1="2" x2="12" y2="5" />
+          <line x1="12" y1="19" x2="12" y2="22" />
+          <line x1="2" y1="12" x2="5" y2="12" />
+          <line x1="19" y1="12" x2="22" y2="12" />
+        </svg>
+      </button>
+      <button
+        class="toolbar-button"
+        @click="toggleFullscreen"
+        :title="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'"
+      >
+        <svg
+          v-if="!isFullscreen"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M4 8V4h4" />
+          <path d="M16 4h4v4" />
+          <path d="M20 16v4h-4" />
+          <path d="M4 16v4h4" />
+        </svg>
+        <svg
+          v-else
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M8 4v4H4" />
+          <path d="M16 4v4h4" />
+          <path d="M4 16h4v4" />
+          <path d="M20 16h-4v4" />
+        </svg>
+      </button>
+    </div>
 
     <LayerPanel
       v-if="hasDXFData && layerList.length > 0"
@@ -123,6 +167,7 @@ interface Emits {
 const emit = defineEmits<Emits>();
 
 const dxfContainer = ref<HTMLDivElement | null>(null);
+const isFullscreen = ref(false);
 
 const {
   isLoading,
@@ -161,6 +206,19 @@ const handleMouseMove = (e: MouseEvent) => {
 
 const handleMouseLeave = () => {
   isCursorVisible.value = false;
+};
+
+const toggleFullscreen = async () => {
+  if (!dxfContainer.value) return;
+  if (!document.fullscreenElement) {
+    await dxfContainer.value.requestFullscreen();
+  } else {
+    await document.exitFullscreen();
+  }
+};
+
+const onFullscreenChange = () => {
+  isFullscreen.value = !!document.fullscreenElement;
 };
 
 const {
@@ -285,6 +343,7 @@ watch(rendererError, (newError) => {
 let resizeObserver: ResizeObserver | null = null;
 
 onMounted(() => {
+  document.addEventListener("fullscreenchange", onFullscreenChange);
   nextTick(() => {
     if (dxfContainer.value) {
       initThreeJS(dxfContainer.value, { enableControls: true });
@@ -302,6 +361,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  document.removeEventListener("fullscreenchange", onFullscreenChange);
   if (resizeObserver) {
     resizeObserver.disconnect();
     resizeObserver = null;
@@ -346,11 +406,16 @@ defineExpose({
   white-space: nowrap;
 }
 
-.reset-button-overlay {
+.toolbar-overlay {
   position: absolute;
   top: var(--dxf-vuer-spacing-sm, 8px);
   right: var(--dxf-vuer-spacing-sm, 8px);
   z-index: 10;
+  display: flex;
+  gap: 4px;
+}
+
+.toolbar-button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -358,8 +423,6 @@ defineExpose({
   color: var(--dxf-vuer-text-color, #212121);
   border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
   border-radius: var(--dxf-vuer-border-radius, 4px);
-  font-weight: 500;
-  font-size: 14px;
   transition: all 0.2s;
   user-select: none;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -367,11 +430,11 @@ defineExpose({
   cursor: pointer;
 }
 
-.reset-button-overlay:hover {
+.toolbar-button:hover {
   border-color: rgb(from var(--dxf-vuer-primary-color, #1040b0) r g b / 0.5);
 }
 
-.reset-button-overlay:active {
+.toolbar-button:active {
   transform: scale(0.94);
 }
 
@@ -463,11 +526,11 @@ defineExpose({
     max-width: calc(100% - 80px);
   }
 
-  .reset-button-overlay {
+  .toolbar-button {
     padding: 6px;
   }
 
-  .reset-button-overlay svg {
+  .toolbar-button svg {
     width: 18px;
     height: 18px;
   }
