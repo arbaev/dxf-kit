@@ -2,6 +2,7 @@ import type DxfScanner from "../scanner";
 import type { IGroup } from "../scanner";
 import * as helpers from "../parseHelpers";
 import type { IPoint, IEntityBase } from "../parseHelpers";
+import { parseAttrib, type IAttribEntity } from "./attrib";
 
 export interface IInsertEntity extends IEntityBase {
   type: "INSERT";
@@ -16,6 +17,7 @@ export interface IInsertEntity extends IEntityBase {
   columnSpacing?: number;
   rowSpacing?: number;
   extrusionDirection?: IPoint;
+  attribs?: IAttribEntity[];
 }
 
 export function parseInsert(scanner: DxfScanner, curr: IGroup): IInsertEntity {
@@ -23,14 +25,19 @@ export function parseInsert(scanner: DxfScanner, curr: IGroup): IInsertEntity {
   curr = scanner.next();
   while (!scanner.isEOF()) {
     if (curr.code === 0) {
-      // Skip ATTRIB entities until SEQEND
+      // Parse ATTRIB entities until SEQEND
       if (curr.value === "ATTRIB") {
-        while (!scanner.isEOF()) {
+        const attribs: IAttribEntity[] = [];
+        while (!scanner.isEOF() && curr.code === 0 && curr.value === "ATTRIB") {
+          attribs.push(parseAttrib(scanner, curr));
+          curr = scanner.lastReadGroup;
+        }
+        if (attribs.length > 0) {
+          entity.attribs = attribs;
+        }
+        // Skip SEQEND
+        if (curr.code === 0 && curr.value === "SEQEND") {
           curr = scanner.next();
-          if (curr.code === 0 && curr.value === "SEQEND") {
-            curr = scanner.next(); // Read the group after SEQEND
-            break;
-          }
         }
       }
       break;

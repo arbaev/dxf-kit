@@ -652,8 +652,56 @@ const processEntity = (
     }
 
     case "INSERT": {
-      const blockGroup = createBlockGroup(entity, dxf, colorCtx, depth);
-      return blockGroup;
+      if (isInsertEntity(entity)) {
+        const blockGroup = createBlockGroup(entity, dxf, colorCtx, depth);
+        // Render ATTRIB entities outside block transform (world coordinates)
+        if (entity.attribs && entity.attribs.length > 0) {
+          const objects: THREE.Object3D[] = [];
+          if (blockGroup) objects.push(blockGroup);
+
+          for (const attrib of entity.attribs) {
+            if (attrib.invisible) continue;
+            const text = attrib.text;
+            if (!text) continue;
+
+            const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor);
+            const textHeight = attrib.textHeight || TEXT_HEIGHT;
+            const hAlign = getTextHAlign(attrib.horizontalJustification);
+            const vAlign = getTextVAlign(attrib.verticalJustification);
+
+            // Use endPoint for justified text, startPoint otherwise
+            const hasJustification =
+              (attrib.horizontalJustification && attrib.horizontalJustification > 0) ||
+              (attrib.verticalJustification && attrib.verticalJustification > 0);
+            const pos = hasJustification && attrib.endPoint
+              ? attrib.endPoint
+              : attrib.startPoint;
+            if (!pos) continue;
+
+            const textMesh = createTextMesh(
+              replaceSpecialChars(text),
+              textHeight,
+              attribColor,
+              false,
+              false,
+              hAlign,
+              "Arial",
+              vAlign,
+            );
+            textMesh.position.set(pos.x, pos.y, 0);
+
+            if (attrib.rotation) {
+              textMesh.rotation.z = degreesToRadians(attrib.rotation);
+            }
+
+            objects.push(textMesh);
+          }
+
+          return objects.length > 0 ? objects : null;
+        }
+        return blockGroup;
+      }
+      break;
     }
 
     case "HATCH": {

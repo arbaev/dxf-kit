@@ -3,6 +3,7 @@ import { createScannerAt } from "../../__tests__/test-helpers";
 import { parseText } from "../text";
 import { parseMText } from "../mtext";
 import { parseAttdef } from "../attdef";
+import { parseAttrib } from "../attrib";
 import { parseDimension } from "../dimension";
 import { parseInsert } from "../insert";
 
@@ -310,6 +311,102 @@ describe("parseDimension", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// ATTRIB entity handler
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("parseAttrib", () => {
+  it("parses basic attrib with text, tag, and position", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "ATTRIB",
+      "10", "5.0",
+      "20", "10.0",
+      "40", "2.5",
+      "1", "Sheet A1",
+      "2", "SHEET_NUM",
+      "0", "EOF",
+    );
+
+    const entity = parseAttrib(scanner, group);
+
+    expect(entity.type).toBe("ATTRIB");
+    expect(entity.startPoint).toEqual({ x: 5.0, y: 10.0 });
+    expect(entity.textHeight).toBe(2.5);
+    expect(entity.text).toBe("Sheet A1");
+    expect(entity.tag).toBe("SHEET_NUM");
+  });
+
+  it("sets default values for scale and textStyle", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "ATTRIB",
+      "1", "Test",
+      "2", "TAG",
+      "0", "EOF",
+    );
+
+    const entity = parseAttrib(scanner, group);
+
+    expect(entity.type).toBe("ATTRIB");
+    expect(entity.scale).toBe(1);
+    expect(entity.textStyle).toBe("STANDARD");
+  });
+
+  it("parses invisible and constant flags from code 70", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "ATTRIB",
+      "1", "Hidden",
+      "2", "SECRET",
+      "70", "3",
+      "0", "EOF",
+    );
+
+    const entity = parseAttrib(scanner, group);
+
+    expect(entity.invisible).toBe(true);
+    expect(entity.constant).toBe(true);
+    expect(entity.verificationRequired).toBe(false);
+    expect(entity.preset).toBe(false);
+  });
+
+  it("parses alignment codes", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "ATTRIB",
+      "1", "Centered",
+      "2", "TAG",
+      "10", "0.0",
+      "20", "0.0",
+      "11", "50.0",
+      "21", "25.0",
+      "72", "1",
+      "74", "2",
+      "0", "EOF",
+    );
+
+    const entity = parseAttrib(scanner, group);
+
+    expect(entity.horizontalJustification).toBe(1);
+    expect(entity.verticalJustification).toBe(2);
+    expect(entity.startPoint).toEqual({ x: 0.0, y: 0.0 });
+    expect(entity.endPoint).toEqual({ x: 50.0, y: 25.0 });
+  });
+
+  it("parses rotation", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "ATTRIB",
+      "1", "Rotated",
+      "2", "TAG",
+      "10", "1.0",
+      "20", "2.0",
+      "50", "45.0",
+      "0", "EOF",
+    );
+
+    const entity = parseAttrib(scanner, group);
+
+    expect(entity.rotation).toBe(45.0);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // INSERT entity handler
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -377,7 +474,7 @@ describe("parseInsert", () => {
     expect(entity.rowSpacing).toBe(15.0);
   });
 
-  it("skips ATTRIB entities until SEQEND", () => {
+  it("parses ATTRIB entities into attribs array", () => {
     const { scanner, group } = createScannerAt(
       "0", "INSERT",
       "2", "BlockName",
@@ -386,6 +483,15 @@ describe("parseInsert", () => {
       "0", "ATTRIB",
       "1", "SomeValue",
       "2", "SomeTag",
+      "10", "5.0",
+      "20", "10.0",
+      "40", "2.5",
+      "0", "ATTRIB",
+      "1", "SecondValue",
+      "2", "SecondTag",
+      "10", "15.0",
+      "20", "20.0",
+      "40", "3.0",
       "0", "SEQEND",
       "8", "Layer1",
       "0", "EOF",
@@ -396,7 +502,31 @@ describe("parseInsert", () => {
     expect(entity.type).toBe("INSERT");
     expect(entity.name).toBe("BlockName");
     expect(entity.position).toEqual({ x: 0.0, y: 0.0 });
-    // Verify that ATTRIB content was not assigned to the INSERT entity
-    expect((entity as Record<string, unknown>).text).toBeUndefined();
+    expect(entity.attribs).toBeDefined();
+    expect(entity.attribs).toHaveLength(2);
+    expect(entity.attribs![0].text).toBe("SomeValue");
+    expect(entity.attribs![0].tag).toBe("SomeTag");
+    expect(entity.attribs![0].startPoint).toEqual({ x: 5.0, y: 10.0 });
+    expect(entity.attribs![0].textHeight).toBe(2.5);
+    expect(entity.attribs![1].text).toBe("SecondValue");
+    expect(entity.attribs![1].tag).toBe("SecondTag");
+    expect(entity.attribs![1].startPoint).toEqual({ x: 15.0, y: 20.0 });
+    expect(entity.attribs![1].textHeight).toBe(3.0);
+  });
+
+  it("parses insert without ATTRIB (attribs is undefined)", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "INSERT",
+      "2", "SimpleBlock",
+      "10", "10.0",
+      "20", "20.0",
+      "0", "EOF",
+    );
+
+    const entity = parseInsert(scanner, group);
+
+    expect(entity.type).toBe("INSERT");
+    expect(entity.name).toBe("SimpleBlock");
+    expect(entity.attribs).toBeUndefined();
   });
 });

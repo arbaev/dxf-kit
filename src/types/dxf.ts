@@ -92,6 +92,30 @@ export interface DxfDimensionEntity extends DxfEntityBase {
   arcPoint?: DxfVertex; // code 16
 }
 
+export interface DxfAttribEntity extends DxfEntityBase {
+  type: "ATTRIB";
+  text?: string;
+  tag?: string;
+  textStyle?: string;
+  startPoint?: DxfVertex;
+  endPoint?: DxfVertex;
+  thickness?: number;
+  textHeight?: number;
+  rotation?: number;
+  scale?: number;
+  obliqueAngle?: number;
+  invisible?: boolean;
+  constant?: boolean;
+  verificationRequired?: boolean;
+  preset?: boolean;
+  backwards?: boolean;
+  mirrored?: boolean;
+  horizontalJustification?: number;
+  fieldLength?: number;
+  verticalJustification?: number;
+  extrusionDirection?: DxfVertex;
+}
+
 export interface DxfInsertEntity extends DxfEntityBase {
   type: "INSERT";
   name: string;
@@ -104,6 +128,7 @@ export interface DxfInsertEntity extends DxfEntityBase {
   rowCount?: number;
   columnSpacing?: number;
   rowSpacing?: number;
+  attribs?: DxfAttribEntity[];
 }
 
 export interface DxfSolidEntity extends DxfEntityBase {
@@ -265,6 +290,7 @@ export type DxfEntity =
   | DxfLeaderEntity
   | DxfMLeaderEntity
   | DxfAttdefEntity
+  | DxfAttribEntity
   | DxfUnknownEntity;
 
 export function isLineEntity(entity: DxfEntity): entity is DxfLineEntity {
@@ -329,6 +355,10 @@ export function isMLeaderEntity(entity: DxfEntity): entity is DxfMLeaderEntity {
 
 export function isAttdefEntity(entity: DxfEntity): entity is DxfAttdefEntity {
   return entity.type === "ATTDEF";
+}
+
+export function isAttribEntity(entity: DxfEntity): entity is DxfAttribEntity {
+  return entity.type === "ATTRIB";
 }
 
 export interface DxfLayer {
