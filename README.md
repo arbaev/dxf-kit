@@ -188,6 +188,10 @@ Override CSS custom properties to match your app's theme:
 
 Vue 3.5, TypeScript 5.9, Three.js 0.182, Vite 7.
 
+## Acknowledgements
+
+The DXF parser architecture was inspired by and initially ported from [dxf-parser](https://github.com/gdsestimating/dxf-parser) by GDS Estimating. The codebase has since been substantially rewritten in TypeScript with a modular structure, 22 entity handlers (7 new), linetype/OCS/hatch pattern systems, and a comprehensive test suite.
+
 ## License
 
 MIT

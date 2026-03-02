@@ -67,12 +67,12 @@
         <div class="feature-card">
           <h3>Built-in Parser</h3>
           <p>Custom DXF parser with zero external dependencies.
-            16 entity types including dimensions, hatches, and splines.</p>
+            16 entity types including dimensions, hatches, splines, and block attributes.</p>
         </div>
         <div class="feature-card">
           <h3>WebGL Rendering</h3>
           <p>Three.js-powered rendering with pan, zoom, layer visibility,
-            and AutoCAD Color Index support.</p>
+            linetypes, hatch patterns, OCS transforms, and fullscreen mode.</p>
         </div>
         <div class="feature-card">
           <h3>Framework Flexible</h3>
@@ -81,7 +81,7 @@
         </div>
         <div class="feature-card">
           <h3>Lightweight</h3>
-          <p>~75 KB main bundle, ~40 KB parser.
+          <p>~89 KB main bundle, ~41 KB parser.
             Tree-shakeable composables for custom builds.</p>
         </div>
       </section>
