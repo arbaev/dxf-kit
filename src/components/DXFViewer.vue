@@ -27,7 +27,7 @@
       </div>
     </div>
 
-    <div v-if="fileName && hasDXFData" class="file-name-overlay">
+    <div v-if="showFileName && fileName && hasDXFData" class="file-name-overlay">
       {{ fileName }}
     </div>
 
@@ -159,6 +159,7 @@ interface Props {
   showFullscreenButton?: boolean;
   autoFit?: boolean;
   showCoordinates?: boolean;
+  showFileName?: boolean;
   darkTheme?: boolean;
 }
 
@@ -170,6 +171,7 @@ const props = withDefaults(defineProps<Props>(), {
   showFullscreenButton: true,
   autoFit: true,
   showCoordinates: false,
+  showFileName: true,
   darkTheme: false,
 });
 
