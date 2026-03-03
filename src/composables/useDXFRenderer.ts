@@ -140,5 +140,6 @@ export function useDXFRenderer() {
     applyLayerVisibility,
     cleanup,
     getCamera,
+    getRenderer,
   };
 }

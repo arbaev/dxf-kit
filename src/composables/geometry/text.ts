@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { TEXT_HEIGHT, MAX_TEXT_FONT_SIZE } from "@/constants";
+import { TEXT_HEIGHT, MAX_TEXT_FONT_SIZE, MAX_TEXT_CANVAS_SIZE } from "@/constants";
 import ACI_PALETTE from "@/parser/acadColorIndex";
 import { rgbNumberToHex } from "@/utils/colorResolver";
 
@@ -246,8 +246,11 @@ export const createStackedTextMesh = (
 
   const gap = mainText ? STACKED_GAP : 0;
   const totalWidth = mainWidth + gap + stackedMaxWidth;
-  const canvasWidth = Math.ceil(totalWidth) + PADDING * 2;
+  let canvasWidth = Math.ceil(totalWidth) + PADDING * 2;
   const canvasHeight = Math.ceil(topExtent + bottomExtent) + PADDING * 2;
+
+  // Clamp to GPU max texture size
+  if (canvasWidth > MAX_TEXT_CANVAS_SIZE) canvasWidth = MAX_TEXT_CANVAS_SIZE;
 
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
@@ -308,12 +311,23 @@ export const createTextMesh = (
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d")!;
 
-  const fontSize = Math.min(Math.max(height * CANVAS_SCALE, TEXT_HEIGHT), MAX_TEXT_FONT_SIZE);
-  const fontStyle = `${italic ? "italic " : ""}${bold ? "bold " : ""}${fontSize}px '${fontFamily}', Arial, sans-serif`;
-  context.font = fontStyle;
-  const textMetrics = context.measureText(text);
+  let fontSize = Math.min(Math.max(height * CANVAS_SCALE, TEXT_HEIGHT), MAX_TEXT_FONT_SIZE);
 
-  const canvasWidth = Math.ceil(textMetrics.width) + TEXT_CANVAS_PADDING * 2;
+  // Measure at initial fontSize, then scale down if canvas would exceed GPU limits
+  let fontStyle = `${italic ? "italic " : ""}${bold ? "bold " : ""}${fontSize}px '${fontFamily}', Arial, sans-serif`;
+  context.font = fontStyle;
+  let textMetrics = context.measureText(text);
+  let canvasWidth = Math.ceil(textMetrics.width) + TEXT_CANVAS_PADDING * 2;
+
+  if (canvasWidth > MAX_TEXT_CANVAS_SIZE) {
+    const scale = MAX_TEXT_CANVAS_SIZE / canvasWidth;
+    fontSize = Math.max(TEXT_HEIGHT, Math.floor(fontSize * scale));
+    fontStyle = `${italic ? "italic " : ""}${bold ? "bold " : ""}${fontSize}px '${fontFamily}', Arial, sans-serif`;
+    context.font = fontStyle;
+    textMetrics = context.measureText(text);
+    canvasWidth = Math.ceil(textMetrics.width) + TEXT_CANVAS_PADDING * 2;
+  }
+
   const canvasHeight = Math.ceil(fontSize * TEXT_HEIGHT_MULTIPLIER) + TEXT_CANVAS_PADDING * 2;
 
   canvas.width = canvasWidth;

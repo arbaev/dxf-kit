@@ -181,6 +181,7 @@ const {
   applyLayerVisibility,
   cleanup,
   getCamera,
+  getRenderer,
 } = useDXFRenderer();
 
 // Cursor world coordinates
@@ -275,9 +276,16 @@ const loadDXFFromText = (dxfText: string) => {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       try {
+        console.time("[dxf-vuer] parseDXF");
         const dxf = parseDXF(dxfText);
+        console.timeEnd("[dxf-vuer] parseDXF");
+
         lastLoadedDxf = dxf;
+
+        console.time("[dxf-vuer] displayDXF");
         const unsupportedEntities = displayDXF(dxf);
+        console.timeEnd("[dxf-vuer] displayDXF");
+
         initLayersFromDXF(dxf);
         applyLayerVisibility(visibleLayerNames.value);
         emit("dxf-loaded", true);
@@ -377,6 +385,7 @@ defineExpose({
   loadDXFFromData,
   resize,
   resetView,
+  getRenderer,
 });
 </script>
 

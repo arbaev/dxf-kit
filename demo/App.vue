@@ -48,6 +48,11 @@
 
       <UnsupportedEntities v-if="unsupportedEntities.length > 0" :entities="unsupportedEntities" />
 
+      <div class="debug-panel">
+        <div class="debug-ticker">{{ tickerDisplay }}</div>
+        <div class="debug-stats">Draw calls: {{ drawCalls }} | Geometries: {{ geometries }} | Triangles: {{ triangles }}</div>
+      </div>
+
       <div class="viewer-container">
         <DXFViewer
           ref="dxfViewerRef"
@@ -96,7 +101,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
 import FileUploader from "@/components/FileUploader.vue";
 import UnsupportedEntities from "@/components/UnsupportedEntities.vue";
 import DXFViewer from "@/components/DXFViewer.vue";
@@ -108,7 +113,36 @@ const error = ref<string | null>(null);
 const currentFileName = ref<string>("");
 const dxfViewerRef = ref<InstanceType<typeof DXFViewer> | null>(null);
 
+// Render statistics
+const tickerHundredths = ref(0);
+const drawCalls = ref(0);
+const geometries = ref(0);
+const triangles = ref(0);
+let tickerInterval: ReturnType<typeof setInterval> | null = null;
+
+const tickerDisplay = computed(() => {
+  const total = tickerHundredths.value;
+  const m = Math.floor(total / 6000);
+  const sec = Math.floor((total % 6000) / 100);
+  const cs = total % 100;
+  return `${m}:${String(sec).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
+});
+
+const updateRenderStats = () => {
+  const renderer = dxfViewerRef.value?.getRenderer?.();
+  if (renderer) {
+    drawCalls.value = renderer.info.render.calls;
+    triangles.value = renderer.info.render.triangles;
+    geometries.value = renderer.info.memory.geometries;
+  }
+};
+
 onMounted(async () => {
+  // Start ticker (10ms = hundredths of a second)
+  tickerInterval = setInterval(() => {
+    tickerHundredths.value++;
+  }, 10);
+
   await nextTick();
   try {
     const response = await fetch("/entities.dxf");
@@ -119,6 +153,13 @@ onMounted(async () => {
     }
   } catch {
     // Sample file not available — ignore
+  }
+});
+
+onBeforeUnmount(() => {
+  if (tickerInterval) {
+    clearInterval(tickerInterval);
+    tickerInterval = null;
   }
 });
 
@@ -154,6 +195,8 @@ const handleDXFLoaded = (success: boolean) => {
   if (!success) {
     dxfData.value = null;
   }
+  // Capture stats right after DXF render
+  nextTick(() => updateRenderStats());
 };
 
 const handleDXFData = (data: DxfData | null) => {
@@ -322,6 +365,29 @@ const resetView = () => {
 
 .error-message svg {
   flex-shrink: 0;
+}
+
+.debug-panel {
+  background-color: #1a1a2e;
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
+  border: 1px solid #333;
+  border-bottom: none;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.debug-ticker {
+  padding: 4px var(--spacing-md);
+  color: #e0e080;
+  border-bottom: 1px solid #333;
+}
+
+.debug-stats {
+  padding: 4px var(--spacing-md);
+  color: #a0e0a0;
+  white-space: nowrap;
+  overflow-x: auto;
 }
 
 @media (max-width: 768px) {
