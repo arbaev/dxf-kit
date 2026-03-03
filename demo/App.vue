@@ -58,12 +58,14 @@
           :file-name="currentFileName"
           :show-reset-button="!!dxfData"
           :show-coordinates="true"
+          :allow-drop="true"
           :dark-theme="isDark"
           @dxf-data="handleDXFData"
           @unsupported-entities="handleUnsupportedEntities"
           @error="handleError"
           @dxf-loaded="handleDXFLoaded"
           @reset-view="resetView"
+          @file-dropped="(name: string) => currentFileName = name"
         />
       </div>
 

@@ -5,6 +5,9 @@
     :class="{ 'dark-theme': darkTheme }"
     @mousemove="handleMouseMove"
     @mouseleave="handleMouseLeave"
+    @dragover.prevent="handleDragOver"
+    @dragleave="handleDragLeave"
+    @drop.prevent="handleDrop"
   >
     <div v-if="!webGLSupported" class="message-overlay">
       <div class="message-content error">
@@ -140,6 +143,17 @@
         <div class="message-text">Select a DXF file to view</div>
       </div>
     </div>
+
+    <div v-if="isDragOver" class="message-overlay drop-overlay">
+      <div class="message-content">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        <div class="message-text">Drop DXF file here</div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -160,6 +174,7 @@ interface Props {
   autoFit?: boolean;
   showCoordinates?: boolean;
   showFileName?: boolean;
+  allowDrop?: boolean;
   darkTheme?: boolean;
 }
 
@@ -172,6 +187,7 @@ const props = withDefaults(defineProps<Props>(), {
   autoFit: true,
   showCoordinates: false,
   showFileName: true,
+  allowDrop: false,
   darkTheme: false,
 });
 
@@ -181,6 +197,7 @@ interface Emits {
   (e: "error", error: string): void;
   (e: "unsupported-entities", entities: string[]): void;
   (e: "reset-view"): void;
+  (e: "file-dropped", fileName: string): void;
 }
 
 const emit = defineEmits<Emits>();
@@ -229,6 +246,33 @@ const handleMouseMove = (e: MouseEvent) => {
 
 const handleMouseLeave = () => {
   isCursorVisible.value = false;
+};
+
+// Drag-and-drop
+const isDragOver = ref(false);
+let dragLeaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+const handleDragOver = (e: DragEvent) => {
+  if (!props.allowDrop) return;
+  if (dragLeaveTimer) { clearTimeout(dragLeaveTimer); dragLeaveTimer = null; }
+  isDragOver.value = true;
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+};
+
+const handleDragLeave = () => {
+  if (!props.allowDrop) return;
+  // Debounce to avoid flicker when dragging over child elements
+  dragLeaveTimer = setTimeout(() => { isDragOver.value = false; }, 50);
+};
+
+const handleDrop = async (e: DragEvent) => {
+  if (!props.allowDrop) return;
+  isDragOver.value = false;
+  const file = e.dataTransfer?.files[0];
+  if (!file) return;
+  emit("file-dropped", file.name);
+  const text = await file.text();
+  loadDXFFromText(text);
 };
 
 const toggleFullscreen = async () => {
@@ -728,6 +772,25 @@ defineExpose({
 
 .dark-theme :deep(.color-swatch) {
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+.drop-overlay {
+  z-index: 30;
+  background-color: rgba(250, 250, 250, 0.9);
+  border: 3px dashed var(--dxf-vuer-primary-color, #1040b0);
+}
+
+.drop-overlay svg {
+  color: var(--dxf-vuer-primary-color, #1040b0);
+}
+
+.dark-theme .drop-overlay {
+  background-color: rgba(26, 26, 26, 0.9);
+  border-color: #6b8fd4;
+}
+
+.dark-theme .drop-overlay svg {
+  color: #6b8fd4;
 }
 
 .dark-theme .coordinates-overlay {
