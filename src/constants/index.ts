@@ -5,9 +5,11 @@ export const CAMERA_INITIAL_Z_POSITION = 100;
 export const CAMERA_PADDING = 1.25;
 
 export const SCENE_BG_COLOR = "#fafafa";
+export const SCENE_BG_COLOR_DARK = "#1a1a1a";
 
 // ACI 7 maps to black on light background (AutoCAD behavior)
 export const DEFAULT_ENTITY_COLOR = "#000000";
+export const DEFAULT_ENTITY_COLOR_DARK = "#ffffff";
 
 export const TEXT_HEIGHT = 16;
 export const DIM_TEXT_HEIGHT = 5;

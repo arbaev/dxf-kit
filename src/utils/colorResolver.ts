@@ -1,5 +1,5 @@
 import type { DxfEntity, DxfLayer } from "@/types/dxf";
-import { DEFAULT_ENTITY_COLOR } from "@/constants";
+import { DEFAULT_ENTITY_COLOR, DEFAULT_ENTITY_COLOR_DARK } from "@/constants";
 import ACI_PALETTE from "@/parser/acadColorIndex";
 
 export function rgbNumberToHex(rgbNumber: number): string {
@@ -14,13 +14,16 @@ export function resolveEntityColor(
   entity: DxfEntity,
   layers: Record<string, DxfLayer>,
   blockColor?: string,
+  darkTheme?: boolean,
 ): string {
   const colorIndex = entity.colorIndex;
   const trueColor = entity.color;
+  const aci7Color = darkTheme ? "#ffffff" : "#000000";
+  const defaultColor = darkTheme ? DEFAULT_ENTITY_COLOR_DARK : DEFAULT_ENTITY_COLOR;
 
   // ByBlock (colorIndex === 0): inherit color from parent INSERT entity
   if (colorIndex === 0) {
-    return blockColor ?? DEFAULT_ENTITY_COLOR;
+    return blockColor ?? defaultColor;
   }
 
   if (colorIndex !== undefined && colorIndex >= 1 && colorIndex <= 255) {
@@ -28,9 +31,9 @@ export function resolveEntityColor(
     if (trueColor !== undefined) {
       return rgbNumberToHex(trueColor);
     }
-    // ACI 7 and 255 are white in palette, rendered as black on light background
+    // ACI 7 and 255 are white in palette, rendered as black on light / white on dark
     if (colorIndex === 7 || colorIndex === 255) {
-      return "#000000";
+      return aci7Color;
     }
     return rgbNumberToHex(ACI_PALETTE[colorIndex]);
   }
@@ -43,17 +46,17 @@ export function resolveEntityColor(
     if (layer.color !== undefined && layer.color !== 0) {
       const layerColorIndex = layer.colorIndex;
       if (layerColorIndex === 7 || layerColorIndex === 255) {
-        return "#000000";
+        return aci7Color;
       }
       return rgbNumberToHex(layer.color);
     }
     if (layer.colorIndex >= 1 && layer.colorIndex <= 255) {
       if (layer.colorIndex === 7 || layer.colorIndex === 255) {
-        return "#000000";
+        return aci7Color;
       }
       return rgbNumberToHex(ACI_PALETTE[layer.colorIndex]);
     }
   }
 
-  return DEFAULT_ENTITY_COLOR;
+  return defaultColor;
 }

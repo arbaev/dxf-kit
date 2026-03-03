@@ -20,6 +20,7 @@ export interface EntityColorContext {
   lineTypes: Record<string, DxfLineType>;
   globalLtScale: number;
   blockLineType?: string;
+  darkTheme?: boolean;
 }
 
 export const degreesToRadians = (degrees: number): number =>

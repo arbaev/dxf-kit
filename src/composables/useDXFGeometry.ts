@@ -251,7 +251,7 @@ const collectEntity = (
   worldMatrix?: THREE.Matrix4,
   overrideColor?: string,
 ): boolean => {
-  const entityColor = overrideColor ?? resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
+  const entityColor = overrideColor ?? resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
   const ltInfo = resolveEntityLinetype(
     entity,
     colorCtx.layers,
@@ -598,7 +598,7 @@ const collectInsertEntity = async (
     : insertMatrix;
 
   // Block color context for ByBlock inheritance
-  const insertColor = resolveEntityColor(insertEntity, colorCtx.layers, colorCtx.blockColor);
+  const insertColor = resolveEntityColor(insertEntity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
   const blockColorCtx: EntityColorContext = {
     ...colorCtx,
     blockColor: insertColor,
@@ -674,7 +674,7 @@ const collectInsertEntity = async (
         const text = attrib.text;
         if (!text) continue;
 
-        const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor);
+        const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
         const textHeight = attrib.textHeight || TEXT_HEIGHT;
         const hAlign = getTextHAlign(attrib.horizontalJustification);
         const vAlign = getTextVAlign(attrib.verticalJustification);
@@ -788,7 +788,7 @@ const collectInsertEntity = async (
       const text = attrib.text;
       if (!text) continue;
 
-      const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor);
+      const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
       const textHeight = attrib.textHeight || TEXT_HEIGHT;
       const hAlign = getTextHAlign(attrib.horizontalJustification);
       const vAlign = getTextVAlign(attrib.verticalJustification);
@@ -993,7 +993,7 @@ const createBlockGroup = (
   }
 
   // Compute INSERT entity color for ByBlock inheritance
-  const insertColor = resolveEntityColor(insertEntity, colorCtx.layers, colorCtx.blockColor);
+  const insertColor = resolveEntityColor(insertEntity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
   const blockColorCtx: EntityColorContext = {
     layers: colorCtx.layers,
     blockColor: insertColor,
@@ -1003,6 +1003,7 @@ const createBlockGroup = (
     lineTypes: colorCtx.lineTypes,
     globalLtScale: colorCtx.globalLtScale,
     blockLineType: insertEntity.lineType || colorCtx.blockLineType,
+    darkTheme: colorCtx.darkTheme,
   };
 
   const blockGroup = new THREE.Group();
@@ -1047,7 +1048,7 @@ const processEntity = (
   colorCtx: EntityColorContext,
   depth = 0,
 ): THREE.Object3D | THREE.Object3D[] | null => {
-  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
+  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
   const ltInfo = resolveEntityLinetype(
     entity,
     colorCtx.layers,
@@ -1470,7 +1471,7 @@ const processEntity = (
             const text = attrib.text;
             if (!text) continue;
 
-            const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor);
+            const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
             const textHeight = attrib.textHeight || TEXT_HEIGHT;
             const hAlign = getTextHAlign(attrib.horizontalJustification);
             const vAlign = getTextVAlign(attrib.verticalJustification);
@@ -1714,6 +1715,7 @@ interface YieldState {
 export async function createThreeObjectsFromDXF(
   dxf: DxfData,
   signal?: DisplaySignal,
+  darkTheme?: boolean,
 ): Promise<{
   group: THREE.Group;
   warnings?: string;
@@ -1744,6 +1746,7 @@ export async function createThreeObjectsFromDXF(
     pointsMaterialCache: new Map(),
     lineTypes,
     globalLtScale,
+    darkTheme,
   };
 
   const collector = new GeometryCollector();

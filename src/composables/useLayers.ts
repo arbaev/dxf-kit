@@ -18,14 +18,15 @@ export function useLayers() {
   const initLayers = (
     dxfLayers: Record<string, DxfLayer>,
     entityLayerCounts: Record<string, number>,
+    darkTheme?: boolean,
   ) => {
     const newLayers = new Map<string, LayerState>();
     for (const [name, layer] of Object.entries(dxfLayers)) {
       let color = "#FFFFFF";
       if (layer.colorIndex >= 1 && layer.colorIndex <= 255) {
-        // ACI 7 and 255 are white in the palette but rendered as black on light background
+        // ACI 7 and 255 are white in the palette but rendered as black on light / white on dark
         color = (layer.colorIndex === 7 || layer.colorIndex === 255)
-          ? "#000000"
+          ? (darkTheme ? "#ffffff" : "#000000")
           : rgbNumberToHex(ACI_PALETTE[layer.colorIndex]);
       }
 

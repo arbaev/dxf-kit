@@ -136,4 +136,56 @@ describe("resolveEntityColor", () => {
     const result = resolveEntityColor(entity, {});
     expect(result).toBe(DEFAULT_ENTITY_COLOR);
   });
+
+  // -- darkTheme --
+
+  it("returns white for colorIndex=7 when darkTheme is true", () => {
+    const entity = makeEntity({ colorIndex: 7 });
+    const result = resolveEntityColor(entity, {}, undefined, true);
+    expect(result).toBe("#ffffff");
+  });
+
+  it("returns black for colorIndex=7 when darkTheme is false (backward compat)", () => {
+    const entity = makeEntity({ colorIndex: 7 });
+    const result = resolveEntityColor(entity, {}, undefined, false);
+    expect(result).toBe("#000000");
+  });
+
+  it("returns black for colorIndex=7 when darkTheme is undefined (backward compat)", () => {
+    const entity = makeEntity({ colorIndex: 7 });
+    const result = resolveEntityColor(entity, {}, undefined, undefined);
+    expect(result).toBe("#000000");
+  });
+
+  it("returns white for colorIndex=255 when darkTheme is true", () => {
+    const entity = makeEntity({ colorIndex: 255 });
+    const result = resolveEntityColor(entity, {}, undefined, true);
+    expect(result).toBe("#ffffff");
+  });
+
+  it("returns white for ByLayer with layer colorIndex=7 when darkTheme is true", () => {
+    const layers = makeLayer("Default", { colorIndex: 7, color: 0xFFFFFF });
+    const entity = makeEntity({ colorIndex: 256, layer: "Default" });
+    const result = resolveEntityColor(entity, layers, undefined, true);
+    expect(result).toBe("#ffffff");
+  });
+
+  it("returns white for ByLayer with ACI-only layer colorIndex=7 when darkTheme is true", () => {
+    const layers = makeLayer("Default", { colorIndex: 7, color: 0 });
+    const entity = makeEntity({ layer: "Default" });
+    const result = resolveEntityColor(entity, layers, undefined, true);
+    expect(result).toBe("#ffffff");
+  });
+
+  it("returns white default color for ByBlock without blockColor when darkTheme is true", () => {
+    const entity = makeEntity({ colorIndex: 0 });
+    const result = resolveEntityColor(entity, {}, undefined, true);
+    expect(result).toBe("#ffffff");
+  });
+
+  it("returns white default color when no colorIndex and no layer when darkTheme is true", () => {
+    const entity = makeEntity({});
+    const result = resolveEntityColor(entity, {}, undefined, true);
+    expect(result).toBe("#ffffff");
+  });
 });

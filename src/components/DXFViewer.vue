@@ -2,6 +2,7 @@
   <div
     ref="dxfContainer"
     class="dxf-viewer"
+    :class="{ 'dark-theme': darkTheme }"
     @mousemove="handleMouseMove"
     @mouseleave="handleMouseLeave"
   >
@@ -157,6 +158,7 @@ interface Props {
   showFullscreenButton?: boolean;
   autoFit?: boolean;
   showCoordinates?: boolean;
+  darkTheme?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -167,6 +169,7 @@ const props = withDefaults(defineProps<Props>(), {
   showFullscreenButton: true,
   autoFit: true,
   showCoordinates: false,
+  darkTheme: false,
 });
 
 interface Emits {
@@ -260,14 +263,14 @@ const handleResetView = () => {
   emit("reset-view");
 };
 
-const initLayersFromDXF = (dxf: DxfData) => {
+const initLayersFromDXF = (dxf: DxfData, darkTheme?: boolean) => {
   const dxfLayers = (dxf.tables?.layer?.layers || {}) as Record<string, DxfLayer>;
   const entityLayerCounts: Record<string, number> = {};
   for (const entity of dxf.entities) {
     const layerName = entity.layer || "0";
     entityLayerCounts[layerName] = (entityLayerCounts[layerName] || 0) + 1;
   }
-  initLayers(dxfLayers, entityLayerCounts);
+  initLayers(dxfLayers, entityLayerCounts, darkTheme);
 };
 
 const handleToggleLayer = (layerName: string) => {
@@ -297,10 +300,10 @@ const loadDXFFromText = async (dxfText: string) => {
 
     loadingPhase.value = "rendering";
     console.time("[dxf-vuer] displayDXF");
-    const unsupportedEntities = await displayDXF(dxf);
+    const unsupportedEntities = await displayDXF(dxf, props.darkTheme);
     console.timeEnd("[dxf-vuer] displayDXF");
 
-    initLayersFromDXF(dxf);
+    initLayersFromDXF(dxf, props.darkTheme);
     applyLayerVisibility(visibleLayerNames.value);
     emit("dxf-loaded", true);
     emit("dxf-data", dxf);
@@ -324,8 +327,8 @@ const loadDXFFromData = async (dxfData: DxfData) => {
   isLoading.value = true;
   loadingPhase.value = "rendering";
   try {
-    const unsupportedEntities = await displayDXF(dxfData);
-    initLayersFromDXF(dxfData);
+    const unsupportedEntities = await displayDXF(dxfData, props.darkTheme);
+    initLayersFromDXF(dxfData, props.darkTheme);
     applyLayerVisibility(visibleLayerNames.value);
     emit("dxf-loaded", true);
     emit("dxf-data", dxfData);
@@ -384,6 +387,15 @@ watch(
 
 watch(() => props.url, (newUrl) => {
   if (newUrl) loadDXFFromUrl(newUrl);
+});
+
+watch(() => props.darkTheme, () => {
+  // Re-render with new theme colors (baked into materials)
+  if (lastLoadedDxf) {
+    loadDXFFromData(lastLoadedDxf);
+  } else if (props.dxfData && hasDXFData.value) {
+    loadDXFFromData(props.dxfData);
+  }
 });
 
 watch(rendererError, (newError) => {
@@ -590,6 +602,109 @@ defineExpose({
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Dark theme overrides */
+.dxf-viewer.dark-theme {
+  background-color: #1a1a1a;
+  border-color: #333;
+}
+
+.dark-theme .loading-overlay {
+  background-color: rgba(26, 26, 26, 0.85);
+}
+
+.dark-theme .file-name-overlay {
+  background-color: rgba(30, 30, 30, 0.95);
+  border-color: #333;
+  color: #e0e0e0;
+}
+
+.dark-theme .toolbar-button {
+  background-color: rgba(30, 30, 30, 0.95);
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+.dark-theme .message-text {
+  color: #aaa;
+}
+
+.dark-theme .progress-text {
+  color: #aaa;
+}
+
+.dark-theme .message-title {
+  color: #e0e0e0;
+}
+
+.dark-theme .spinner {
+  border-color: #444;
+  border-top-color: #6b8fd4;
+}
+
+.dark-theme .progress-container {
+  background-color: #444;
+}
+
+.dark-theme .message-content.placeholder svg {
+  color: #555;
+}
+
+.dark-theme :deep(.layer-panel) {
+  background-color: rgba(30, 30, 30, 0.95);
+  border-color: #444;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.dark-theme :deep(.layer-panel-header) {
+  border-bottom-color: #444;
+}
+
+.dark-theme :deep(.layer-panel-title) {
+  color: #e0e0e0;
+}
+
+.dark-theme :deep(.collapse-btn) {
+  color: #aaa;
+}
+
+.dark-theme :deep(.layer-panel-actions) {
+  border-bottom-color: #444;
+}
+
+.dark-theme :deep(.action-btn) {
+  border-color: #555;
+  color: #aaa;
+}
+
+.dark-theme :deep(.action-btn:hover) {
+  border-color: #6b8fd4;
+  color: #6b8fd4;
+}
+
+.dark-theme :deep(.layer-item:hover) {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.dark-theme :deep(.eye-icon) {
+  color: #e0e0e0;
+}
+
+.dark-theme :deep(.eye-icon.off) {
+  color: #666;
+}
+
+.dark-theme :deep(.layer-name) {
+  color: #e0e0e0;
+}
+
+.dark-theme :deep(.layer-count) {
+  color: #888;
+}
+
+.dark-theme :deep(.color-swatch) {
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 @media (max-width: 768px) {

@@ -111,7 +111,7 @@ export function buildBlockTemplate(
       overrideColor = BYBLOCK_COLOR;
     } else {
       // Resolve fixed color (ByLayer on named layer, or explicit ACI/trueColor)
-      overrideColor = resolveEntityColor(entity, colorCtx.layers, undefined);
+      overrideColor = resolveEntityColor(entity, colorCtx.layers, undefined, colorCtx.darkTheme);
     }
 
     // Collect geometry in local coordinates (no worldMatrix)

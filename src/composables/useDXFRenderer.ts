@@ -3,6 +3,7 @@ import * as THREE from "three";
 import type { Group } from "three";
 import { parseDxf } from "@/parser";
 import type { DxfData } from "@/types/dxf";
+import { SCENE_BG_COLOR, SCENE_BG_COLOR_DARK } from "@/constants";
 import { useThreeScene, type ThreeJSOptions } from "./useThreeScene";
 import { useCamera } from "./useCamera";
 import { createThreeObjectsFromDXF, type DisplaySignal } from "./useDXFGeometry";
@@ -109,13 +110,16 @@ export function useDXFRenderer() {
     });
   };
 
-  const displayDXF = async (dxf: DxfData): Promise<string[] | undefined> => {
+  const displayDXF = async (dxf: DxfData, darkTheme?: boolean): Promise<string[] | undefined> => {
     const scene = getScene();
     const camera = getCamera();
 
     if (!scene) {
       return undefined;
     }
+
+    // Update scene background for theme
+    scene.background = new THREE.Color(darkTheme ? SCENE_BG_COLOR_DARK : SCENE_BG_COLOR);
 
     // Cancel previous display if still running
     if (displaySignal) {
@@ -134,7 +138,7 @@ export function useDXFRenderer() {
       currentDXFGroup = null;
     }
 
-    const result = await createThreeObjectsFromDXF(dxf, signal);
+    const result = await createThreeObjectsFromDXF(dxf, signal, darkTheme);
 
     if (signal.cancelled) {
       return undefined;
