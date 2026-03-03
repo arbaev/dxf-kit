@@ -23,11 +23,17 @@ Vue 3 component for viewing DXF files in the browser. Built-in DXF parser, Three
 - **TypeScript** — strict types, full `.d.ts` declarations
 - **Composables** — build custom viewers with `useDXFRenderer`, `useThreeScene`, `useCamera`, etc.
 - **CSS custom properties** — theme with `--dxf-vuer-*` variables, no global resets
+- **Dark theme** — `darkTheme` prop switches scene background, entity colors (ACI 7), and all overlays to dark mode
+- **Drag-and-drop** — `allowDrop` prop enables dropping DXF files directly onto the viewer
+- **Export to PNG** — `exportToPNG()` method and optional toolbar button to save current view
+- **Loading by URL** — `url` prop to load DXF files from a remote URL
+- **Loading progress** — progress bar with percentage during rendering phase
+- **Performance optimizations** — geometry merging (–78% draw calls), block template caching, async parsing in Web Worker, time-sliced rendering
 - **Layer panel** — toggle layer visibility with color indicators; frozen/locked layer support
 - **Paper space filtering** — paper space entities (title blocks, borders) automatically excluded
 - **World coordinates** — optional cursor position display in drawing units
 - **Fullscreen mode** — built-in fullscreen button in the viewer toolbar
-- **Lightweight** — ~89 KB main bundle, ~41 KB parser chunk (minified)
+- **Lightweight** — ~145 KB main bundle, ~41 KB parser chunk (minified)
 
 ## Installation
 
@@ -95,9 +101,15 @@ async function loadFile(file) {
 |------|------|---------|-------------|
 | `dxfData` | `DxfData \| null` | `null` | Parsed DXF data to display |
 | `fileName` | `string` | `""` | File name shown in the top-left corner |
+| `url` | `string` | `""` | URL to load DXF file from |
 | `showResetButton` | `boolean` | `false` | Show a reset-view button |
-| `autoFit` | `boolean` | `true` | Auto-fit camera to content |
+| `showFullscreenButton` | `boolean` | `true` | Show a fullscreen button |
+| `showExportButton` | `boolean` | `false` | Show an export-to-PNG button |
+| `showFileName` | `boolean` | `true` | Show the file name overlay |
 | `showCoordinates` | `boolean` | `false` | Show world coordinates at cursor position |
+| `allowDrop` | `boolean` | `false` | Enable drag-and-drop of DXF files onto the viewer |
+| `darkTheme` | `boolean` | `false` | Dark theme for scene, entity colors, and overlays |
+| `autoFit` | `boolean` | `true` | Auto-fit camera to content |
 
 ### Events
 
@@ -108,6 +120,7 @@ async function loadFile(file) {
 | `error` | `string` | Error message on failure |
 | `unsupported-entities` | `string[]` | List of entity types that could not be rendered |
 | `reset-view` | — | Emitted when user clicks reset button |
+| `file-dropped` | `string` | File name when a file is dropped (requires `allowDrop`) |
 
 ### Exposed Methods
 
@@ -115,7 +128,9 @@ async function loadFile(file) {
 |--------|-----------|-------------|
 | `loadDXFFromText` | `(text: string) => void` | Parse and display DXF from raw text (shows loading spinner) |
 | `loadDXFFromData` | `(data: DxfData) => void` | Display pre-parsed DXF data |
+| `loadDXFFromUrl` | `(url: string) => void` | Fetch and display DXF from URL |
 | `resetView` | `() => void` | Reset camera to fit content |
+| `exportToPNG` | `() => void` | Download current view as PNG |
 | `resize` | `() => void` | Trigger manual resize |
 
 ## Other Components
@@ -187,6 +202,14 @@ Override CSS custom properties to match your app's theme:
 ## Tech Stack
 
 Vue 3.5, TypeScript 5.9, Three.js 0.182, Vite 7.
+
+## Performance
+
+- **Geometry merging** — entities are merged by layer+color into shared buffers, reducing draw calls by ~78%
+- **Block template caching** — frequently used INSERT blocks are parsed once, then instantiated via matrix transforms
+- **Web Worker parsing** — DXF parsing runs in a Web Worker to keep the UI responsive
+- **Time-sliced rendering** — entity processing yields to the main thread every ~16ms with a progress bar
+- **Shared canvas for text** — single canvas reused for all text textures instead of DOM allocation per entity
 
 ## Acknowledgements
 

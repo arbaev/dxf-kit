@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-03
+
+### Added
+
+- **Dark theme** — new `darkTheme` prop: dark scene background (#1a1a1a), ACI 7 rendered as white, dark overlays for all UI elements including layer panel, coordinates, toolbar, and loading spinner
+- **Drag-and-drop** — new `allowDrop` prop enables dropping DXF files directly onto the viewer area; visual "Drop DXF file here" overlay during drag; emits `file-dropped` event with file name
+- **Export to PNG** — new `exportToPNG()` exposed method and `showExportButton` prop for toolbar button; downloads current view as PNG file
+- **Loading by URL** — new `url` prop to fetch and display DXF files from a remote URL; `loadDXFFromUrl()` exposed method
+- **Loading progress bar** — progress bar with percentage shown during the rendering phase; separate loading phases: fetching, parsing, rendering
+- **`showFullscreenButton` prop** — control visibility of the fullscreen button (default: `true`)
+- **`showFileName` prop** — control visibility of the file name overlay (default: `true`)
+- **Geometry merging** — entities merged by layer+color into shared `LineSegments`/`Points`/`Mesh` buffers, reducing draw calls by ~78% on complex drawings
+- **Block template caching** — frequently used INSERT blocks parsed once and instantiated via matrix transforms; `INSTANCING_THRESHOLD=2`
+- **Web Worker parsing** — DXF parsing offloaded to an inline Web Worker to keep UI responsive; automatic fallback to main thread if Workers are unavailable
+- **Time-sliced rendering** — entity processing yields to the main thread every ~16ms, preventing UI freezes on large files; cancellation support for fast file switching
+- **Shared canvas for text** — single canvas reused for all text/dimension textures, eliminating per-entity DOM allocations
+- **Camera fit from header extents** — uses `$EXTMIN`/`$EXTMAX` from DXF header for instant camera fitting instead of computing bounding box from geometry
+- Test suite expanded from 465 to 492 cases across 22 files
+
+### Changed
+
+- Coordinates panel moved to bottom-left, layer panel to bottom-right
+- Coordinates panel styled consistently with other overlays (light background with border); values displayed in two rows with fixed-width columns
+- Main bundle size: ~89 KB → ~145 KB (includes inline Web Worker with parser)
+- `preserveDrawingBuffer` enabled on WebGL renderer to support PNG export
+
 ## [1.1.0] - 2026-03-02
 
 ### Added
@@ -80,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dual package exports**: `dxf-vuer` (full library) and `dxf-vuer/parser` (parser only), plus `dxf-vuer/style.css`
 - **Demo application** deployed at [dxf-vuer.netlify.app](https://dxf-vuer.netlify.app)
 
+[1.2.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.2.0
 [1.1.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.1.0
 [1.0.1]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.0.1
 [1.0.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.0.0

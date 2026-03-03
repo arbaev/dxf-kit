@@ -74,22 +74,26 @@
         <div class="feature-card">
           <h3>Built-in Parser</h3>
           <p>Custom DXF parser with zero external dependencies.
-            16 entity types including dimensions, hatches, splines, and block attributes.</p>
+            16 entity types including dimensions, hatches, splines, and block attributes.
+            Async parsing in a Web Worker keeps the UI responsive.</p>
         </div>
         <div class="feature-card">
           <h3>WebGL Rendering</h3>
           <p>Three.js-powered rendering with pan, zoom, layer visibility,
-            linetypes, hatch patterns, OCS transforms, and fullscreen mode.</p>
+            linetypes, hatch patterns, OCS transforms, dark theme,
+            drag-and-drop, and PNG export.</p>
+        </div>
+        <div class="feature-card">
+          <h3>High Performance</h3>
+          <p>Geometry merging cuts draw calls by 78%.
+            Block template caching, time-sliced rendering with progress bar,
+            and shared canvas for text textures.</p>
         </div>
         <div class="feature-card">
           <h3>Framework Flexible</h3>
           <p>Vue 3 component or standalone parser via dxf-vuer/parser.
-            Works in Node.js, React, or any JS runtime.</p>
-        </div>
-        <div class="feature-card">
-          <h3>Lightweight</h3>
-          <p>~89 KB main bundle, ~41 KB parser.
-            Tree-shakeable composables for custom builds.</p>
+            Works in Node.js, React, or any JS runtime.
+            Full TypeScript support with composables for custom builds.</p>
         </div>
       </section>
 
