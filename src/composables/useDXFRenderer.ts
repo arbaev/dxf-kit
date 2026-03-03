@@ -5,11 +5,16 @@ import { parseDxf } from "@/parser";
 import type { DxfData } from "@/types/dxf";
 import { useThreeScene, type ThreeJSOptions } from "./useThreeScene";
 import { useCamera } from "./useCamera";
-import { createThreeObjectsFromDXF } from "./useDXFGeometry";
+import { createThreeObjectsFromDXF, type DisplaySignal } from "./useDXFGeometry";
+import ParserWorker from "@/workers/parserWorker?worker&inline";
 
 export function useDXFRenderer() {
   const isLoading = ref(false);
   let currentDXFGroup: Group | null = null;
+  let worker: Worker | null = null;
+  let workerFailed = false;
+  let messageId = 0;
+  let displaySignal: DisplaySignal | null = null;
 
   const {
     webGLSupported,
@@ -26,7 +31,7 @@ export function useDXFRenderer() {
     resetOrbitControls,
   } = useThreeScene();
 
-  const { fitCameraToObject, handleResize: handleCameraResize, resetResizing } = useCamera();
+  const { fitCameraToBox, handleResize: handleCameraResize, resetResizing } = useCamera();
 
   const render = () => {
     const scene = getScene();
@@ -56,7 +61,54 @@ export function useDXFRenderer() {
     }
   };
 
-  const displayDXF = (dxf: DxfData): string[] | undefined => {
+  const getOrCreateWorker = (): Worker | null => {
+    if (workerFailed) return null;
+    if (worker) return worker;
+    try {
+      worker = new ParserWorker();
+      return worker;
+    } catch {
+      workerFailed = true;
+      return null;
+    }
+  };
+
+  const terminateWorker = () => {
+    if (worker) {
+      worker.terminate();
+      worker = null;
+    }
+  };
+
+  const parseDXFAsync = (dxfText: string): Promise<DxfData> => {
+    const w = getOrCreateWorker();
+    if (!w) {
+      return Promise.resolve(parseDXF(dxfText));
+    }
+    const id = ++messageId;
+    return new Promise<DxfData>((resolve, reject) => {
+      const onMessage = (event: MessageEvent) => {
+        if (event.data.id !== id) return;
+        w.removeEventListener("message", onMessage);
+        w.removeEventListener("error", onError);
+        if (event.data.success) {
+          resolve(event.data.data);
+        } else {
+          reject(new Error(`DXF file parsing error: ${event.data.error}`));
+        }
+      };
+      const onError = (event: ErrorEvent) => {
+        w.removeEventListener("message", onMessage);
+        w.removeEventListener("error", onError);
+        reject(new Error(`Worker error: ${event.message}`));
+      };
+      w.addEventListener("message", onMessage);
+      w.addEventListener("error", onError);
+      w.postMessage({ id, dxfText });
+    });
+  };
+
+  const displayDXF = async (dxf: DxfData): Promise<string[] | undefined> => {
     const scene = getScene();
     const camera = getCamera();
 
@@ -64,24 +116,48 @@ export function useDXFRenderer() {
       return undefined;
     }
 
+    // Cancel previous display if still running
+    if (displaySignal) {
+      displaySignal.cancelled = true;
+    }
+    const signal: DisplaySignal = { cancelled: false };
+    displaySignal = signal;
+
     if (currentDXFGroup) {
       disposeObject3D(currentDXFGroup);
       scene.remove(currentDXFGroup);
       currentDXFGroup = null;
     }
 
-    const result = createThreeObjectsFromDXF(dxf);
+    const result = await createThreeObjectsFromDXF(dxf, signal);
+
+    if (signal.cancelled) {
+      return undefined;
+    }
+
     scene.add(result.group);
 
     currentDXFGroup = result.group;
 
     if (camera) {
-      const box = new THREE.Box3().setFromObject(result.group);
+      const extMin = dxf.header?.["$EXTMIN"] as { x: number; y: number; z?: number } | undefined;
+      const extMax = dxf.header?.["$EXTMAX"] as { x: number; y: number; z?: number } | undefined;
+
+      let box: THREE.Box3;
+      if (extMin && extMax && extMin.x < extMax.x && extMin.y < extMax.y) {
+        box = new THREE.Box3(
+          new THREE.Vector3(extMin.x, extMin.y, extMin.z ?? 0),
+          new THREE.Vector3(extMax.x, extMax.y, extMax.z ?? 0),
+        );
+      } else {
+        box = new THREE.Box3().setFromObject(result.group);
+      }
+
       const center = box.getCenter(new THREE.Vector3());
 
       // Set OrbitControls target to object center (on the z=0 plane)
       setOrbitTarget(center.x, center.y, 0);
-      fitCameraToObject(result.group, camera);
+      fitCameraToBox(box, camera);
       saveOrbitState();
     }
 
@@ -117,6 +193,7 @@ export function useDXFRenderer() {
   };
 
   const cleanup = () => {
+    terminateWorker();
     // Remove listener before cleaning up controls
     const controls = getControls();
     if (controls) {
@@ -134,6 +211,7 @@ export function useDXFRenderer() {
 
     initThreeJS,
     parseDXF,
+    parseDXFAsync,
     displayDXF,
     handleResize,
     resetView,

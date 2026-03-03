@@ -5,3 +5,8 @@ declare module "*.vue" {
   const component: DefineComponent<{}, {}, any>;
   export default component;
 }
+
+declare module "*?worker&inline" {
+  const WorkerConstructor: new () => Worker;
+  export default WorkerConstructor;
+}

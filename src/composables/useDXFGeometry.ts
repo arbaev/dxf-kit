@@ -548,7 +548,7 @@ const MAX_RECURSION_DEPTH = 10;
  * Simple entities are merged; complex ones (TEXT, DIMENSION, LEADER)
  * are created as individual objects and added to fallbackGroup.
  */
-const collectInsertEntity = (
+const collectInsertEntity = async (
   insertEntity: DxfEntity,
   dxf: DxfData,
   colorCtx: EntityColorContext,
@@ -557,7 +557,8 @@ const collectInsertEntity = (
   parentMatrix: THREE.Matrix4 | null,
   fallbackGroup: THREE.Group,
   depth: number,
-): void => {
+  yieldState: YieldState,
+): Promise<void> => {
   if (depth > MAX_RECURSION_DEPTH || !isInsertEntity(insertEntity)) return;
   if (!dxf.blocks || typeof dxf.blocks !== "object") return;
 
@@ -603,7 +604,7 @@ const collectInsertEntity = (
 
       // Nested INSERT: recurse
       if (entity.type === "INSERT" && isInsertEntity(entity)) {
-        collectInsertEntity(entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix, fallbackGroup, depth + 1);
+        await collectInsertEntity(entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix, fallbackGroup, depth + 1, yieldState);
         continue;
       }
 
@@ -648,6 +649,13 @@ const collectInsertEntity = (
       }
     } catch (error) {
       console.warn(`Error processing entity in block "${insertEntity.name}":`, error);
+    }
+
+    // Yield to browser to keep UI responsive during large blocks
+    if (performance.now() - yieldState.lastYield > CHUNK_TIME_MS) {
+      if (yieldState.signal?.cancelled) return;
+      await yieldToMain();
+      yieldState.lastYield = performance.now();
     }
   }
 
@@ -1564,11 +1572,30 @@ const COLLECTABLE_TYPES = new Set([
   "POINT", "SOLID", "3DFACE", "HATCH",
 ]);
 
-export function createThreeObjectsFromDXF(dxf: DxfData): {
+/** Yield control to the browser so the UI stays responsive */
+const yieldToMain = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+
+/** Time budget per chunk before yielding (ms) */
+const CHUNK_TIME_MS = 16;
+
+export interface DisplaySignal {
+  cancelled: boolean;
+}
+
+/** Shared state for cooperative yielding across async processing */
+interface YieldState {
+  lastYield: number;
+  signal?: DisplaySignal;
+}
+
+export async function createThreeObjectsFromDXF(
+  dxf: DxfData,
+  signal?: DisplaySignal,
+): Promise<{
   group: THREE.Group;
   warnings?: string;
   unsupportedEntities?: string[];
-} {
+}> {
   const group = new THREE.Group();
 
   if (!dxf.entities || dxf.entities.length === 0) {
@@ -1601,23 +1628,31 @@ export function createThreeObjectsFromDXF(dxf: DxfData): {
   const unsupportedTypes: string[] = [];
   const _debugFallback: Record<string, number> = {};
 
-  dxf.entities.forEach((entity: DxfEntity, index: number) => {
+  const yieldState: YieldState = { lastYield: performance.now(), signal };
+
+  for (let index = 0; index < dxf.entities.length; index++) {
+    if (signal?.cancelled) {
+      return { group };
+    }
+
+    const entity = dxf.entities[index];
+
     try {
       // Skip paper space entities — they belong to layouts, not model space
-      if (entity.inPaperSpace) return;
+      if (entity.inPaperSpace) continue;
 
       const layer = entity.layer || "0";
 
       // INSERT blocks: flatten into collector (merged geometry)
       if (entity.type === "INSERT") {
-        collectInsertEntity(entity, dxf, colorCtx, collector, layer, null, group, 0);
-        return;
+        await collectInsertEntity(entity, dxf, colorCtx, collector, layer, null, group, 0, yieldState);
+        continue;
       }
 
       // Try to collect simple entities into merged buffers
       if (COLLECTABLE_TYPES.has(entity.type)) {
         if (collectEntity(entity, colorCtx, collector, layer)) {
-          return;
+          continue;
         }
       }
 
@@ -1652,7 +1687,17 @@ export function createThreeObjectsFromDXF(dxf: DxfData): {
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
       errors.push(`Entity ${index} (${entity.type || "unknown type"}): ${errorMsg}`);
     }
-  });
+
+    // Yield to browser every ~16ms to keep UI responsive
+    if (performance.now() - yieldState.lastYield > CHUNK_TIME_MS) {
+      await yieldToMain();
+      yieldState.lastYield = performance.now();
+    }
+  }
+
+  if (signal?.cancelled) {
+    return { group };
+  }
 
   // Debug: log fallback entity counts
   const blockFallback = group.userData._debugFallback || {};

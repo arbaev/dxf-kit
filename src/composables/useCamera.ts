@@ -4,9 +4,7 @@ import { CAMERA_PADDING, CAMERA_INITIAL_Z_POSITION } from "@/constants";
 export function useCamera() {
   let isResizing = false;
 
-  const fitCameraToObject = (object: THREE.Object3D, camera: THREE.OrthographicCamera) => {
-    const box = new THREE.Box3().setFromObject(object);
-
+  const fitCameraToBox = (box: THREE.Box3, camera: THREE.OrthographicCamera) => {
     if (box.isEmpty()) {
       camera.position.set(0, 0, CAMERA_INITIAL_Z_POSITION);
       camera.zoom = 1;
@@ -29,6 +27,10 @@ export function useCamera() {
     // Use the smaller scale so the entire object fits in view
     camera.zoom = Math.min(scaleX, scaleY);
     camera.updateProjectionMatrix();
+  };
+
+  const fitCameraToObject = (object: THREE.Object3D, camera: THREE.OrthographicCamera) => {
+    fitCameraToBox(new THREE.Box3().setFromObject(object), camera);
   };
 
   // Only updates frustum aspect ratio and renderer size; zoom and position are preserved
@@ -78,6 +80,7 @@ export function useCamera() {
   };
 
   return {
+    fitCameraToBox,
     fitCameraToObject,
     handleResize,
     resetResizing,

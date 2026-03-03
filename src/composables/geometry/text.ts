@@ -3,6 +3,39 @@ import { TEXT_HEIGHT, MAX_TEXT_FONT_SIZE, MAX_TEXT_CANVAS_SIZE } from "@/constan
 import ACI_PALETTE from "@/parser/acadColorIndex";
 import { rgbNumberToHex } from "@/utils/colorResolver";
 
+// Shared canvas + context to avoid thousands of DOM allocations.
+// Canvas is resized before each use; pixel data is extracted into DataTexture.
+let _sharedCanvas: HTMLCanvasElement | null = null;
+let _sharedCtx: CanvasRenderingContext2D | null = null;
+
+export function getSharedCanvas(): {
+  canvas: HTMLCanvasElement;
+  context: CanvasRenderingContext2D;
+} {
+  if (!_sharedCanvas) {
+    _sharedCanvas = document.createElement("canvas");
+    _sharedCtx = _sharedCanvas.getContext("2d")!;
+  }
+  return { canvas: _sharedCanvas, context: _sharedCtx! };
+}
+
+/** Extract pixel data from canvas into a DataTexture (independent of the canvas) */
+export function snapshotToTexture(
+  canvas: HTMLCanvasElement,
+  context: CanvasRenderingContext2D,
+): THREE.DataTexture {
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  const texture = new THREE.DataTexture(
+    imageData.data,
+    canvas.width,
+    canvas.height,
+    THREE.RGBAFormat,
+  );
+  texture.flipY = true;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 /** MTEXT line with optional color, height, and style overrides */
 export interface MTextLine {
   text: string;
@@ -206,8 +239,7 @@ export const createStackedTextMesh = (
   const STACKED_GAP = 2;
   const STACKED_V_GAP = 4;
 
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d")!;
+  const { canvas, context } = getSharedCanvas();
 
   const fontSize = Math.min(Math.max(height * CANVAS_SCALE, TEXT_HEIGHT), MAX_TEXT_FONT_SIZE);
   const fontStyle = `${italic ? "italic " : ""}${bold ? "bold " : ""}${fontSize}px '${fontFamily}', Arial, sans-serif`;
@@ -276,8 +308,7 @@ export const createStackedTextMesh = (
     context.fillText(stackedBottom, stackedX, stackedCenterY + halfVGap + subAscent);
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
+  const texture = snapshotToTexture(canvas, context);
   const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
 
   const aspectRatio = canvasWidth / canvasHeight;
@@ -308,8 +339,7 @@ export const createTextMesh = (
   const TEXT_CANVAS_PADDING = 4;
   const TEXT_HEIGHT_MULTIPLIER = 1.2;
 
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d")!;
+  const { canvas, context } = getSharedCanvas();
 
   let fontSize = Math.min(Math.max(height * CANVAS_SCALE, TEXT_HEIGHT), MAX_TEXT_FONT_SIZE);
 
@@ -339,8 +369,7 @@ export const createTextMesh = (
   context.textBaseline = "middle";
   context.fillText(text, TEXT_CANVAS_PADDING, canvasHeight / 2);
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
+  const texture = snapshotToTexture(canvas, context);
 
   const material = new THREE.MeshBasicMaterial({
     map: texture,

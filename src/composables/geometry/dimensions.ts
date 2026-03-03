@@ -14,7 +14,7 @@ import {
   MIN_ARC_SEGMENTS,
 } from "@/constants";
 import { createArrow } from "./primitives";
-import { replaceSpecialChars } from "./text";
+import { replaceSpecialChars, getSharedCanvas, snapshotToTexture } from "./text";
 
 const EXTENSION_LINE_OVERSHOOT = 2;
 
@@ -465,8 +465,7 @@ export const createDimensionTextMesh = (
   const STACKED_GAP = 2;
   const STACKED_V_GAP = 4;
 
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d")!;
+  const { canvas, context } = getSharedCanvas();
 
   const mainFontSize = Math.max(height * CANVAS_SCALE, TEXT_HEIGHT);
   const DIM_FONT = `"Cascadia Code", "Consolas", "Liberation Mono", monospace`;
@@ -494,8 +493,7 @@ export const createDimensionTextMesh = (
     context.textBaseline = "alphabetic";
     context.fillText(plain, PADDING, PADDING + Math.ceil(ascent));
 
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
+    const texture = snapshotToTexture(canvas, context);
     const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
 
     // Normalize mesh height by reference canvas so font matches createTextMesh sizing
@@ -589,8 +587,7 @@ export const createDimensionTextMesh = (
     context.fillText(bottomText, stackedX, stackedCenterY + halfVGap + subAscent);
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
+  const texture = snapshotToTexture(canvas, context);
   const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
 
   const meshHeight = (height * canvasHeight) / refCanvasHeight;

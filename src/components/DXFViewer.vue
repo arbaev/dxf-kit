@@ -133,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick, toRaw } from "vue";
 import * as THREE from "three";
 import { useDXFRenderer } from "@/composables/useDXFRenderer";
 import { useLayers } from "@/composables/useLayers";
@@ -174,7 +174,7 @@ const {
   webGLSupported,
   error: rendererError,
   initThreeJS,
-  parseDXF,
+  parseDXFAsync,
   displayDXF,
   handleResize,
   resetView,
@@ -269,47 +269,42 @@ const handleHideAllLayers = () => {
   applyLayerVisibility(visibleLayerNames.value);
 };
 
-const loadDXFFromText = (dxfText: string) => {
+const loadDXFFromText = async (dxfText: string) => {
   isLoading.value = true;
-  // Double requestAnimationFrame ensures the browser renders the spinner
-  // before synchronous parsing/rendering blocks the main thread
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      try {
-        console.time("[dxf-vuer] parseDXF");
-        const dxf = parseDXF(dxfText);
-        console.timeEnd("[dxf-vuer] parseDXF");
+  try {
+    console.time("[dxf-vuer] parseDXF");
+    const dxf = await parseDXFAsync(dxfText);
+    console.timeEnd("[dxf-vuer] parseDXF");
 
-        lastLoadedDxf = dxf;
+    lastLoadedDxf = dxf;
 
-        console.time("[dxf-vuer] displayDXF");
-        const unsupportedEntities = displayDXF(dxf);
-        console.timeEnd("[dxf-vuer] displayDXF");
+    console.time("[dxf-vuer] displayDXF");
+    const unsupportedEntities = await displayDXF(dxf);
+    console.timeEnd("[dxf-vuer] displayDXF");
 
-        initLayersFromDXF(dxf);
-        applyLayerVisibility(visibleLayerNames.value);
-        emit("dxf-loaded", true);
-        emit("dxf-data", dxf);
+    initLayersFromDXF(dxf);
+    applyLayerVisibility(visibleLayerNames.value);
+    emit("dxf-loaded", true);
+    emit("dxf-data", dxf);
 
-        if (unsupportedEntities && unsupportedEntities.length > 0) {
-          emit("unsupported-entities", unsupportedEntities);
-        }
-      } catch (error) {
-        clearLayers();
-        const errorMsg = error instanceof Error ? error.message : "Unknown error loading DXF";
-        emit("error", errorMsg);
-        emit("dxf-loaded", false);
-        emit("dxf-data", null);
-      } finally {
-        isLoading.value = false;
-      }
-    });
-  });
+    if (unsupportedEntities && unsupportedEntities.length > 0) {
+      emit("unsupported-entities", unsupportedEntities);
+    }
+  } catch (error) {
+    clearLayers();
+    const errorMsg = error instanceof Error ? error.message : "Unknown error loading DXF";
+    emit("error", errorMsg);
+    emit("dxf-loaded", false);
+    emit("dxf-data", null);
+  } finally {
+    isLoading.value = false;
+  }
 };
 
-const loadDXFFromData = (dxfData: DxfData) => {
+const loadDXFFromData = async (dxfData: DxfData) => {
+  isLoading.value = true;
   try {
-    const unsupportedEntities = displayDXF(dxfData);
+    const unsupportedEntities = await displayDXF(dxfData);
     initLayersFromDXF(dxfData);
     applyLayerVisibility(visibleLayerNames.value);
     emit("dxf-loaded", true);
@@ -325,6 +320,8 @@ const loadDXFFromData = (dxfData: DxfData) => {
     emit("error", errorMsg);
     emit("dxf-loaded", false);
     emit("dxf-data", null);
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -338,7 +335,7 @@ watch(
   () => props.dxfData,
   (newData) => {
     // Skip if data was already loaded via loadDXFFromText
-    if (newData && hasDXFData.value && newData !== lastLoadedDxf) {
+    if (newData && hasDXFData.value && toRaw(newData) !== lastLoadedDxf) {
       loadDXFFromData(newData);
     }
   },
