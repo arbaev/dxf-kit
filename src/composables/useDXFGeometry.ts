@@ -1702,6 +1702,7 @@ const CHUNK_TIME_MS = 16;
 
 export interface DisplaySignal {
   cancelled: boolean;
+  onProgress?: (progress: number) => void;
 }
 
 /** Shared state for cooperative yielding across async processing */
@@ -1752,9 +1753,6 @@ export async function createThreeObjectsFromDXF(
 
   const yieldState: YieldState = { lastYield: performance.now(), signal };
 
-  // Debug timing
-  let _tInsert = 0, _tText = 0, _tGeom = 0, _tDecompose = 0;
-
   // Pre-pass: count INSERT usage and build templates for frequently-used blocks
   const blockRefCounts = new Map<string, number>();
   for (const entity of dxf.entities) {
@@ -1793,39 +1791,28 @@ export async function createThreeObjectsFromDXF(
 
       // INSERT blocks: flatten into collector (merged geometry)
       if (entity.type === "INSERT") {
-        const _t0 = performance.now();
         await collectInsertEntity(entity, dxf, colorCtx, collector, layer, null, group, 0, yieldState, blockTemplates);
-        _tInsert += performance.now() - _t0;
         continue;
       }
 
       // Try to collect simple entities into merged buffers
       if (COLLECTABLE_TYPES.has(entity.type)) {
-        const _t0 = performance.now();
         if (collectEntity(entity, colorCtx, collector, layer)) {
-          _tGeom += performance.now() - _t0;
           continue;
         }
-        _tGeom += performance.now() - _t0;
       }
 
       // Complex entities: create individual Three.js objects
-      const _t0e = performance.now();
       const obj = processEntity(entity, dxf, colorCtx, 0);
-      if (entity.type === "TEXT" || entity.type === "MTEXT") {
-        _tText += performance.now() - _t0e;
-      }
       if (obj) {
         // DIMENSION/LEADER/MLEADER: decompose lines+arrows into collector, keep only text
         const topDecomposable = entity.type === "DIMENSION" || entity.type === "LEADER"
           || entity.type === "MULTILEADER" || entity.type === "MLEADER";
 
         if (topDecomposable) {
-          const _t0d = performance.now();
           const identity = new THREE.Matrix4();
           const beforeCount = group.children.length;
           decomposeToCollector(obj, collector, layer, identity, group);
-          _tDecompose += performance.now() - _t0d;
           const textCount = group.children.length - beforeCount;
           _debugFallback[entity.type + "(text)"] = (_debugFallback[entity.type + "(text)"] || 0) + textCount;
         } else {
@@ -1849,17 +1836,17 @@ export async function createThreeObjectsFromDXF(
 
     // Yield to browser every ~16ms to keep UI responsive
     if (performance.now() - yieldState.lastYield > CHUNK_TIME_MS) {
+      signal?.onProgress?.(index / dxf.entities.length);
       await yieldToMain();
       yieldState.lastYield = performance.now();
     }
   }
 
+  signal?.onProgress?.(1);
+
   if (signal?.cancelled) {
     return { group };
   }
-
-  // Debug: timing breakdown
-  console.log(`[dxf-vuer] Time breakdown — INSERT: ${_tInsert.toFixed(0)}ms | Text: ${_tText.toFixed(0)}ms | Geom: ${_tGeom.toFixed(0)}ms | Decompose: ${_tDecompose.toFixed(0)}ms`);
 
   // Debug: log fallback entity counts
   const blockFallback = group.userData._debugFallback || {};

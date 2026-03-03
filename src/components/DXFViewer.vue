@@ -109,7 +109,15 @@
     <div v-if="isLoading" class="message-overlay loading-overlay">
       <div class="message-content">
         <div class="spinner"></div>
-        <div class="message-text">Loading DXF file...</div>
+        <div class="message-text">
+          {{ loadingPhase === 'parsing' ? 'Parsing DXF...' : 'Rendering...' }}
+        </div>
+        <div v-if="loadingPhase === 'rendering'" class="progress-container">
+          <div class="progress-bar" :style="{ width: (displayProgress * 100) + '%' }"></div>
+        </div>
+        <div v-if="loadingPhase === 'rendering'" class="progress-text">
+          {{ Math.round(displayProgress * 100) }}%
+        </div>
       </div>
     </div>
 
@@ -171,6 +179,7 @@ const isFullscreen = ref(false);
 
 const {
   isLoading,
+  displayProgress,
   webGLSupported,
   error: rendererError,
   initThreeJS,
@@ -183,6 +192,8 @@ const {
   getCamera,
   getRenderer,
 } = useDXFRenderer();
+
+const loadingPhase = ref<"" | "parsing" | "rendering">("");
 
 // Cursor world coordinates
 const cursorX = ref(0);
@@ -272,12 +283,14 @@ const handleHideAllLayers = () => {
 const loadDXFFromText = async (dxfText: string) => {
   isLoading.value = true;
   try {
+    loadingPhase.value = "parsing";
     console.time("[dxf-vuer] parseDXF");
     const dxf = await parseDXFAsync(dxfText);
     console.timeEnd("[dxf-vuer] parseDXF");
 
     lastLoadedDxf = dxf;
 
+    loadingPhase.value = "rendering";
     console.time("[dxf-vuer] displayDXF");
     const unsupportedEntities = await displayDXF(dxf);
     console.timeEnd("[dxf-vuer] displayDXF");
@@ -297,12 +310,14 @@ const loadDXFFromText = async (dxfText: string) => {
     emit("dxf-loaded", false);
     emit("dxf-data", null);
   } finally {
+    loadingPhase.value = "";
     isLoading.value = false;
   }
 };
 
 const loadDXFFromData = async (dxfData: DxfData) => {
   isLoading.value = true;
+  loadingPhase.value = "rendering";
   try {
     const unsupportedEntities = await displayDXF(dxfData);
     initLayersFromDXF(dxfData);
@@ -321,6 +336,7 @@ const loadDXFFromData = async (dxfData: DxfData) => {
     emit("dxf-loaded", false);
     emit("dxf-data", null);
   } finally {
+    loadingPhase.value = "";
     isLoading.value = false;
   }
 };
@@ -517,6 +533,25 @@ defineExpose({
   border-top-color: var(--dxf-vuer-primary-color, #1040b0);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+.progress-container {
+  width: 200px;
+  height: 4px;
+  background-color: var(--dxf-vuer-border-color, #e0e0e0);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: var(--dxf-vuer-primary-color, #1040b0);
+  transition: width 0.1s ease-out;
+}
+
+.progress-text {
+  font-size: 0.85rem;
+  color: var(--dxf-vuer-text-secondary, #757575);
 }
 
 @keyframes spin {

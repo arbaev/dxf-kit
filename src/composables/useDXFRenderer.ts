@@ -10,6 +10,7 @@ import ParserWorker from "@/workers/parserWorker?worker&inline";
 
 export function useDXFRenderer() {
   const isLoading = ref(false);
+  const displayProgress = ref(0);
   let currentDXFGroup: Group | null = null;
   let worker: Worker | null = null;
   let workerFailed = false;
@@ -120,7 +121,11 @@ export function useDXFRenderer() {
     if (displaySignal) {
       displaySignal.cancelled = true;
     }
-    const signal: DisplaySignal = { cancelled: false };
+    displayProgress.value = 0;
+    const signal: DisplaySignal = {
+      cancelled: false,
+      onProgress: (p: number) => { displayProgress.value = p; },
+    };
     displaySignal = signal;
 
     if (currentDXFGroup) {
@@ -206,6 +211,7 @@ export function useDXFRenderer() {
 
   return {
     isLoading,
+    displayProgress,
     webGLSupported,
     error,
 
