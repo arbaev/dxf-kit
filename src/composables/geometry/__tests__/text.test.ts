@@ -27,12 +27,12 @@ describe("replaceSpecialChars", () => {
     expect(replaceSpecialChars("%%P0.1")).toBe("\u00B10.1");
   });
 
-  it("replaces %%c with diameter symbol (U+00D8)", () => {
-    expect(replaceSpecialChars("%%c20")).toBe("\u00D820");
+  it("replaces %%c with diameter sign (U+2300)", () => {
+    expect(replaceSpecialChars("%%c20")).toBe("\u230020");
   });
 
-  it("replaces %%C (uppercase) with diameter symbol", () => {
-    expect(replaceSpecialChars("%%C50")).toBe("\u00D850");
+  it("replaces %%C (uppercase) with diameter sign", () => {
+    expect(replaceSpecialChars("%%C50")).toBe("\u230050");
   });
 
   it("removes underline/overline toggles (%%u, %%U, %%o, %%O)", () => {
@@ -47,8 +47,16 @@ describe("replaceSpecialChars", () => {
 
   it("handles multiple different special chars in one string", () => {
     expect(replaceSpecialChars("%%c20%%p0.5%%d")).toBe(
-      "\u00D820\u00B10.5\u00B0",
+      "\u230020\u00B10.5\u00B0",
     );
+  });
+
+  it("passes U+2300 (⌀ DIAMETER SIGN) through unchanged", () => {
+    expect(replaceSpecialChars("\u230050")).toBe("\u230050");
+  });
+
+  it("passes U+2205 (∅ EMPTY SET) through unchanged", () => {
+    expect(replaceSpecialChars("\u220530")).toBe("\u220530");
   });
 
   it("returns plain text unchanged when no special chars are present", () => {
@@ -191,7 +199,7 @@ describe("parseMTextContent", () => {
   it("applies DXF special chars (%%d, %%c, etc.) inside MTEXT", () => {
     const result = parseMTextContent("Angle: 45%%d, Dia: %%c20");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("Angle: 45\u00B0, Dia: \u00D820");
+    expect(result[0].text).toBe("Angle: 45\u00B0, Dia: \u230020");
   });
 });
 

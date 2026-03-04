@@ -61,7 +61,8 @@ function measureText(font: Font, text: string): TextMetrics {
       hasVisibleGlyphs = true;
     }
 
-    totalAdvance += (glyphs[i].advanceWidth ?? 0) * invEm;
+    // Use GlyphData advance (correct for both font and custom glyphs)
+    totalAdvance += gd ? gd.advance : (glyphs[i].advanceWidth ?? 0) * invEm;
     if (i < glyphs.length - 1) {
       totalAdvance += font.getKerningValue(glyphs[i], glyphs[i + 1]) * invEm;
     }
@@ -249,7 +250,8 @@ export function addTextToCollector(
       }
     }
 
-    xCursor += (m.glyphs[i].advanceWidth ?? 0) * invEm;
+    // Use GlyphData advance (correct for both font and custom glyphs)
+    xCursor += gd ? gd.advance : (m.glyphs[i].advanceWidth ?? 0) * invEm;
     if (i < m.glyphs.length - 1) {
       xCursor += font.getKerningValue(m.glyphs[i], m.glyphs[i + 1]) * invEm;
     }

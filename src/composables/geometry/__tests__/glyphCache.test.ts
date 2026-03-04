@@ -80,6 +80,22 @@ describe("glyphCache", () => {
       }
     });
 
+    it("returns custom glyph for U+2300 (⌀ diameter sign)", () => {
+      // U+2300 DIAMETER SIGN is not in Noto Sans Light
+      expect(font.charToGlyphIndex("\u2300")).toBe(0);
+      const data = getTriangulatedGlyph(font, "\u2300");
+      expect(data).not.toBeNull();
+      expect(data!.positions.length).toBeGreaterThan(0);
+      expect(data!.indices.length).toBeGreaterThan(0);
+      expect(data!.advance).toBeGreaterThan(0);
+    });
+
+    it("caches custom glyph — same object on second call", () => {
+      const data1 = getTriangulatedGlyph(font, "\u2300");
+      const data2 = getTriangulatedGlyph(font, "\u2300");
+      expect(data1).toBe(data2);
+    });
+
     it("caches results — same object on second call", () => {
       const data1 = getTriangulatedGlyph(font, "A");
       const data2 = getTriangulatedGlyph(font, "A");

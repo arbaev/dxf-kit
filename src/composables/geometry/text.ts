@@ -21,7 +21,7 @@ export const replaceSpecialChars = (text: string): string =>
   text
     .replace(/%%[dD]/g, "\u00B0")
     .replace(/%%[pP]/g, "\u00B1")
-    .replace(/%%[cC]/g, "\u00D8")
+    .replace(/%%[cC]/g, "\u2300")
     .replace(/%%[uUoO]/g, "") // toggle underline/overline — remove
     .replace(/%%(\d{3})/g, (_, code) => String.fromCharCode(parseInt(code)));
 

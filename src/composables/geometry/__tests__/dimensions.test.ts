@@ -106,7 +106,7 @@ describe("cleanDimensionMText", () => {
   it("converts special character codes (%%d -> deg, %%p -> plus/minus, %%c -> diameter)", () => {
     expect(cleanDimensionMText("90%%d")).toBe("90\u00B0");
     expect(cleanDimensionMText("%%p0.01")).toBe("\u00B10.01");
-    expect(cleanDimensionMText("%%c25")).toBe("\u00D825");
+    expect(cleanDimensionMText("%%c25")).toBe("\u230025");
   });
 
   it("restores escaped backslash, braces", () => {

@@ -1,5 +1,6 @@
 import { ShapePath, ShapeUtils } from "three";
 import type { Font, Glyph } from "opentype.js";
+import { getCustomGlyph } from "./customGlyphs";
 
 /** Number of line segments per curve in glyph outlines.
  *  5 gives smooth contours for fonts with cubic Bézier curves (Noto Sans etc.).
@@ -150,14 +151,24 @@ function getFallbackGlyph(font: Font): GlyphData | null {
 
 /**
  * Get triangulated glyph data for a character.
- * Results are cached per font+glyph. Returns fallback glyph data
- * for characters not present in the font.
+ * Results are cached per font+glyph. Falls back to custom glyph registry
+ * for engineering symbols, then to generic fallback (? / U+FFFD).
  */
 export function getTriangulatedGlyph(font: Font, char: string): GlyphData | null {
   const glyphIndex = font.charToGlyphIndex(char);
 
-  // Missing glyph → fallback
+  // Missing glyph → try custom glyph registry, then generic fallback
   if (glyphIndex === 0) {
+    const customKey = `custom::${char}`;
+    const cachedCustom = cache.get(customKey);
+    if (cachedCustom) return cachedCustom;
+
+    const custom = getCustomGlyph(char);
+    if (custom) {
+      cache.set(customKey, custom);
+      return custom;
+    }
+
     return getFallbackGlyph(font);
   }
 
