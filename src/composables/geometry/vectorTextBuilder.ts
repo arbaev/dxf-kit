@@ -1,6 +1,7 @@
 import type { Font, Glyph } from "opentype.js";
 import { getTriangulatedGlyph, type GlyphData } from "./glyphCache";
 import type { GeometryCollector } from "./mergeCollectors";
+import type { MTextLine } from "./text";
 
 /** DXF TEXT horizontal alignment (code 72) */
 export const enum HAlign {
@@ -248,5 +249,242 @@ export function addTextToCollector(
 
   if (allPositions.length >= 9 && allIndices.length >= 3) {
     collector.addMesh(layer, color, allPositions, allIndices);
+  }
+}
+
+// ── MTEXT support ──────────────────────────────────────────────────────
+
+const LINE_SPACING = 1.4;
+const STACKED_RATIO = 0.6;
+/** Small gap between main text and stacked fraction, as ratio of height */
+const STACKED_H_GAP = 0.1;
+
+/**
+ * Map MTEXT horizontal alignment string to HAlign enum.
+ */
+function mtextHAlignToEnum(hAlign: "left" | "center" | "right"): number {
+  if (hAlign === "center") return HAlign.CENTER;
+  if (hAlign === "right") return HAlign.RIGHT;
+  return HAlign.LEFT;
+}
+
+/**
+ * Word wrap text to fit within a maximum width (in world units).
+ * Splits by spaces; single words wider than maxWidth stay on their own line.
+ */
+function wrapTextToWidth(
+  font: Font, text: string, height: number, maxWidth: number,
+): string[] {
+  if (!text) return [text];
+  const words = text.split(" ");
+  if (words.length <= 1) return [text];
+
+  const lines: string[] = [];
+  let currentLine = words[0];
+
+  for (let i = 1; i < words.length; i++) {
+    const testLine = currentLine + " " + words[i];
+    const m = measureText(font, testLine);
+    // totalAdvance is normalized (unitsPerEm=1), multiply by height for world units
+    if (m.totalAdvance * height > maxWidth && currentLine.length > 0) {
+      lines.push(currentLine);
+      currentLine = words[i];
+    } else {
+      currentLine = testLine;
+    }
+  }
+  lines.push(currentLine);
+  return lines;
+}
+
+/**
+ * Emit stacked text (main text + fraction) into collector.
+ * Handles horizontal alignment for the combined width.
+ *
+ * @param posX/posY Position for this line (VAlign.TOP semantics — top of text at posY)
+ */
+function emitStackedText(
+  collector: GeometryCollector,
+  layer: string, color: string,
+  font: Font,
+  mainText: string, stackedTop: string, stackedBottom: string,
+  height: number,
+  posX: number, posY: number, posZ: number,
+  rotation: number,
+  hAlign: "left" | "center" | "right",
+): void {
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  const stackedHeight = height * STACKED_RATIO;
+
+  // Measure advance widths in world units
+  const mainAdvance = mainText ? measureText(font, mainText).totalAdvance * height : 0;
+  const topAdvance = stackedTop
+    ? measureText(font, stackedTop).totalAdvance * stackedHeight : 0;
+  const bottomAdvance = stackedBottom
+    ? measureText(font, stackedBottom).totalAdvance * stackedHeight : 0;
+  const stackedWidth = Math.max(topAdvance, bottomAdvance);
+  const gap = mainText ? height * STACKED_H_GAP : 0;
+  const totalWidth = mainAdvance + gap + stackedWidth;
+
+  // Horizontal alignment offset (in local text direction)
+  let offsetX = 0;
+  if (hAlign === "center") offsetX = -totalWidth / 2;
+  else if (hAlign === "right") offsetX = -totalWidth;
+
+  // Start position with alignment offset applied in rotated direction
+  let curX = posX + offsetX * cos;
+  let curY = posY + offsetX * sin;
+
+  // Emit main text (LEFT-aligned, alignment handled above)
+  if (mainText) {
+    addTextToCollector(
+      collector, layer, color, font, mainText, height,
+      curX, curY, posZ, rotation, HAlign.LEFT, VAlign.TOP,
+    );
+    curX += (mainAdvance + gap) * cos;
+    curY += (mainAdvance + gap) * sin;
+  }
+
+  // Stacked fractions: centered on the visual middle of the main text line.
+  // With VAlign.TOP, the ascender top is at posY.
+  // Visual center = posY - (ascender/unitsPerEm) * height * 0.5
+  const normAsc = font.ascender / font.unitsPerEm;
+  const halfAsc = normAsc * height * 0.5;
+  // Gap between top and bottom fractions (in world units)
+  const vGap = height * 0.02;
+
+  // Top fraction: baseline positioned above center
+  if (stackedTop) {
+    const topOffsetY = -halfAsc + vGap;
+    const topX = curX - topOffsetY * sin;
+    const topY = curY + topOffsetY * cos;
+    addTextToCollector(
+      collector, layer, color, font, stackedTop, stackedHeight,
+      topX, topY, posZ, rotation, HAlign.LEFT, VAlign.BASELINE,
+    );
+  }
+
+  // Bottom fraction: baseline positioned below center
+  if (stackedBottom) {
+    const stackedAsc = normAsc * stackedHeight;
+    const bottomOffsetY = -halfAsc - vGap - stackedAsc;
+    const bottomX = curX - bottomOffsetY * sin;
+    const bottomY = curY + bottomOffsetY * cos;
+    addTextToCollector(
+      collector, layer, color, font, stackedBottom, stackedHeight,
+      bottomX, bottomY, posZ, rotation, HAlign.LEFT, VAlign.BASELINE,
+    );
+  }
+}
+
+/**
+ * Add MTEXT entity lines to GeometryCollector as triangulated mesh.
+ * Handles multiline text with word wrapping, 9 attachment points,
+ * stacked text (fractions), and per-line color/height overrides.
+ *
+ * @param collector       GeometryCollector to write into
+ * @param layer           Layer name for merge key
+ * @param color           Default entity color (fallback when line.color undefined)
+ * @param font            opentype.js Font
+ * @param lines           Parsed MTEXT lines from parseMTextContent()
+ * @param defaultHeight   Entity height (entity.height || TEXT_HEIGHT)
+ * @param posX            Insertion point X
+ * @param posY            Insertion point Y
+ * @param posZ            Insertion point Z
+ * @param rotation        Rotation in radians
+ * @param attachmentPoint 1-9 (DXF code 71)
+ * @param width           Column width for word wrapping (DXF code 41), world units
+ */
+export function addMTextToCollector(
+  collector: GeometryCollector,
+  layer: string,
+  color: string,
+  font: Font,
+  lines: MTextLine[],
+  defaultHeight: number,
+  posX: number,
+  posY: number,
+  posZ: number,
+  rotation: number = 0,
+  attachmentPoint: number = 1,
+  width?: number,
+): void {
+  if (lines.length === 0 || defaultHeight <= 0) return;
+
+  // 1. Word wrapping: expand lines if width constraint is set
+  const expandedLines: MTextLine[] = [];
+  if (width && width > 0) {
+    for (const line of lines) {
+      // Skip wrapping for stacked lines (typically short fractions)
+      if (line.stackedTop || line.stackedBottom) {
+        expandedLines.push(line);
+        continue;
+      }
+      const lineHeight = line.height || defaultHeight;
+      const wrapped = wrapTextToWidth(font, line.text, lineHeight, width);
+      for (const wText of wrapped) {
+        expandedLines.push({ ...line, text: wText });
+      }
+    }
+  } else {
+    expandedLines.push(...lines);
+  }
+
+  if (expandedLines.length === 0) return;
+
+  // 2. Compute total block height
+  let totalHeight = 0;
+  for (const line of expandedLines) {
+    totalHeight += (line.height || defaultHeight) * LINE_SPACING;
+  }
+  // Remove trailing spacing from last line
+  const lastLineHeight = expandedLines[expandedLines.length - 1].height || defaultHeight;
+  totalHeight = totalHeight - lastLineHeight * LINE_SPACING + lastLineHeight;
+
+  // 3. Determine alignment from attachment point (1-9)
+  const col = (attachmentPoint - 1) % 3; // 0=left, 1=center, 2=right
+  const row = Math.ceil(attachmentPoint / 3); // 1=top, 2=middle, 3=bottom
+  const hAlign: "left" | "center" | "right" =
+    col === 1 ? "center" : col === 2 ? "right" : "left";
+
+  // Vertical offset: how much to shift the text block up from the insertion point
+  let groupYOffset = 0;
+  if (row === 2) groupYOffset = totalHeight / 2; // middle
+  else if (row === 3) groupYOffset = totalHeight; // bottom
+
+  // 4. Emit each line
+  const hAlignEnum = mtextHAlignToEnum(hAlign);
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  let lineYOffset = 0; // accumulates downward (negative Y in local coords)
+
+  for (const line of expandedLines) {
+    const lineHeight = line.height || defaultHeight;
+    const lineColor = line.color || color;
+
+    // Local offset from insertion point (in text-local coordinates)
+    // Lines stack downward from groupYOffset
+    const localY = groupYOffset + lineYOffset;
+
+    // Apply rotation to get world position
+    const worldX = posX - localY * sin;
+    const worldY = posY + localY * cos;
+
+    if (line.stackedTop || line.stackedBottom) {
+      emitStackedText(
+        collector, layer, lineColor, font,
+        line.text, line.stackedTop || "", line.stackedBottom || "",
+        lineHeight, worldX, worldY, posZ, rotation, hAlign,
+      );
+    } else {
+      addTextToCollector(
+        collector, layer, lineColor, font,
+        line.text, lineHeight,
+        worldX, worldY, posZ, rotation, hAlignEnum, VAlign.TOP,
+      );
+    }
+
+    lineYOffset -= lineHeight * LINE_SPACING;
   }
 }

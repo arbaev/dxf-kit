@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import {
   addTextToCollector,
+  addMTextToCollector,
   measureTextWidth,
   HAlign,
   VAlign,
 } from "../vectorTextBuilder";
+import type { MTextLine } from "../text";
 import { loadDefaultFont } from "../fontManager";
 import { clearGlyphCache } from "../glyphCache";
 import type { Font } from "opentype.js";
@@ -315,6 +317,210 @@ describe("vectorTextBuilder", () => {
     it("returns 0 for empty string", () => {
       const w = measureTextWidth(font, "", 10);
       expect(w).toBe(0);
+    });
+  });
+
+  describe("addMTextToCollector — basic", () => {
+    it("produces mesh data for multiline text", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [
+        { text: "Line one" },
+        { text: "Line two" },
+      ];
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 10, 0, 0, 0);
+      expect(c.meshCalls.length).toBe(2);
+      expect(c.totalVertices).toBeGreaterThan(0);
+    });
+
+    it("produces nothing for empty lines array", () => {
+      const c = new MockCollector();
+      addMTextToCollector(c as any, "0", "#fff", font, [], 10, 0, 0, 0);
+      expect(c.meshCalls.length).toBe(0);
+    });
+
+    it("single line works like addTextToCollector", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{ text: "Hello" }];
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 10, 0, 0, 0);
+      expect(c.meshCalls.length).toBe(1);
+      expect(c.totalVertices).toBeGreaterThan(0);
+    });
+
+    it("all z-coordinates match posZ", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{ text: "A" }, { text: "B" }];
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 10, 0, 0, 7);
+      for (const call of c.meshCalls) {
+        for (let i = 2; i < call.vertices.length; i += 3) {
+          expect(call.vertices[i]).toBe(7);
+        }
+      }
+    });
+
+    it("produces nothing for zero height", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{ text: "Hello" }];
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 0, 0, 0, 0);
+      expect(c.meshCalls.length).toBe(0);
+    });
+  });
+
+  describe("addMTextToCollector — attachment points", () => {
+    it("TOP_LEFT (1): text extends below and right of position", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{ text: "AB" }, { text: "CD" }];
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 10, 50, 50, 0, 0, 1);
+      const b = c.getBounds();
+      // TOP_LEFT: text starts at position and goes right and down
+      expect(b.xMin).toBeGreaterThanOrEqual(48);
+      expect(b.yMax).toBeLessThanOrEqual(52); // top near position
+    });
+
+    it("BOTTOM_RIGHT (9): text extends above and left of position", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{ text: "AB" }, { text: "CD" }];
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 10, 50, 50, 0, 0, 9);
+      const b = c.getBounds();
+      // BOTTOM_RIGHT: text extends above and to the left
+      expect(b.xMax).toBeLessThanOrEqual(52);
+      expect(b.yMin).toBeGreaterThanOrEqual(48); // bottom near position
+    });
+
+    it("MIDDLE_CENTER (5): text is centered around position", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{ text: "AB" }, { text: "CD" }];
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 10, 50, 50, 0, 0, 5);
+      const b = c.getBounds();
+      const midX = (b.xMin + b.xMax) / 2;
+      const midY = (b.yMin + b.yMax) / 2;
+      // Center should be near (50, 50)
+      expect(Math.abs(midX - 50)).toBeLessThan(5);
+      expect(Math.abs(midY - 50)).toBeLessThan(5);
+    });
+  });
+
+  describe("addMTextToCollector — per-line color", () => {
+    it("lines with different colors produce separate addMesh calls", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [
+        { text: "Red line", color: "#ff0000" },
+        { text: "Blue line", color: "#0000ff" },
+      ];
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 10, 0, 0, 0);
+      // Each line has different color → separate calls
+      const colors = c.meshCalls.map(call => call.color);
+      expect(colors).toContain("#ff0000");
+      expect(colors).toContain("#0000ff");
+    });
+
+    it("lines without color use default entity color", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{ text: "Default" }];
+      addMTextToCollector(c as any, "0", "#abcdef", font, lines, 10, 0, 0, 0);
+      expect(c.meshCalls[0].color).toBe("#abcdef");
+    });
+  });
+
+  describe("addMTextToCollector — per-line height", () => {
+    it("different line heights render at different sizes", () => {
+      const cSmall = new MockCollector();
+      const cLarge = new MockCollector();
+      const smallLines: MTextLine[] = [{ text: "A", height: 5 }];
+      const largeLines: MTextLine[] = [{ text: "A", height: 20 }];
+      addMTextToCollector(cSmall as any, "0", "#fff", font, smallLines, 10, 0, 0, 0);
+      addMTextToCollector(cLarge as any, "0", "#fff", font, largeLines, 10, 0, 0, 0);
+      const hSmall = cSmall.getBounds().yMax - cSmall.getBounds().yMin;
+      const hLarge = cLarge.getBounds().yMax - cLarge.getBounds().yMin;
+      expect(hLarge).toBeGreaterThan(hSmall * 2);
+    });
+  });
+
+  describe("addMTextToCollector — word wrapping", () => {
+    it("long text with width constraint produces multiple lines", () => {
+      const c = new MockCollector();
+      // "Hello World Test" with narrow width should wrap
+      const lines: MTextLine[] = [{ text: "Hello World Test" }];
+      // Measure width of "Hello" to set a narrow constraint
+      const helloWidth = measureTextWidth(font, "Hello World", 10);
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 10, 0, 0, 0, 0, 1, helloWidth * 0.8);
+      // Should have more than 1 addMesh call (wrapped into multiple lines)
+      expect(c.meshCalls.length).toBeGreaterThan(1);
+    });
+
+    it("short text stays single line when width is large enough", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{ text: "Hi" }];
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 10, 0, 0, 0, 0, 1, 1000);
+      expect(c.meshCalls.length).toBe(1);
+    });
+
+    it("width=0 or undefined skips wrapping", () => {
+      const c1 = new MockCollector();
+      const c2 = new MockCollector();
+      const lines: MTextLine[] = [{ text: "Hello World Test" }];
+      addMTextToCollector(c1 as any, "0", "#fff", font, lines, 10, 0, 0, 0, 0, 1, 0);
+      addMTextToCollector(c2 as any, "0", "#fff", font, lines, 10, 0, 0, 0, 0, 1, undefined);
+      // No wrapping → single addMesh call each
+      expect(c1.meshCalls.length).toBe(1);
+      expect(c2.meshCalls.length).toBe(1);
+    });
+  });
+
+  describe("addMTextToCollector — stacked text", () => {
+    it("line with stackedTop/stackedBottom renders extra geometry", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{
+        text: "Main",
+        stackedTop: "1",
+        stackedBottom: "2",
+      }];
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 10, 0, 0, 0);
+      // Should have calls for main text + top fraction + bottom fraction
+      expect(c.meshCalls.length).toBeGreaterThanOrEqual(3);
+      expect(c.totalVertices).toBeGreaterThan(0);
+    });
+
+    it("stacked text without main text still renders fractions", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{
+        text: "",
+        stackedTop: "1",
+        stackedBottom: "2",
+      }];
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 10, 0, 0, 0);
+      // Top + bottom fractions
+      expect(c.meshCalls.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe("addMTextToCollector — rotation", () => {
+    it("90° rotation changes text direction", () => {
+      const c0 = new MockCollector();
+      const c90 = new MockCollector();
+      const lines: MTextLine[] = [{ text: "ABC" }];
+      addMTextToCollector(c0 as any, "0", "#fff", font, lines, 10, 0, 0, 0, 0);
+      addMTextToCollector(c90 as any, "0", "#fff", font, lines, 10, 0, 0, 0, Math.PI / 2);
+      const b0 = c0.getBounds();
+      const b90 = c90.getBounds();
+      // Unrotated: wider than tall
+      const w0 = b0.xMax - b0.xMin;
+      const h0 = b0.yMax - b0.yMin;
+      expect(w0).toBeGreaterThan(h0);
+      // Rotated 90°: taller than wide (text direction is vertical)
+      const w90 = b90.xMax - b90.xMin;
+      const h90 = b90.yMax - b90.yMin;
+      expect(h90).toBeGreaterThan(w90);
+    });
+
+    it("multiline rotation positions lines perpendicular to text direction", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{ text: "A" }, { text: "B" }];
+      // 90° rotation: lines should spread horizontally (perpendicular to text direction)
+      addMTextToCollector(c as any, "0", "#fff", font, lines, 10, 0, 0, 0, Math.PI / 2, 1);
+      const b = c.getBounds();
+      // With 90° rotation, line stacking goes in -X direction instead of -Y
+      const w = b.xMax - b.xMin;
+      expect(w).toBeGreaterThan(5); // lines spread horizontally
     });
   });
 });
