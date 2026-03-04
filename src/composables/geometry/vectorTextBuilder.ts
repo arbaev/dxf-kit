@@ -637,22 +637,75 @@ export function addDimensionTextToCollector(
     const mainText = stackedMatch[1].trim();
     const topText = stackedMatch[2].trim();
     const bottomText = stackedMatch[3].trim();
+    const stackedHeight = height * STACKED_RATIO;
 
-    // emitStackedText expects VAlign.TOP semantics (top of text at posY).
-    // Shift posY up by half the ascender height to center the block on posY.
-    const normAsc = font.ascender / font.unitsPerEm;
-    const halfBlockUp = normAsc * height * 0.5;
     const cos = Math.cos(rotation);
     const sin = Math.sin(rotation);
-    const topX = posX + halfBlockUp * sin;
-    const topY = posY + halfBlockUp * cos;
 
-    emitStackedText(
-      collector, layer, color, font,
-      mainText, topText, bottomText,
-      height, topX, topY, posZ, rotation, hAlign,
-      transform,
-    );
+    // Measure widths to compute horizontal alignment
+    const mainAdvance = mainText ? measureText(font, mainText).totalAdvance * height : 0;
+    const topAdvance = topText ? measureText(font, topText).totalAdvance * stackedHeight : 0;
+    const bottomAdvance = bottomText ? measureText(font, bottomText).totalAdvance * stackedHeight : 0;
+    const stackedWidth = Math.max(topAdvance, bottomAdvance);
+    const gap = mainText ? height * STACKED_H_GAP : 0;
+    const totalWidth = mainAdvance + gap + stackedWidth;
+
+    // Horizontal alignment offset
+    let offsetX = 0;
+    if (hAlign === "center") offsetX = -totalWidth / 2;
+    else if (hAlign === "right") offsetX = -totalWidth;
+
+    // posX/posY = visual center of the dimension text block
+    let curX = posX + offsetX * cos;
+    let curY = posY + offsetX * sin;
+
+    // Emit main text centered on posY
+    if (mainText) {
+      addTextToCollector(
+        collector, layer, color, font, mainText, height,
+        curX, curY, posZ, rotation, HAlign.LEFT, VAlign.MIDDLE,
+        1, undefined, undefined, transform,
+      );
+      curX += (mainAdvance + gap) * cos;
+      curY += (mainAdvance + gap) * sin;
+    }
+
+    // Fractions: centered vertically around posY (= dimension midpoint).
+    // Use actual glyph visual bounds for precise centering.
+    const vGap = height * 0.04;
+    const topMetrics = topText ? measureText(font, topText) : null;
+    const bottomMetrics = bottomText ? measureText(font, bottomText) : null;
+    const topVisualH = topMetrics ? (topMetrics.bounds.yMax - topMetrics.bounds.yMin) * stackedHeight : 0;
+    const bottomVisualH = bottomMetrics ? (bottomMetrics.bounds.yMax - bottomMetrics.bounds.yMin) * stackedHeight : 0;
+    const totalStackH = topVisualH + vGap + bottomVisualH;
+    // halfStack = distance from center to the top edge of the top fraction
+    const halfStack = totalStackH / 2;
+
+    // Top fraction: its top edge (yMax) at center + halfStack
+    // baseline = center + halfStack - yMax * stackedHeight
+    if (topText && topMetrics) {
+      const topBaseY = halfStack - topMetrics.bounds.yMax * stackedHeight;
+      const topX = curX - topBaseY * sin;
+      const topY = curY + topBaseY * cos;
+      addTextToCollector(
+        collector, layer, color, font, topText, stackedHeight,
+        topX, topY, posZ, rotation, HAlign.LEFT, VAlign.BASELINE,
+        1, undefined, undefined, transform,
+      );
+    }
+
+    // Bottom fraction: its bottom edge (yMin) at center - halfStack
+    // baseline = center - halfStack - yMin * stackedHeight
+    if (bottomText && bottomMetrics) {
+      const bottomBaseY = -halfStack - bottomMetrics.bounds.yMin * stackedHeight;
+      const bottomX = curX - bottomBaseY * sin;
+      const bottomY = curY + bottomBaseY * cos;
+      addTextToCollector(
+        collector, layer, color, font, bottomText, stackedHeight,
+        bottomX, bottomY, posZ, rotation, HAlign.LEFT, VAlign.BASELINE,
+        1, undefined, undefined, transform,
+      );
+    }
   } else {
     const plain = cleaned.replace(/\\S[^;]*;/g, "").trim();
     if (!plain) return;
