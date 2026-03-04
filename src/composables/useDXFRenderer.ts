@@ -13,6 +13,8 @@ export function useDXFRenderer() {
   const isLoading = ref(false);
   const displayProgress = ref(0);
   let currentDXFGroup: Group | null = null;
+  // Origin offset: group is shifted by -center for float32 precision on large coordinates
+  let originOffset = new THREE.Vector3();
   let worker: Worker | null = null;
   let workerFailed = false;
   let messageId = 0;
@@ -164,8 +166,13 @@ export function useDXFRenderer() {
 
       const center = box.getCenter(new THREE.Vector3());
 
-      // Set OrbitControls target to object center (on the z=0 plane)
-      setOrbitTarget(center.x, center.y, 0);
+      // Shift group to origin for float32 precision on large coordinates
+      originOffset.set(center.x, center.y, 0);
+      result.group.position.set(-center.x, -center.y, 0);
+      box.translate(new THREE.Vector3(-center.x, -center.y, 0));
+
+      // OrbitControls target at origin (group already shifted)
+      setOrbitTarget(0, 0, 0);
       fitCameraToBox(box, camera);
       saveOrbitState();
     }
@@ -201,6 +208,8 @@ export function useDXFRenderer() {
     render();
   };
 
+  const getOriginOffset = () => originOffset;
+
   const cleanup = () => {
     terminateWorker();
     // Remove listener before cleaning up controls
@@ -210,6 +219,7 @@ export function useDXFRenderer() {
     }
     cleanupScene(currentDXFGroup);
     currentDXFGroup = null;
+    originOffset = new THREE.Vector3();
     resetResizing();
   };
 
@@ -229,5 +239,6 @@ export function useDXFRenderer() {
     cleanup,
     getCamera,
     getRenderer,
+    getOriginOffset,
   };
 }

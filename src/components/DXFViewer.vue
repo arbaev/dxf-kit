@@ -259,6 +259,7 @@ const {
   cleanup,
   getCamera,
   getRenderer,
+  getOriginOffset,
 } = useDXFRenderer();
 
 const loadingPhase = ref<"" | "fetching" | "parsing" | "rendering">("");
@@ -279,8 +280,10 @@ const handleMouseMove = (e: MouseEvent) => {
   const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   const worldPos = new THREE.Vector3(ndcX, ndcY, 0).unproject(camera);
 
-  cursorX.value = worldPos.x;
-  cursorY.value = worldPos.y;
+  // Add back origin offset to display original DXF coordinates
+  const offset = getOriginOffset();
+  cursorX.value = worldPos.x + offset.x;
+  cursorY.value = worldPos.y + offset.y;
   isCursorVisible.value = true;
 };
 

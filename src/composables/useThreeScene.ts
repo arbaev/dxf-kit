@@ -141,6 +141,7 @@ export function useThreeScene() {
         alpha: true,
         preserveDrawingBuffer: true,
       });
+      renderer.sortObjects = false;
       renderer.setSize(containerWidth, containerHeight);
     } catch (err) {
       const errorMessage =
