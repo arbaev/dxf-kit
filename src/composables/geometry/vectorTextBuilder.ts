@@ -131,6 +131,7 @@ export function addTextToCollector(
   widthFactor: number = 1,
   endPosX?: number,
   endPosY?: number,
+  transform?: readonly number[],
 ): void {
   if (!text || height <= 0) return;
 
@@ -230,11 +231,17 @@ export function addTextToCollector(
         const localX = (gd.positions[j] + xCursor - originX) * scaleX;
         const localY = (gd.positions[j + 1] - originY) * scaleY;
         // Rotation + translation to world coordinates
-        allPositions.push(
-          posX + localX * cos - localY * sin,
-          posY + localX * sin + localY * cos,
-          posZ,
-        );
+        let wx = posX + localX * cos - localY * sin;
+        let wy = posY + localX * sin + localY * cos;
+        let wz = posZ;
+        // Apply block INSERT transform if provided (Matrix4 elements)
+        if (transform) {
+          const tx = transform[0] * wx + transform[4] * wy + transform[8] * wz + transform[12];
+          const ty = transform[1] * wx + transform[5] * wy + transform[9] * wz + transform[13];
+          const tz = transform[2] * wx + transform[6] * wy + transform[10] * wz + transform[14];
+          wx = tx; wy = ty; wz = tz;
+        }
+        allPositions.push(wx, wy, wz);
       }
 
       for (const idx of gd.indices) {
@@ -313,6 +320,7 @@ function emitStackedText(
   posX: number, posY: number, posZ: number,
   rotation: number,
   hAlign: "left" | "center" | "right",
+  transform?: readonly number[],
 ): void {
   const cos = Math.cos(rotation);
   const sin = Math.sin(rotation);
@@ -342,6 +350,7 @@ function emitStackedText(
     addTextToCollector(
       collector, layer, color, font, mainText, height,
       curX, curY, posZ, rotation, HAlign.LEFT, VAlign.TOP,
+      1, undefined, undefined, transform,
     );
     curX += (mainAdvance + gap) * cos;
     curY += (mainAdvance + gap) * sin;
@@ -363,6 +372,7 @@ function emitStackedText(
     addTextToCollector(
       collector, layer, color, font, stackedTop, stackedHeight,
       topX, topY, posZ, rotation, HAlign.LEFT, VAlign.BASELINE,
+      1, undefined, undefined, transform,
     );
   }
 
@@ -375,6 +385,7 @@ function emitStackedText(
     addTextToCollector(
       collector, layer, color, font, stackedBottom, stackedHeight,
       bottomX, bottomY, posZ, rotation, HAlign.LEFT, VAlign.BASELINE,
+      1, undefined, undefined, transform,
     );
   }
 }
@@ -562,6 +573,7 @@ export function addDimensionTextToCollector(
   posZ: number,
   rotation: number = 0,
   hAlign: "left" | "center" | "right" = "center",
+  transform?: readonly number[],
 ): void {
   const cleaned = cleanDimensionMText(rawText);
   if (!cleaned.trim() || height <= 0) return;
@@ -584,6 +596,7 @@ export function addDimensionTextToCollector(
       collector, layer, color, font,
       mainText, topText, bottomText,
       height, gapX, gapY, posZ, rotation, hAlign,
+      transform,
     );
   } else {
     const plain = cleaned.replace(/\\S[^;]*;/g, "").trim();
@@ -593,6 +606,7 @@ export function addDimensionTextToCollector(
     addTextToCollector(
       collector, layer, color, font, plain, height,
       gapX, gapY, posZ, rotation, hAlignEnum, VAlign.BASELINE,
+      1, undefined, undefined, transform,
     );
   }
 }

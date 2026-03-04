@@ -457,6 +457,7 @@ export const createOrdinateDimension = (
   font?: Font,
   collector?: GeometryCollector,
   layer?: string,
+  transform?: readonly number[],
 ): THREE.Object3D[] | null => {
   const feature = entity.linearOrAngularPoint1; // Code 13 -- point on object
   const leader = entity.linearOrAngularPoint2; // Code 14 -- end of diagonal
@@ -486,7 +487,7 @@ export const createOrdinateDimension = (
   if (textPos) {
     actualTextWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
     addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textPos.x, textPos.y - textHeight / 2, 0.2, 0, "center");
+      textPos.x, textPos.y - textHeight / 2, 0.2, 0, "center", transform);
   }
 
   // X-ordinate (bit 0 set in dimensionType) or Y-ordinate (bit 0 clear)
@@ -590,6 +591,7 @@ export const createRadialDimension = (
   font?: Font,
   collector?: GeometryCollector,
   layer?: string,
+  transform?: readonly number[],
 ): THREE.Object3D[] | null => {
   const center = entity.anchorPoint; // code 10
   const arcPt = entity.diameterOrRadiusPoint; // code 15
@@ -641,7 +643,7 @@ export const createRadialDimension = (
 
     const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
     addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textPos.x, underlineY, 0.2, 0, "center");
+      textPos.x, underlineY, 0.2, 0, "center", transform);
 
     const textLeft = textPos.x - textWidth / 2;
     const textRight = textPos.x + textWidth / 2;
@@ -687,6 +689,7 @@ export const createDiametricDimension = (
   font?: Font,
   collector?: GeometryCollector,
   layer?: string,
+  transform?: readonly number[],
 ): THREE.Object3D[] | null => {
   const p10 = entity.anchorPoint; // code 10 -- first point on circle
   const p15 = entity.diameterOrRadiusPoint; // code 15 -- opposite point
@@ -766,7 +769,7 @@ export const createDiametricDimension = (
     if (angle > Math.PI / 2) angle -= Math.PI;
     if (angle < -Math.PI / 2) angle += Math.PI;
     addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textPos.x, textPos.y, 0.2, angle, "center");
+      textPos.x, textPos.y, 0.2, angle, "center", transform);
   } else if (textPos) {
     // Text offset outside -- leader from nearest line end toward text
     const dist10 = (textPos.x - p10.x) ** 2 + (textPos.y - p10.y) ** 2;
@@ -788,7 +791,7 @@ export const createDiametricDimension = (
 
     const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
     addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textPos.x, underlineY, 0.2, 0, "center");
+      textPos.x, underlineY, 0.2, 0, "center", transform);
 
     const textLeft = textPos.x - textWidth / 2;
     const textRight = textPos.x + textWidth / 2;
@@ -812,7 +815,7 @@ export const createDiametricDimension = (
     ]);
     objects.push(new THREE.Line(diamLineGeom2, lineMat));
     addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      cx, cy, 0.2, 0, "center");
+      cx, cy, 0.2, 0, "center", transform);
   }
 
   return objects.length > 0 ? objects : null;
@@ -871,6 +874,7 @@ export const createAngularDimension = (
   font?: Font,
   collector?: GeometryCollector,
   layer?: string,
+  transform?: readonly number[],
 ): THREE.Object3D[] | null => {
   const p13 = entity.linearOrAngularPoint1; // code 13 -- end 1 of first line
   const p14 = entity.linearOrAngularPoint2; // code 14 -- end 2 of first line
@@ -1040,7 +1044,7 @@ export const createAngularDimension = (
     }
 
     addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textX, textY, 0.2, textRotation, "center");
+      textX, textY, 0.2, textRotation, "center", transform);
   }
 
   return objects.length > 0 ? objects : null;

@@ -684,4 +684,67 @@ describe("vectorTextBuilder", () => {
       expect(w).toBe(0);
     });
   });
+
+  // ── Transform (block INSERT worldMatrix) ────────────────────────────
+
+  describe("transform parameter (block INSERT)", () => {
+    it("addTextToCollector applies transform to vertex positions", () => {
+      const c1 = new MockCollector();
+      addTextToCollector(c1 as any, "0", "#000", font, "A", 10, 0, 0, 0);
+
+      // Identity matrix — should produce same positions
+      // prettier-ignore
+      const identity = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+      const c2 = new MockCollector();
+      addTextToCollector(c2 as any, "0", "#000", font, "A", 10, 0, 0, 0, 0, HAlign.LEFT, VAlign.BASELINE, 1, undefined, undefined, identity);
+      expect(c2.meshCalls.length).toBe(1);
+      expect(c2.meshCalls[0].vertices.length).toBe(c1.meshCalls[0].vertices.length);
+      // Verify positions match with identity
+      for (let i = 0; i < c1.meshCalls[0].vertices.length; i++) {
+        expect(c2.meshCalls[0].vertices[i]).toBeCloseTo(c1.meshCalls[0].vertices[i], 5);
+      }
+    });
+
+    it("addTextToCollector translates vertices by transform", () => {
+      // Translation matrix: move (+100, +200, 0)
+      // prettier-ignore
+      const translate = [1,0,0,0, 0,1,0,0, 0,0,1,0, 100,200,0,1];
+
+      const cOrig = new MockCollector();
+      addTextToCollector(cOrig as any, "0", "#000", font, "A", 10, 5, 5, 0);
+
+      const cTransformed = new MockCollector();
+      addTextToCollector(cTransformed as any, "0", "#000", font, "A", 10, 5, 5, 0, 0, HAlign.LEFT, VAlign.BASELINE, 1, undefined, undefined, translate);
+
+      expect(cTransformed.meshCalls.length).toBe(1);
+      const vOrig = cOrig.meshCalls[0].vertices;
+      const vT = cTransformed.meshCalls[0].vertices;
+      // Every X should be shifted by +100, every Y by +200
+      for (let i = 0; i < vOrig.length; i += 3) {
+        expect(vT[i]).toBeCloseTo(vOrig[i] + 100, 5);
+        expect(vT[i + 1]).toBeCloseTo(vOrig[i + 1] + 200, 5);
+        expect(vT[i + 2]).toBeCloseTo(vOrig[i + 2], 5);
+      }
+    });
+
+    it("addDimensionTextToCollector passes transform through", () => {
+      // Translation matrix: move (+500, +300, 0)
+      // prettier-ignore
+      const translate = [1,0,0,0, 0,1,0,0, 0,0,1,0, 500,300,0,1];
+
+      const cOrig = new MockCollector();
+      addDimensionTextToCollector(cOrig as any, "0", "#000", font, "10", 5, 10, 10, 0);
+
+      const cT = new MockCollector();
+      addDimensionTextToCollector(cT as any, "0", "#000", font, "10", 5, 10, 10, 0, 0, "center", translate);
+
+      expect(cT.meshCalls.length).toBe(1);
+      const vOrig = cOrig.meshCalls[0].vertices;
+      const vT = cT.meshCalls[0].vertices;
+      for (let i = 0; i < vOrig.length; i += 3) {
+        expect(vT[i]).toBeCloseTo(vOrig[i] + 500, 5);
+        expect(vT[i + 1]).toBeCloseTo(vOrig[i + 1] + 300, 5);
+      }
+    });
+  });
 });

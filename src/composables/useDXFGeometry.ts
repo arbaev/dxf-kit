@@ -675,18 +675,20 @@ const collectDimensionEntity = (
   const font = colorCtx.font!;
   const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
   const baseDimType = (entity.dimensionType ?? 0) & 0x0f;
+  // Extract Matrix4 elements for text vertex transform inside block INSERTs
+  const transform = worldMatrix ? Array.from(worldMatrix.elements) : undefined;
 
   let result: THREE.Object3D[] | null = null;
 
   // Ordinate dimension (type 6 = Y-ordinate, type 7 = X-ordinate)
   if ((baseDimType & 0x0e) === 6) {
-    result = createOrdinateDimension(entity, entityColor, font, collector, layer);
+    result = createOrdinateDimension(entity, entityColor, font, collector, layer, transform);
   } else if (baseDimType === 2) {
-    result = createAngularDimension(entity, entityColor, colorCtx.globalLtScale, font, collector, layer);
+    result = createAngularDimension(entity, entityColor, colorCtx.globalLtScale, font, collector, layer, transform);
   } else if (baseDimType === 3) {
-    result = createDiametricDimension(entity, entityColor, font, collector, layer);
+    result = createDiametricDimension(entity, entityColor, font, collector, layer, transform);
   } else if (baseDimType === 4) {
-    result = createRadialDimension(entity, entityColor, font, collector, layer);
+    result = createRadialDimension(entity, entityColor, font, collector, layer, transform);
   } else {
     // Linear/aligned dimension
     const dimData = extractDimensionData(entity);
@@ -710,7 +712,7 @@ const collectDimensionEntity = (
       const dimAngleRad = dimAngle !== 0 ? degreesToRadians(dimAngle) : 0;
       addDimensionTextToCollector(collector, layer, entityColor, font,
         dimData.dimensionText, dimData.textHeight,
-        dimData.textPos.x, dimData.textPos.y, 0.2, dimAngleRad, "center");
+        dimData.textPos.x, dimData.textPos.y, 0.2, dimAngleRad, "center", transform);
     }
   }
 
@@ -988,11 +990,6 @@ const collectInsertEntity = async (
         // Complex entities — fallback to individual Three.js objects
         const obj = processEntity(entity, dxf, blockColorCtx, depth + 1);
         if (obj) {
-          const key = entity.type || "unknown";
-          fallbackGroup.userData._debugFallback ??= {};
-          const count = Array.isArray(obj) ? obj.length : 1;
-          fallbackGroup.userData._debugFallback[key] =
-            (fallbackGroup.userData._debugFallback[key] || 0) + count;
           if (Array.isArray(obj)) {
             for (const o of obj) {
               o.applyMatrix4(worldMatrix);
@@ -1081,11 +1078,6 @@ const collectInsertEntity = async (
 
       const obj = processEntity(entity, dxf, blockColorCtx, depth + 1);
       if (obj) {
-        const key = entity.type || "unknown";
-        fallbackGroup.userData._debugFallback ??= {};
-        const count = Array.isArray(obj) ? obj.length : 1;
-        fallbackGroup.userData._debugFallback[key] =
-          (fallbackGroup.userData._debugFallback[key] || 0) + count;
         if (Array.isArray(obj)) {
           for (const o of obj) {
             o.applyMatrix4(worldMatrix);
@@ -1534,7 +1526,6 @@ export async function createThreeObjectsFromDXF(
   const collector = new GeometryCollector();
   const errors: string[] = [];
   const unsupportedTypes: string[] = [];
-  const _debugFallback: Record<string, number> = {};
 
   const yieldState: YieldState = { lastYield: performance.now(), signal };
 
@@ -1557,10 +1548,6 @@ export async function createThreeObjectsFromDXF(
       }
     }
   }
-  if (blockTemplates.size > 0) {
-    console.log(`[dxf-vuer] Block template cache: ${blockTemplates.size} templates built for ${[...blockRefCounts.entries()].filter(([, c]) => c >= INSTANCING_THRESHOLD).reduce((s, [, c]) => s + c, 0)} INSERTs`);
-  }
-
   for (let index = 0; index < dxf.entities.length; index++) {
     if (signal?.cancelled) {
       return { group };
@@ -1609,9 +1596,6 @@ export async function createThreeObjectsFromDXF(
       const obj = processEntity(entity, dxf, colorCtx, 0);
       if (obj) {
         setLayerName(obj, layer);
-        const count = Array.isArray(obj) ? obj.length : 1;
-        _debugFallback[entity.type] = (_debugFallback[entity.type] || 0) + count;
-
         if (Array.isArray(obj)) {
           obj.forEach((o) => group.add(o));
         } else {
@@ -1639,27 +1623,12 @@ export async function createThreeObjectsFromDXF(
     return { group };
   }
 
-  // Debug: log fallback entity counts
-  const blockFallback = group.userData._debugFallback || {};
-  delete group.userData._debugFallback;
-  // Merge top-level and block fallbacks
-  for (const [k, v] of Object.entries(_debugFallback)) {
-    blockFallback[k] = (blockFallback[k] || 0) + (v as number);
-  }
-  if (Object.keys(blockFallback).length > 0) {
-    console.log("[dxf-vuer] Non-merged objects by type:", blockFallback);
-  }
-
   // Flush merged geometry into Three.js objects
-  console.log("[dxf-vuer] Collector buckets — lines:", collector.lineSegments.size,
-    "| points:", collector.points.size, "| dots:", collector.linetypeDots.size,
-    "| meshes:", collector.meshVertices.size);
   const mergedObjects = collector.flush(
     colorCtx.materialCache,
     colorCtx.meshMaterialCache,
     colorCtx.pointsMaterialCache,
   );
-  console.log("[dxf-vuer] Merged objects:", mergedObjects.length, "| Direct children:", group.children.length);
   for (const obj of mergedObjects) {
     group.add(obj);
   }
