@@ -341,32 +341,35 @@ function emitStackedText(
   if (hAlign === "center") offsetX = -totalWidth / 2;
   else if (hAlign === "right") offsetX = -totalWidth;
 
-  // Start position with alignment offset applied in rotated direction
-  let curX = posX + offsetX * cos;
-  let curY = posY + offsetX * sin;
+  // Visual center of the main text line
+  const normAsc = font.ascender / font.unitsPerEm;
+  const halfAsc = normAsc * height * 0.5;
+  // Center point: shift down from top by halfAsc
+  const centerOffsetY = -halfAsc;
+  const centerX = posX - centerOffsetY * sin;
+  const centerY = posY + centerOffsetY * cos;
 
-  // Emit main text (LEFT-aligned, alignment handled above)
+  // Start position with alignment offset applied in rotated direction
+  let curX = centerX + offsetX * cos;
+  let curY = centerY + offsetX * sin;
+
+  // Emit main text (LEFT-aligned, vertically centered on the stacked block center)
   if (mainText) {
     addTextToCollector(
       collector, layer, color, font, mainText, height,
-      curX, curY, posZ, rotation, HAlign.LEFT, VAlign.TOP,
+      curX, curY, posZ, rotation, HAlign.LEFT, VAlign.MIDDLE,
       1, undefined, undefined, transform,
     );
     curX += (mainAdvance + gap) * cos;
     curY += (mainAdvance + gap) * sin;
   }
-
-  // Stacked fractions: centered on the visual middle of the main text line.
-  // With VAlign.TOP, the ascender top is at posY.
-  // Visual center = posY - (ascender/unitsPerEm) * height * 0.5
-  const normAsc = font.ascender / font.unitsPerEm;
-  const halfAsc = normAsc * height * 0.5;
   // Gap between top and bottom fractions (in world units)
   const vGap = height * 0.02;
 
   // Top fraction: baseline positioned above center
+  // curX/curY is already at visual center (centerOffsetY = -halfAsc applied)
   if (stackedTop) {
-    const topOffsetY = -halfAsc + vGap;
+    const topOffsetY = vGap;
     const topX = curX - topOffsetY * sin;
     const topY = curY + topOffsetY * cos;
     addTextToCollector(
@@ -379,7 +382,7 @@ function emitStackedText(
   // Bottom fraction: baseline positioned below center
   if (stackedBottom) {
     const stackedAsc = normAsc * stackedHeight;
-    const bottomOffsetY = -halfAsc - vGap - stackedAsc;
+    const bottomOffsetY = -vGap - stackedAsc;
     const bottomX = curX - bottomOffsetY * sin;
     const bottomY = curY + bottomOffsetY * cos;
     addTextToCollector(
@@ -580,22 +583,24 @@ export function addDimensionTextToCollector(
 
   const stackedMatch = cleaned.match(STACKED_REGEX);
 
-  // Baseline gap: offset upward from dimension line in rotation direction
-  const baselineGap = height * 0.15;
-  const cos = Math.cos(rotation);
-  const sin = Math.sin(rotation);
-  const gapX = posX - baselineGap * sin;
-  const gapY = posY + baselineGap * cos;
-
   if (stackedMatch) {
     const mainText = stackedMatch[1].trim();
     const topText = stackedMatch[2].trim();
     const bottomText = stackedMatch[3].trim();
 
+    // emitStackedText expects VAlign.TOP semantics (top of text at posY).
+    // Shift posY up by half the ascender height to center the block on posY.
+    const normAsc = font.ascender / font.unitsPerEm;
+    const halfBlockUp = normAsc * height * 0.5;
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    const topX = posX + halfBlockUp * sin;
+    const topY = posY + halfBlockUp * cos;
+
     emitStackedText(
       collector, layer, color, font,
       mainText, topText, bottomText,
-      height, gapX, gapY, posZ, rotation, hAlign,
+      height, topX, topY, posZ, rotation, hAlign,
       transform,
     );
   } else {
@@ -605,7 +610,7 @@ export function addDimensionTextToCollector(
     const hAlignEnum = mtextHAlignToEnum(hAlign);
     addTextToCollector(
       collector, layer, color, font, plain, height,
-      gapX, gapY, posZ, rotation, hAlignEnum, VAlign.BASELINE,
+      posX, posY, posZ, rotation, hAlignEnum, VAlign.MIDDLE,
       1, undefined, undefined, transform,
     );
   }

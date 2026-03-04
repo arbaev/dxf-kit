@@ -327,6 +327,53 @@ describe("parseDimension", () => {
     expect(entity.dimensionType).toBe(1);
     expect(entity.angle).toBe(45.0);
   });
+
+  it("extracts textHeight from XDATA DIMSTYLE override (DIMTXT=140)", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "DIMENSION",
+      "10", "0.0",
+      "20", "0.0",
+      "70", "38",
+      "42", "10.0",
+      // XDATA block: ACAD DSTYLE with DIMTXT=2.5 and DIMASZ=3.0
+      "1001", "ACAD",
+      "1000", "DSTYLE",
+      "1002", "{",
+      "1070", "41",    // DIMASZ variable
+      "1040", "3.0",   // arrow size value
+      "1070", "140",   // DIMTXT variable
+      "1040", "2.5",   // text height value
+      "1002", "}",
+      "0", "EOF",
+    );
+
+    const entity = parseDimension(scanner, group);
+
+    expect(entity.textHeight).toBe(2.5);
+    expect(entity.arrowSize).toBe(3.0);
+  });
+
+  it("keeps direct code 140 textHeight over XDATA", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "DIMENSION",
+      "10", "0.0",
+      "20", "0.0",
+      "140", "4.0",  // direct textHeight
+      // XDATA with different value
+      "1001", "ACAD",
+      "1000", "DSTYLE",
+      "1002", "{",
+      "1070", "140",
+      "1040", "2.5",
+      "1002", "}",
+      "0", "EOF",
+    );
+
+    const entity = parseDimension(scanner, group);
+
+    // Direct code 140 should win — XDATA only sets if not already set
+    expect(entity.textHeight).toBe(4.0);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

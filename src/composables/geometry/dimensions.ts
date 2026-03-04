@@ -487,7 +487,7 @@ export const createOrdinateDimension = (
   if (textPos) {
     actualTextWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
     addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textPos.x, textPos.y - textHeight / 2, 0.2, 0, "center", transform);
+      textPos.x, textPos.y, 0.2, 0, "center", transform);
   }
 
   // X-ordinate (bit 0 set in dimensionType) or Y-ordinate (bit 0 clear)
@@ -632,6 +632,7 @@ export const createRadialDimension = (
 
   if (textPos) {
     // textPos is the middle of text per DXF spec ("middle point of dimension text")
+    // Underline Y for leader geometry: bottom of text area
     const underlineY = textPos.y - textHeight / 2;
 
     // Compute where the leader line intersects the text underline horizontal
@@ -643,7 +644,7 @@ export const createRadialDimension = (
 
     const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
     addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textPos.x, underlineY, 0.2, 0, "center", transform);
+      textPos.x, textPos.y, 0.2, 0, "center", transform);
 
     const textLeft = textPos.x - textWidth / 2;
     const textRight = textPos.x + textWidth / 2;
@@ -781,6 +782,7 @@ export const createDiametricDimension = (
     const dirNx = lenN > EPSILON ? dxN / lenN : 1;
     const dirNy = lenN > EPSILON ? dyN / lenN : 0;
 
+    // Underline Y for leader geometry: bottom of text area
     const underlineY = textPos.y - textHeight / 2;
 
     let intersectX = textPos.x;
@@ -791,7 +793,7 @@ export const createDiametricDimension = (
 
     const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
     addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textPos.x, underlineY, 0.2, 0, "center", transform);
+      textPos.x, textPos.y, 0.2, 0, "center", transform);
 
     const textLeft = textPos.x - textWidth / 2;
     const textRight = textPos.x + textWidth / 2;

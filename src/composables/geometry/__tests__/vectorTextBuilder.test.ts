@@ -621,25 +621,26 @@ describe("vectorTextBuilder", () => {
     });
   });
 
-  describe("addDimensionTextToCollector — baseline gap", () => {
-    it("text positioned above insertion point by baseline gap", () => {
+  describe("addDimensionTextToCollector — vertical centering", () => {
+    it("text vertically centered on insertion point (VAlign.MIDDLE)", () => {
       const c = new MockCollector();
       addDimensionTextToCollector(c as any, "0", "#fff", font, "25.40", 10, 0, 0, 0, 0, "center");
       const b = c.getBounds();
-      // With baseline gap = height * 0.15 = 1.5, and VAlign.BASELINE,
-      // most of the text should be above y=0
+      // With VAlign.MIDDLE, text should be centered on posY=0
       const midY = (b.yMin + b.yMax) / 2;
-      expect(midY).toBeGreaterThan(0);
+      expect(Math.abs(midY)).toBeLessThan(1); // approximately centered
     });
 
-    it("gap applied perpendicular to rotation direction", () => {
+    it("text centered on insertion point with rotation", () => {
       const c = new MockCollector();
-      // 90° rotation: gap should shift in -X direction (perpendicular)
+      // 90° rotation: text should still be approximately centered on (50,50)
       addDimensionTextToCollector(c as any, "0", "#fff", font, "A", 10, 50, 50, 0, Math.PI / 2, "center");
       const b = c.getBounds();
       const midX = (b.xMin + b.xMax) / 2;
-      // Gap shifts text in -X direction at 90° rotation
-      expect(midX).toBeLessThan(50);
+      const midY = (b.yMin + b.yMax) / 2;
+      // With rotation, center should still be near insertion point
+      expect(Math.abs(midX - 50)).toBeLessThan(5);
+      expect(Math.abs(midY - 50)).toBeLessThan(5);
     });
   });
 
