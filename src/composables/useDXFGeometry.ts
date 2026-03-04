@@ -668,27 +668,6 @@ const collectTextOrMText = (
  * Collect DIMENSION entity: geometry (lines/arrows) decomposed into collector,
  * text rendered as vector glyphs directly into collector.
  */
-// DEBUG: draw a small cross marker at a point (in block-local coords, transformed by matrix)
-const DEBUG_DIM_MARKERS = true;
-const debugCross = (
-  collector: GeometryCollector, layer: string, color: string,
-  x: number, y: number, size: number, matrix: THREE.Matrix4,
-) => {
-  if (!DEBUG_DIM_MARKERS) return;
-  const v = new THREE.Vector3();
-  const half = size;
-  const pts = [
-    [x - half, y, 0, x + half, y, 0],
-    [x, y - half, 0, x, y + half, 0],
-  ];
-  for (const seg of pts) {
-    v.set(seg[0], seg[1], seg[2]).applyMatrix4(matrix);
-    const x1 = v.x, y1 = v.y, z1 = v.z;
-    v.set(seg[3], seg[4], seg[5]).applyMatrix4(matrix);
-    collector.addLineSegments(layer, color, [x1, y1, z1, v.x, v.y, v.z]);
-  }
-};
-
 const collectDimensionEntity = (
   entity: DxfEntity,
   _dxf: DxfData,
@@ -706,32 +685,6 @@ const collectDimensionEntity = (
   const matrix = worldMatrix ?? new THREE.Matrix4();
 
   let result: THREE.Object3D[] | null = null;
-
-  // DEBUG: draw markers at key dimension reference points
-  if (DEBUG_DIM_MARKERS) {
-    const th = entity.textHeight || DIM_TEXT_HEIGHT;
-    const sz = th * 0.5; // cross marker size proportional to text height
-    // Red — anchorPoint (code 10)
-    if (entity.anchorPoint) {
-      debugCross(collector, layer, "#ff0000", entity.anchorPoint.x, entity.anchorPoint.y, sz, matrix);
-    }
-    // Green — middleOfText (code 11)
-    if (entity.middleOfText) {
-      debugCross(collector, layer, "#00ff00", entity.middleOfText.x, entity.middleOfText.y, sz, matrix);
-    }
-    // Blue — feature/point1 (code 13)
-    if (entity.linearOrAngularPoint1) {
-      debugCross(collector, layer, "#0000ff", entity.linearOrAngularPoint1.x, entity.linearOrAngularPoint1.y, sz, matrix);
-    }
-    // Cyan — leader/point2 (code 14)
-    if (entity.linearOrAngularPoint2) {
-      debugCross(collector, layer, "#00ffff", entity.linearOrAngularPoint2.x, entity.linearOrAngularPoint2.y, sz, matrix);
-    }
-    // Magenta — diameterOrRadiusPoint (code 15)
-    if (entity.diameterOrRadiusPoint) {
-      debugCross(collector, layer, "#ff00ff", entity.diameterOrRadiusPoint.x, entity.diameterOrRadiusPoint.y, sz, matrix);
-    }
-  }
 
   // Ordinate dimension (type 6 = Y-ordinate, type 7 = X-ordinate)
   if ((baseDimType & 0x0e) === 6) {
