@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { NURBSCurve } from "three/examples/jsm/curves/NURBSCurve.js";
-import type { DxfVertex, DxfEntity, DxfData, DxfLayer, DxfSplineEntity } from "@/types/dxf";
+import type { DxfVertex, DxfEntity, DxfData, DxfLayer, DxfSplineEntity, DxfTextEntity } from "@/types/dxf";
 import {
   isLineEntity,
   isCircleEntity,
@@ -72,6 +72,13 @@ import {
   type Point2D,
 } from "./geometry/hatch";
 import { GeometryCollector } from "./geometry/mergeCollectors";
+import {
+  addTextToCollector,
+  addMTextToCollector,
+  addDimensionTextToCollector,
+  HAlign,
+  VAlign,
+} from "./geometry/vectorTextBuilder";
 import {
   type BlockTemplate,
   INSTANCING_THRESHOLD,
@@ -546,6 +553,347 @@ const collectEntity = (
   }
 };
 
+// ─── Vector text collection ───────────────────────────────────────────
+
+/**
+ * Collect TEXT or MTEXT entity as vector glyphs into GeometryCollector.
+ * Handles OCS transform and optional world matrix (for block inserts).
+ */
+const collectTextOrMText = (
+  entity: DxfTextEntity,
+  colorCtx: EntityColorContext,
+  collector: GeometryCollector,
+  layer: string,
+  worldMatrix?: THREE.Matrix4,
+): void => {
+  const font = colorCtx.font!;
+  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const textContent = entity.text;
+  if (!textContent) return;
+
+  if (entity.type === "TEXT") {
+    const textHeight = entity.height || entity.textHeight || TEXT_HEIGHT;
+    const ocsMatrix = buildOcsMatrix(entity.extrusionDirection);
+
+    // Use endPoint for justified text, startPoint for LEFT/BASELINE
+    const hasJustification =
+      (entity.halign && entity.halign > 0) || (entity.valign && entity.valign > 0);
+    const posCoord = hasJustification && entity.endPoint
+      ? entity.endPoint
+      : entity.position || entity.startPoint;
+    if (!posCoord) return;
+
+    let pos = transformOcsPoint(
+      new THREE.Vector3(posCoord.x, posCoord.y, posCoord.z || 0),
+      ocsMatrix,
+    );
+    let rotation = entity.rotation ? degreesToRadians(entity.rotation) : 0;
+    let height = textHeight;
+
+    // endPoint for FIT/ALIGNED modes
+    let endX: number | undefined;
+    let endY: number | undefined;
+    if (entity.endPoint && entity.startPoint) {
+      const ep = transformOcsPoint(
+        new THREE.Vector3(entity.endPoint.x, entity.endPoint.y, entity.endPoint.z || 0),
+        ocsMatrix,
+      );
+      const sp = transformOcsPoint(
+        new THREE.Vector3(entity.startPoint.x, entity.startPoint.y, entity.startPoint.z || 0),
+        ocsMatrix,
+      );
+      // For FIT/ALIGNED, addTextToCollector uses startPoint as posX/posY
+      if (entity.halign === HAlign.FIT || entity.halign === HAlign.ALIGNED) {
+        pos = sp;
+        endX = ep.x;
+        endY = ep.y;
+      }
+    }
+
+    if (worldMatrix) {
+      pos.applyMatrix4(worldMatrix);
+      if (endX !== undefined && endY !== undefined) {
+        const ep = new THREE.Vector3(endX, endY, 0).applyMatrix4(worldMatrix);
+        endX = ep.x;
+        endY = ep.y;
+      }
+      // Extract rotation from world matrix
+      const m = worldMatrix.elements;
+      rotation += Math.atan2(m[1], m[0]);
+      // Scale height by Y component of matrix scale
+      height *= Math.sqrt(m[4] * m[4] + m[5] * m[5]);
+    }
+
+    addTextToCollector(
+      collector, layer, entityColor, font,
+      replaceSpecialChars(textContent), height,
+      pos.x, pos.y, pos.z, rotation,
+      entity.halign ?? HAlign.LEFT,
+      entity.valign ?? VAlign.BASELINE,
+      entity.xScale,
+      endX, endY,
+    );
+  } else {
+    // MTEXT
+    const defaultHeight = entity.height || entity.textHeight || TEXT_HEIGHT;
+    const ocsMatrix = buildOcsMatrix(entity.extrusionDirection);
+    const textPosition = entity.position || entity.startPoint;
+    if (!textPosition) return;
+
+    let pos = transformOcsPoint(
+      new THREE.Vector3(textPosition.x, textPosition.y, textPosition.z || 0),
+      ocsMatrix,
+    );
+    let rotation = entity.rotation ? degreesToRadians(entity.rotation) : 0;
+    if (!entity.rotation && entity.directionVector) {
+      rotation = Math.atan2(entity.directionVector.y, entity.directionVector.x);
+    }
+    let height = defaultHeight;
+
+    if (worldMatrix) {
+      pos.applyMatrix4(worldMatrix);
+      const m = worldMatrix.elements;
+      rotation += Math.atan2(m[1], m[0]);
+      height *= Math.sqrt(m[4] * m[4] + m[5] * m[5]);
+    }
+
+    const lines = parseMTextContent(textContent);
+    addMTextToCollector(
+      collector, layer, entityColor, font, lines, height,
+      pos.x, pos.y, pos.z, rotation,
+      entity.attachmentPoint, entity.width,
+    );
+  }
+};
+
+/**
+ * Collect DIMENSION entity: geometry (lines/arrows) decomposed into collector,
+ * text rendered as vector glyphs directly into collector.
+ */
+const collectDimensionEntity = (
+  entity: DxfEntity,
+  _dxf: DxfData,
+  colorCtx: EntityColorContext,
+  collector: GeometryCollector,
+  layer: string,
+  worldMatrix?: THREE.Matrix4,
+): void => {
+  if (!isDimensionEntity(entity)) return;
+  const font = colorCtx.font!;
+  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const baseDimType = (entity.dimensionType ?? 0) & 0x0f;
+
+  let result: THREE.Object3D[] | null = null;
+
+  // Ordinate dimension (type 6 = Y-ordinate, type 7 = X-ordinate)
+  if ((baseDimType & 0x0e) === 6) {
+    result = createOrdinateDimension(entity, entityColor, font, collector, layer);
+  } else if (baseDimType === 2) {
+    result = createAngularDimension(entity, entityColor, colorCtx.globalLtScale, font, collector, layer);
+  } else if (baseDimType === 3) {
+    result = createDiametricDimension(entity, entityColor, font, collector, layer);
+  } else if (baseDimType === 4) {
+    result = createRadialDimension(entity, entityColor, font, collector, layer);
+  } else {
+    // Linear/aligned dimension
+    const dimData = extractDimensionData(entity);
+    if (!dimData) return;
+
+    let dimAngle = dimData.angle;
+    if (baseDimType === 1 && dimAngle === 0) {
+      const dx = dimData.point2.x - dimData.point1.x;
+      const dy = dimData.point2.y - dimData.point1.y;
+      dimAngle = (Math.atan2(dy, dx) * DEGREES_TO_RADIANS_DIVISOR) / Math.PI;
+    }
+
+    const dimGroup = createDimensionGroup(
+      dimData.point1, dimData.point2, dimData.anchorPoint,
+      dimData.textPos, dimData.textHeight, dimData.isRadial,
+      entityColor, dimAngle, colorCtx.globalLtScale,
+    );
+    result = [dimGroup];
+
+    if (dimData.textPos) {
+      const dimAngleRad = dimAngle !== 0 ? degreesToRadians(dimAngle) : 0;
+      addDimensionTextToCollector(collector, layer, entityColor, font,
+        dimData.dimensionText, dimData.textHeight,
+        dimData.textPos.x, dimData.textPos.y, 0.2, dimAngleRad, "center");
+    }
+  }
+
+  // Decompose geometry objects (lines, arrows) into collector
+  if (result) {
+    const matrix = worldMatrix ?? new THREE.Matrix4();
+    for (const obj of result) {
+      if (obj instanceof THREE.Group) {
+        obj.updateMatrixWorld(true);
+        obj.traverse((child) => {
+          if (child === obj || child instanceof THREE.Group) return;
+          const geo = (child as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+          if (!geo) return;
+          const posAttr = geo.getAttribute("position") as THREE.BufferAttribute | undefined;
+          if (!posAttr) return;
+          const mat = (child as THREE.Mesh).material as THREE.Material & { color?: THREE.Color };
+          const childColor = mat?.color ? "#" + mat.color.getHexString() : entityColor;
+          const v = new THREE.Vector3();
+
+          if (child instanceof THREE.LineSegments || child instanceof THREE.Line) {
+            const count = posAttr.count;
+            for (let i = 0; i < count - 1; i += (child instanceof THREE.LineSegments ? 2 : 1)) {
+              v.fromBufferAttribute(posAttr, i).applyMatrix4(child.matrixWorld).applyMatrix4(matrix);
+              const x1 = v.x, y1 = v.y, z1 = v.z;
+              v.fromBufferAttribute(posAttr, i + 1).applyMatrix4(child.matrixWorld).applyMatrix4(matrix);
+              collector.addLineSegments(layer, childColor, [x1, y1, z1, v.x, v.y, v.z]);
+            }
+          } else if (child instanceof THREE.Mesh) {
+            const count = posAttr.count;
+            const positions: number[] = [];
+            for (let i = 0; i < count; i++) {
+              v.fromBufferAttribute(posAttr, i).applyMatrix4(child.matrixWorld).applyMatrix4(matrix);
+              positions.push(v.x, v.y, v.z);
+            }
+            const index = geo.getIndex();
+            const indices = index ? Array.from(index.array) : [];
+            if (indices.length === 0) {
+              for (let i = 0; i < count; i++) indices.push(i);
+            }
+            collector.addMesh(layer, childColor, positions, indices);
+          }
+        });
+      } else {
+        // Single object (Line, Mesh)
+        const geo = (obj as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+        if (!geo) continue;
+        const posAttr = geo.getAttribute("position") as THREE.BufferAttribute | undefined;
+        if (!posAttr) continue;
+        const mat = (obj as THREE.Mesh).material as THREE.Material & { color?: THREE.Color };
+        const objColor = mat?.color ? "#" + mat.color.getHexString() : entityColor;
+        const v = new THREE.Vector3();
+
+        if (obj instanceof THREE.LineSegments || obj instanceof THREE.Line) {
+          const count = posAttr.count;
+          for (let i = 0; i < count - 1; i += (obj instanceof THREE.LineSegments ? 2 : 1)) {
+            v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
+            const x1 = v.x, y1 = v.y, z1 = v.z;
+            v.fromBufferAttribute(posAttr, i + 1).applyMatrix4(matrix);
+            collector.addLineSegments(layer, objColor, [x1, y1, z1, v.x, v.y, v.z]);
+          }
+        } else if (obj instanceof THREE.Mesh) {
+          const count = posAttr.count;
+          const positions: number[] = [];
+          for (let i = 0; i < count; i++) {
+            v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
+            positions.push(v.x, v.y, v.z);
+          }
+          const index = geo.getIndex();
+          const indices = index ? Array.from(index.array) : [];
+          if (indices.length === 0) {
+            for (let i = 0; i < count; i++) indices.push(i);
+          }
+          collector.addMesh(layer, objColor, positions, indices);
+        }
+      }
+    }
+  }
+};
+
+/**
+ * Collect LEADER/MULTILEADER entity: lines and arrows decomposed into collector,
+ * text rendered as vector glyphs directly into collector.
+ */
+const collectLeaderEntity = (
+  entity: DxfEntity,
+  _dxf: DxfData,
+  colorCtx: EntityColorContext,
+  collector: GeometryCollector,
+  layer: string,
+  worldMatrix?: THREE.Matrix4,
+): void => {
+  const font = colorCtx.font!;
+  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const matrix = worldMatrix ?? new THREE.Matrix4();
+  const v = new THREE.Vector3();
+
+  const addLineToCollector = (points: THREE.Vector3[]) => {
+    for (let i = 0; i < points.length - 1; i++) {
+      v.copy(points[i]).applyMatrix4(matrix);
+      const x1 = v.x, y1 = v.y, z1 = v.z;
+      v.copy(points[i + 1]).applyMatrix4(matrix);
+      collector.addLineSegments(layer, entityColor, [x1, y1, z1, v.x, v.y, v.z]);
+    }
+  };
+
+  const addArrowToCollector = (from: THREE.Vector3, to: THREE.Vector3, size: number) => {
+    const arrow = createArrow(from, to, size, getMeshMaterial(entityColor, colorCtx.meshMaterialCache));
+    const geo = arrow.geometry as THREE.BufferGeometry;
+    const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
+    const count = posAttr.count;
+    const positions: number[] = [];
+    for (let i = 0; i < count; i++) {
+      v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
+      positions.push(v.x, v.y, v.z);
+    }
+    const index = geo.getIndex();
+    const indices = index ? Array.from(index.array) : [];
+    if (indices.length === 0) {
+      for (let i = 0; i < count; i++) indices.push(i);
+    }
+    collector.addMesh(layer, entityColor, positions, indices);
+  };
+
+  if (entity.type === "LEADER" && isLeaderEntity(entity) && entity.vertices.length >= 2) {
+    const points = entity.vertices.map(
+      (vt) => new THREE.Vector3(vt.x, vt.y, vt.z || 0),
+    );
+    addLineToCollector(points);
+
+    if (entity.arrowHeadFlag === 1 && points.length >= 2) {
+      addArrowToCollector(points[1], points[0], ARROW_SIZE);
+    }
+  } else if ((entity.type === "MULTILEADER" || entity.type === "MLEADER") && isMLeaderEntity(entity) && entity.leaders.length > 0) {
+    const arrowSize = entity.arrowSize || ARROW_SIZE;
+
+    for (const leader of entity.leaders) {
+      for (const line of leader.lines) {
+        if (line.vertices.length < 2) continue;
+        const points = line.vertices.map(
+          (vt) => new THREE.Vector3(vt.x, vt.y, vt.z || 0),
+        );
+        if (leader.lastLeaderPoint) {
+          points.push(new THREE.Vector3(
+            leader.lastLeaderPoint.x,
+            leader.lastLeaderPoint.y,
+            leader.lastLeaderPoint.z || 0,
+          ));
+        }
+        addLineToCollector(points);
+
+        if (entity.hasArrowHead !== false && points.length >= 2) {
+          addArrowToCollector(points[1], points[0], arrowSize);
+        }
+      }
+    }
+
+    if (entity.text && entity.textPosition) {
+      const textHeight = entity.textHeight || TEXT_HEIGHT;
+      const textContent = replaceSpecialChars(entity.text);
+      if (textContent) {
+        let posX = entity.textPosition.x;
+        let posY = entity.textPosition.y;
+        if (worldMatrix) {
+          v.set(posX, posY, 0).applyMatrix4(worldMatrix);
+          posX = v.x;
+          posY = v.y;
+        }
+        addTextToCollector(
+          collector, layer, entityColor, font, textContent, textHeight,
+          posX, posY, 0, 0, HAlign.LEFT, VAlign.MIDDLE,
+        );
+      }
+    }
+  }
+};
+
 // ─── INSERT block collection ──────────────────────────────────────────
 
 const MAX_RECURSION_DEPTH = 10;
@@ -630,6 +978,20 @@ const collectInsertEntity = async (
           }
         }
 
+        // Vector text intercepts for block entities
+        if (colorCtx.font && (entity.type === "TEXT" || entity.type === "MTEXT") && isTextEntity(entity)) {
+          collectTextOrMText(entity, blockColorCtx, collector, entityLayer, worldMatrix);
+          continue;
+        }
+        if (colorCtx.font && entity.type === "DIMENSION" && isDimensionEntity(entity)) {
+          collectDimensionEntity(entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix);
+          continue;
+        }
+        if (colorCtx.font && (entity.type === "LEADER" || entity.type === "MULTILEADER" || entity.type === "MLEADER")) {
+          collectLeaderEntity(entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix);
+          continue;
+        }
+
         // Complex entities (DIMENSION, LEADER, TEXT, etc.)
         const decomposable = entity.type === "DIMENSION" || entity.type === "LEADER"
           || entity.type === "MULTILEADER" || entity.type === "MLEADER";
@@ -676,8 +1038,6 @@ const collectInsertEntity = async (
 
         const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
         const textHeight = attrib.textHeight || TEXT_HEIGHT;
-        const hAlign = getTextHAlign(attrib.horizontalJustification);
-        const vAlign = getTextVAlign(attrib.verticalJustification);
 
         const hasJustification =
           (attrib.horizontalJustification && attrib.horizontalJustification > 0) ||
@@ -688,30 +1048,42 @@ const collectInsertEntity = async (
         if (!posCoord) continue;
 
         const attribMatrix = buildOcsMatrix(attrib.extrusionDirection);
-        const textMesh = createTextMesh(
-          replaceSpecialChars(text),
-          textHeight,
-          attribColor,
-          false,
-          false,
-          hAlign,
-          "Arial",
-          vAlign,
-        );
         const attribPos = transformOcsPoint(
           new THREE.Vector3(posCoord.x, posCoord.y, 0),
           attribMatrix,
         );
-        textMesh.position.set(attribPos.x, attribPos.y, attribPos.z);
 
-        if (attrib.rotation) {
-          textMesh.rotation.z = degreesToRadians(attrib.rotation);
+        if (colorCtx.font) {
+          const rotation = attrib.rotation ? degreesToRadians(attrib.rotation) : 0;
+          addTextToCollector(collector, insertLayer, attribColor, colorCtx.font,
+            replaceSpecialChars(text), textHeight,
+            attribPos.x, attribPos.y, attribPos.z, rotation,
+            attrib.horizontalJustification ?? HAlign.LEFT,
+            attrib.verticalJustification ?? VAlign.BASELINE);
+        } else {
+          const hAlign = getTextHAlign(attrib.horizontalJustification);
+          const vAlign = getTextVAlign(attrib.verticalJustification);
+          const textMesh = createTextMesh(
+            replaceSpecialChars(text),
+            textHeight,
+            attribColor,
+            false,
+            false,
+            hAlign,
+            "Arial",
+            vAlign,
+          );
+          textMesh.position.set(attribPos.x, attribPos.y, attribPos.z);
+
+          if (attrib.rotation) {
+            textMesh.rotation.z = degreesToRadians(attrib.rotation);
+          }
+
+          textMesh.userData.layerName = insertLayer;
+          fallbackGroup.add(textMesh);
+          fallbackGroup.userData._debugFallback ??= {};
+          fallbackGroup.userData._debugFallback["ATTRIB"] = (fallbackGroup.userData._debugFallback["ATTRIB"] || 0) + 1;
         }
-
-        textMesh.userData.layerName = insertLayer;
-        fallbackGroup.add(textMesh);
-        fallbackGroup.userData._debugFallback ??= {};
-        fallbackGroup.userData._debugFallback["ATTRIB"] = (fallbackGroup.userData._debugFallback["ATTRIB"] || 0) + 1;
       }
     }
 
@@ -735,6 +1107,20 @@ const collectInsertEntity = async (
         if (collectEntity(entity, blockColorCtx, collector, entityLayer, worldMatrix)) {
           continue;
         }
+      }
+
+      // Vector text intercepts for block entities
+      if (colorCtx.font && (entity.type === "TEXT" || entity.type === "MTEXT") && isTextEntity(entity)) {
+        collectTextOrMText(entity, blockColorCtx, collector, entityLayer, worldMatrix);
+        continue;
+      }
+      if (colorCtx.font && entity.type === "DIMENSION" && isDimensionEntity(entity)) {
+        collectDimensionEntity(entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix);
+        continue;
+      }
+      if (colorCtx.font && (entity.type === "LEADER" || entity.type === "MULTILEADER" || entity.type === "MLEADER")) {
+        collectLeaderEntity(entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix);
+        continue;
       }
 
       // DIMENSION/LEADER/MLEADER: decompose geometry into collector, keep only text
@@ -790,8 +1176,6 @@ const collectInsertEntity = async (
 
       const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
       const textHeight = attrib.textHeight || TEXT_HEIGHT;
-      const hAlign = getTextHAlign(attrib.horizontalJustification);
-      const vAlign = getTextVAlign(attrib.verticalJustification);
 
       const hasJustification =
         (attrib.horizontalJustification && attrib.horizontalJustification > 0) ||
@@ -802,30 +1186,42 @@ const collectInsertEntity = async (
       if (!posCoord) continue;
 
       const attribMatrix = buildOcsMatrix(attrib.extrusionDirection);
-      const textMesh = createTextMesh(
-        replaceSpecialChars(text),
-        textHeight,
-        attribColor,
-        false,
-        false,
-        hAlign,
-        "Arial",
-        vAlign,
-      );
       const attribPos = transformOcsPoint(
         new THREE.Vector3(posCoord.x, posCoord.y, 0),
         attribMatrix,
       );
-      textMesh.position.set(attribPos.x, attribPos.y, attribPos.z);
 
-      if (attrib.rotation) {
-        textMesh.rotation.z = degreesToRadians(attrib.rotation);
+      if (colorCtx.font) {
+        const rotation = attrib.rotation ? degreesToRadians(attrib.rotation) : 0;
+        addTextToCollector(collector, insertLayer, attribColor, colorCtx.font,
+          replaceSpecialChars(text), textHeight,
+          attribPos.x, attribPos.y, attribPos.z, rotation,
+          attrib.horizontalJustification ?? HAlign.LEFT,
+          attrib.verticalJustification ?? VAlign.BASELINE);
+      } else {
+        const hAlign = getTextHAlign(attrib.horizontalJustification);
+        const vAlign = getTextVAlign(attrib.verticalJustification);
+        const textMesh = createTextMesh(
+          replaceSpecialChars(text),
+          textHeight,
+          attribColor,
+          false,
+          false,
+          hAlign,
+          "Arial",
+          vAlign,
+        );
+        textMesh.position.set(attribPos.x, attribPos.y, attribPos.z);
+
+        if (attrib.rotation) {
+          textMesh.rotation.z = degreesToRadians(attrib.rotation);
+        }
+
+        textMesh.userData.layerName = insertLayer;
+        fallbackGroup.add(textMesh);
+        fallbackGroup.userData._debugFallback ??= {};
+        fallbackGroup.userData._debugFallback["ATTRIB"] = (fallbackGroup.userData._debugFallback["ATTRIB"] || 0) + 1;
       }
-
-      textMesh.userData.layerName = insertLayer;
-      fallbackGroup.add(textMesh);
-      fallbackGroup.userData._debugFallback ??= {};
-      fallbackGroup.userData._debugFallback["ATTRIB"] = (fallbackGroup.userData._debugFallback["ATTRIB"] || 0) + 1;
     }
   }
 };
@@ -1716,6 +2112,7 @@ export async function createThreeObjectsFromDXF(
   dxf: DxfData,
   signal?: DisplaySignal,
   darkTheme?: boolean,
+  font?: import("opentype.js").Font,
 ): Promise<{
   group: THREE.Group;
   warnings?: string;
@@ -1747,6 +2144,7 @@ export async function createThreeObjectsFromDXF(
     lineTypes,
     globalLtScale,
     darkTheme,
+    font,
   };
 
   const collector = new GeometryCollector();
@@ -1803,6 +2201,24 @@ export async function createThreeObjectsFromDXF(
         if (collectEntity(entity, colorCtx, collector, layer)) {
           continue;
         }
+      }
+
+      // Vector text: collect TEXT/MTEXT directly into GeometryCollector
+      if (colorCtx.font && (entity.type === "TEXT" || entity.type === "MTEXT") && isTextEntity(entity)) {
+        collectTextOrMText(entity, colorCtx, collector, layer);
+        continue;
+      }
+
+      // Vector text: collect DIMENSION directly (lines decomposed, text via collector)
+      if (colorCtx.font && entity.type === "DIMENSION" && isDimensionEntity(entity)) {
+        collectDimensionEntity(entity, dxf, colorCtx, collector, layer);
+        continue;
+      }
+
+      // Vector text: collect LEADER/MULTILEADER directly
+      if (colorCtx.font && (entity.type === "LEADER" || entity.type === "MULTILEADER" || entity.type === "MLEADER")) {
+        collectLeaderEntity(entity, dxf, colorCtx, collector, layer);
+        continue;
       }
 
       // Complex entities: create individual Three.js objects

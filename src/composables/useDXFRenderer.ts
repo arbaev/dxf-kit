@@ -7,6 +7,7 @@ import { SCENE_BG_COLOR, SCENE_BG_COLOR_DARK } from "@/constants";
 import { useThreeScene, type ThreeJSOptions } from "./useThreeScene";
 import { useCamera } from "./useCamera";
 import { createThreeObjectsFromDXF, type DisplaySignal } from "./useDXFGeometry";
+import { loadDefaultFont } from "./geometry/fontManager";
 import ParserWorker from "@/workers/parserWorker?worker&inline";
 
 export function useDXFRenderer() {
@@ -140,7 +141,8 @@ export function useDXFRenderer() {
       currentDXFGroup = null;
     }
 
-    const result = await createThreeObjectsFromDXF(dxf, signal, darkTheme);
+    const font = loadDefaultFont();
+    const result = await createThreeObjectsFromDXF(dxf, signal, darkTheme, font);
 
     if (signal.cancelled) {
       return undefined;

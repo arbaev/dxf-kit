@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { Font } from "opentype.js";
 import type { DxfLayer, DxfLineType } from "@/types/dxf";
 import { applyLinetypePattern, type PatternGeometry } from "@/utils/linetypeResolver";
 import {
@@ -21,6 +22,7 @@ export interface EntityColorContext {
   globalLtScale: number;
   blockLineType?: string;
   darkTheme?: boolean;
+  font?: Font; // Vector text font (null = canvas fallback)
 }
 
 export const degreesToRadians = (degrees: number): number =>

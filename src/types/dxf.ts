@@ -67,12 +67,15 @@ export interface DxfTextEntity extends DxfEntityBase {
   text: string;
   position?: DxfVertex;
   startPoint?: DxfVertex;
+  endPoint?: DxfVertex; // TEXT: second alignment point (codes 11/21/31)
   height?: number;
   textHeight?: number;
   rotation?: number;
   directionVector?: DxfVertex; // MTEXT: text direction vector (code 11)
   halign?: number;
   valign?: number;
+  xScale?: number; // TEXT: width factor (code 41)
+  width?: number; // MTEXT: column width for word wrap (code 41)
   attachmentPoint?: number; // MTEXT: 1-9 (TopLeft..BottomRight)
   extrusionDirection?: DxfVertex;
 }

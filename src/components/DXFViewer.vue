@@ -215,6 +215,7 @@ interface Props {
   showExportButton?: boolean;
   allowDrop?: boolean;
   darkTheme?: boolean;
+  fontUrl?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -229,6 +230,7 @@ const props = withDefaults(defineProps<Props>(), {
   showExportButton: false,
   allowDrop: false,
   darkTheme: false,
+  fontUrl: "",
 });
 
 interface Emits {

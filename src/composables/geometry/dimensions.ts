@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { Font } from "opentype.js";
 import type { DxfVertex, DxfDimensionEntity } from "@/types/dxf";
 import {
   DIM_TEXT_HEIGHT,
@@ -15,6 +16,8 @@ import {
 } from "@/constants";
 import { createArrow } from "./primitives";
 import { replaceSpecialChars, getSharedCanvas, snapshotToTexture } from "./text";
+import type { GeometryCollector } from "./mergeCollectors";
+import { addDimensionTextToCollector, measureDimensionTextWidth } from "./vectorTextBuilder";
 
 const EXTENSION_LINE_OVERSHOOT = 2;
 
@@ -611,6 +614,9 @@ export const createDimensionTextMesh = (
 export const createOrdinateDimension = (
   entity: DxfDimensionEntity,
   color: string,
+  font?: Font,
+  collector?: GeometryCollector,
+  layer?: string,
 ): THREE.Object3D[] | null => {
   const feature = entity.linearOrAngularPoint1; // Code 13 -- point on object
   const leader = entity.linearOrAngularPoint2; // Code 14 -- end of diagonal
@@ -639,12 +645,18 @@ export const createOrdinateDimension = (
   let textMesh: THREE.Mesh | null = null;
   let actualTextWidth = 0;
   if (textPos) {
-    textMesh = createDimensionTextMesh(dimensionText, textHeight, color, "center");
-    textMesh.position.set(textPos.x, textPos.y - textHeight / 2, 0.2);
-    textMesh.geometry.computeBoundingBox();
-    const bbox = textMesh.geometry.boundingBox;
-    if (bbox) {
-      actualTextWidth = bbox.max.x - bbox.min.x;
+    if (font && collector && layer) {
+      actualTextWidth = measureDimensionTextWidth(font, dimensionText, textHeight);
+      addDimensionTextToCollector(collector, layer, color, font, dimensionText, textHeight,
+        textPos.x, textPos.y - textHeight / 2, 0.2, 0, "center");
+    } else {
+      textMesh = createDimensionTextMesh(dimensionText, textHeight, color, "center");
+      textMesh.position.set(textPos.x, textPos.y - textHeight / 2, 0.2);
+      textMesh.geometry.computeBoundingBox();
+      const bbox = textMesh.geometry.boundingBox;
+      if (bbox) {
+        actualTextWidth = bbox.max.x - bbox.min.x;
+      }
     }
   }
 
@@ -750,6 +762,9 @@ export const createOrdinateDimension = (
 export const createRadialDimension = (
   entity: DxfDimensionEntity,
   color: string,
+  font?: Font,
+  collector?: GeometryCollector,
+  layer?: string,
 ): THREE.Object3D[] | null => {
   const center = entity.anchorPoint; // code 10
   const arcPt = entity.diameterOrRadiusPoint; // code 15
@@ -800,13 +815,19 @@ export const createRadialDimension = (
       intersectX = arcPt.x + t * dirX;
     }
 
-    textMesh = createDimensionTextMesh(dimensionText, textHeight, color, "center");
-    textMesh.position.set(textPos.x, underlineY, 0.2);
-    textMesh.geometry.computeBoundingBox();
     let textWidth = 0;
-    const bbox = textMesh.geometry.boundingBox;
-    if (bbox) {
-      textWidth = bbox.max.x - bbox.min.x;
+    if (font && collector && layer) {
+      textWidth = measureDimensionTextWidth(font, dimensionText, textHeight);
+      addDimensionTextToCollector(collector, layer, color, font, dimensionText, textHeight,
+        textPos.x, underlineY, 0.2, 0, "center");
+    } else {
+      textMesh = createDimensionTextMesh(dimensionText, textHeight, color, "center");
+      textMesh.position.set(textPos.x, underlineY, 0.2);
+      textMesh.geometry.computeBoundingBox();
+      const bbox = textMesh.geometry.boundingBox;
+      if (bbox) {
+        textWidth = bbox.max.x - bbox.min.x;
+      }
     }
 
     const textLeft = textPos.x - textWidth / 2;
@@ -854,6 +875,9 @@ export const createRadialDimension = (
 export const createDiametricDimension = (
   entity: DxfDimensionEntity,
   color: string,
+  font?: Font,
+  collector?: GeometryCollector,
+  layer?: string,
 ): THREE.Object3D[] | null => {
   const p10 = entity.anchorPoint; // code 10 -- first point on circle
   const p15 = entity.diameterOrRadiusPoint; // code 15 -- opposite point
@@ -928,16 +952,21 @@ export const createDiametricDimension = (
   objects.push(new THREE.Line(diamLineGeom, lineMat));
 
   let textMesh: THREE.Mesh | null = null;
+  const useVector = !!(font && collector && layer);
 
   if (textPos && textOnLine) {
     // Text along diameter line -- rotated to match line angle
-    textMesh = createDimensionTextMesh(dimensionText, textHeight, color, "center");
-    // Keep text readable (not upside down)
     let angle = Math.atan2(p10.y - p15.y, p10.x - p15.x);
     if (angle > Math.PI / 2) angle -= Math.PI;
     if (angle < -Math.PI / 2) angle += Math.PI;
-    textMesh.position.set(textPos.x, textPos.y, 0.2);
-    textMesh.rotation.z = angle;
+    if (useVector) {
+      addDimensionTextToCollector(collector, layer, color, font, dimensionText, textHeight,
+        textPos.x, textPos.y, 0.2, angle, "center");
+    } else {
+      textMesh = createDimensionTextMesh(dimensionText, textHeight, color, "center");
+      textMesh.position.set(textPos.x, textPos.y, 0.2);
+      textMesh.rotation.z = angle;
+    }
   } else if (textPos) {
 
     // Text offset outside -- leader from nearest line end toward text
@@ -958,13 +987,19 @@ export const createDiametricDimension = (
       intersectX = nearPt.x + t * dirNx;
     }
 
-    textMesh = createDimensionTextMesh(dimensionText, textHeight, color, "center");
-    textMesh.position.set(textPos.x, underlineY, 0.2);
-    textMesh.geometry.computeBoundingBox();
     let textWidth = 0;
-    const bbox = textMesh.geometry.boundingBox;
-    if (bbox) {
-      textWidth = bbox.max.x - bbox.min.x;
+    if (useVector) {
+      textWidth = measureDimensionTextWidth(font, dimensionText, textHeight);
+      addDimensionTextToCollector(collector, layer, color, font, dimensionText, textHeight,
+        textPos.x, underlineY, 0.2, 0, "center");
+    } else {
+      textMesh = createDimensionTextMesh(dimensionText, textHeight, color, "center");
+      textMesh.position.set(textPos.x, underlineY, 0.2);
+      textMesh.geometry.computeBoundingBox();
+      const bbox = textMesh.geometry.boundingBox;
+      if (bbox) {
+        textWidth = bbox.max.x - bbox.min.x;
+      }
     }
 
     const textLeft = textPos.x - textWidth / 2;
@@ -983,13 +1018,18 @@ export const createDiametricDimension = (
     ]);
     objects.push(new THREE.Line(underlineGeom, lineMat));
   } else {
-    const diamLineGeom = new THREE.BufferGeometry().setFromPoints([
+    const diamLineGeom2 = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(p15.x, p15.y, 0),
       new THREE.Vector3(p10.x, p10.y, 0),
     ]);
-    objects.push(new THREE.Line(diamLineGeom, lineMat));
-    textMesh = createDimensionTextMesh(dimensionText, textHeight, color, "center");
-    textMesh.position.set(cx, cy, 0.2);
+    objects.push(new THREE.Line(diamLineGeom2, lineMat));
+    if (useVector) {
+      addDimensionTextToCollector(collector, layer, color, font, dimensionText, textHeight,
+        cx, cy, 0.2, 0, "center");
+    } else {
+      textMesh = createDimensionTextMesh(dimensionText, textHeight, color, "center");
+      textMesh.position.set(cx, cy, 0.2);
+    }
   }
 
   if (textMesh) {
@@ -1049,6 +1089,9 @@ export const createAngularDimension = (
   entity: DxfDimensionEntity,
   color: string,
   dimScale: number = 1,
+  font?: Font,
+  collector?: GeometryCollector,
+  layer?: string,
 ): THREE.Object3D[] | null => {
   const p13 = entity.linearOrAngularPoint1; // code 13 -- end 1 of first line
   const p14 = entity.linearOrAngularPoint2; // code 14 -- end 2 of first line
@@ -1192,22 +1235,21 @@ export const createAngularDimension = (
 
   if (dimensionText) {
     const textHeight = entity.textHeight || DIM_TEXT_HEIGHT;
-    const textMesh = createDimensionTextMesh(dimensionText, textHeight, color, "center");
 
     let textAngle: number;
+    let textX: number;
+    let textY: number;
 
     if (textPos) {
-      textMesh.position.set(textPos.x, textPos.y, 0.2);
+      textX = textPos.x;
+      textY = textPos.y;
       textAngle = Math.atan2(textPos.y - vertex.y, textPos.x - vertex.x);
     } else {
       // Default: place text at arc midpoint, offset outward
       const midAngle = startAngle + sweep / 2;
       const textRadius = radius + textHeight * 0.8;
-      textMesh.position.set(
-        vertex.x + textRadius * Math.cos(midAngle),
-        vertex.y + textRadius * Math.sin(midAngle),
-        0.2,
-      );
+      textX = vertex.x + textRadius * Math.cos(midAngle);
+      textY = vertex.y + textRadius * Math.sin(midAngle);
       textAngle = midAngle;
     }
 
@@ -1217,9 +1259,16 @@ export const createAngularDimension = (
     if (norm > Math.PI / 2 && norm < Math.PI * 1.5) {
       textRotation += Math.PI;
     }
-    textMesh.rotation.z = textRotation;
 
-    objects.push(textMesh);
+    if (font && collector && layer) {
+      addDimensionTextToCollector(collector, layer, color, font, dimensionText, textHeight,
+        textX, textY, 0.2, textRotation, "center");
+    } else {
+      const textMesh = createDimensionTextMesh(dimensionText, textHeight, color, "center");
+      textMesh.position.set(textX, textY, 0.2);
+      textMesh.rotation.z = textRotation;
+      objects.push(textMesh);
+    }
   }
 
   return objects.length > 0 ? objects : null;
