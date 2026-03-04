@@ -10,3 +10,8 @@ declare module "*?worker&inline" {
   const WorkerConstructor: new () => Worker;
   export default WorkerConstructor;
 }
+
+declare module "*?arraybuffer" {
+  const buffer: ArrayBuffer;
+  export default buffer;
+}
