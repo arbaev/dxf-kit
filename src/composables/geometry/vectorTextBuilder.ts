@@ -98,45 +98,78 @@ export function measureTextWidth(
   return (m.bounds.xMax - m.bounds.xMin) * height * widthFactor;
 }
 
+// ── Parameter interfaces ──────────────────────────────────────────────
+
+export interface TextParams {
+  collector: GeometryCollector;
+  layer: string;
+  color: string;
+  font: Font;
+  text: string;
+  height: number;
+  posX: number;
+  posY: number;
+  posZ: number;
+  rotation?: number;
+  hAlign?: number;
+  vAlign?: number;
+  widthFactor?: number;
+  endPosX?: number;
+  endPosY?: number;
+  transform?: readonly number[];
+  bold?: boolean;
+  italic?: boolean;
+  obliqueAngle?: number;
+}
+
+export interface MTextParams {
+  collector: GeometryCollector;
+  layer: string;
+  color: string;
+  font: Font;
+  lines: MTextLine[];
+  defaultHeight: number;
+  posX: number;
+  posY: number;
+  posZ: number;
+  rotation?: number;
+  attachmentPoint?: number;
+  width?: number;
+  serifFont?: Font;
+  lineSpacingFactor?: number;
+}
+
+export interface DimensionTextParams {
+  collector: GeometryCollector;
+  layer: string;
+  color: string;
+  font: Font;
+  rawText: string;
+  height: number;
+  posX: number;
+  posY: number;
+  posZ: number;
+  rotation?: number;
+  hAlign?: "left" | "center" | "right";
+  transform?: readonly number[];
+}
+
+// ── addTextToCollector ────────────────────────────────────────────────
+
 /**
  * Add TEXT entity glyphs to GeometryCollector as triangulated mesh.
- *
- * @param collector   GeometryCollector to write into
- * @param layer       Layer name for merge key
- * @param color       Color hex string for merge key
- * @param font        opentype.js Font
- * @param text        Text string to render
- * @param height      Text height in world units
- * @param posX        Insertion point X (startPoint for LEFT/BASELINE, endPoint for others)
- * @param posY        Insertion point Y
- * @param posZ        Insertion point Z
- * @param rotation    Rotation in radians (0 = horizontal)
- * @param hAlign      Horizontal alignment (DXF code 72)
- * @param vAlign      Vertical alignment (DXF code 73)
- * @param widthFactor Relative X scale factor (DXF code 41, default 1)
- * @param endPosX     Second alignment point X (for FIT/ALIGNED)
- * @param endPosY     Second alignment point Y (for FIT/ALIGNED)
  */
-export function addTextToCollector(
-  collector: GeometryCollector,
-  layer: string,
-  color: string,
-  font: Font,
-  text: string,
-  height: number,
-  posX: number,
-  posY: number,
-  posZ: number,
-  rotation: number = 0,
-  hAlign: number = HAlign.LEFT,
-  vAlign: number = VAlign.BASELINE,
-  widthFactor: number = 1,
-  endPosX?: number,
-  endPosY?: number,
-  transform?: readonly number[],
-  bold?: boolean,
-  italic?: boolean,
-): void {
+export function addTextToCollector(p: TextParams): void {
+  const {
+    collector, layer, color, font, text, height,
+    posZ, transform, bold,
+    widthFactor = 1,
+    hAlign = HAlign.LEFT,
+    vAlign = VAlign.BASELINE,
+    endPosX, endPosY,
+    obliqueAngle, italic,
+  } = p;
+  let { posX, posY, rotation = 0 } = p;
   if (!text || height <= 0) return;
 
   const m = measureText(font, text);
@@ -218,6 +251,9 @@ export function addTextToCollector(
   const cos = Math.cos(rotation);
   const sin = Math.sin(rotation);
 
+  // Oblique angle shear: obliqueAngle (degrees) > faux italic > none
+  const shear = obliqueAngle ? Math.tan((obliqueAngle * Math.PI) / 180) : (italic ? ITALIC_SLANT : 0);
+
   // Emit glyphs into collector
   let xCursor = 0; // normalized advance cursor (unitsPerEm = 1)
   const allPositions: number[] = [];
@@ -234,8 +270,8 @@ export function addTextToCollector(
         // All values normalized (unitsPerEm = 1)
         const glyphX = gd.positions[j] + xCursor - originX;
         const glyphY = gd.positions[j + 1] - originY;
-        // Faux italic: shear X by Y
-        const localX = (italic ? glyphX + glyphY * ITALIC_SLANT : glyphX) * scaleX;
+        // Oblique / italic shear X by Y
+        const localX = (shear ? glyphX + glyphY * shear : glyphX) * scaleX;
         const localY = glyphY * scaleY;
         // Rotation + translation to world coordinates
         let wx = posX + localX * cos - localY * sin;
@@ -264,7 +300,7 @@ export function addTextToCollector(
           const glyphX = gd.positions[j] + xCursor - originX;
           const glyphY = gd.positions[j + 1] - originY;
           const localX =
-            ((italic ? glyphX + glyphY * ITALIC_SLANT : glyphX) + BOLD_OFFSET) * scaleX;
+            ((shear ? glyphX + glyphY * shear : glyphX) + BOLD_OFFSET) * scaleX;
           const localY = glyphY * scaleY;
           let wx = posX + localX * cos - localY * sin;
           let wy = posY + localX * sin + localY * cos;
@@ -351,8 +387,6 @@ function wrapTextToWidth(font: Font, text: string, height: number, maxWidth: num
 /**
  * Emit stacked text (main text + fraction) into collector.
  * Handles horizontal alignment for the combined width.
- *
- * @param posX/posY Position for this line (ascender line at posY)
  */
 function emitStackedText(
   collector: GeometryCollector,
@@ -405,26 +439,12 @@ function emitStackedText(
 
   // Emit main text (LEFT-aligned, vertically centered on the stacked block center)
   if (mainText) {
-    addTextToCollector(
-      collector,
-      layer,
-      color,
-      font,
-      mainText,
-      height,
-      curX,
-      curY,
-      posZ,
-      rotation,
-      HAlign.LEFT,
-      VAlign.MIDDLE,
-      1,
-      undefined,
-      undefined,
-      transform,
-      bold,
-      italic,
-    );
+    addTextToCollector({
+      collector, layer, color, font, text: mainText, height,
+      posX: curX, posY: curY, posZ,
+      rotation, hAlign: HAlign.LEFT, vAlign: VAlign.MIDDLE,
+      transform, bold, italic,
+    });
     curX += (mainAdvance + gap) * cos;
     curY += (mainAdvance + gap) * sin;
   }
@@ -432,31 +452,16 @@ function emitStackedText(
   const vGap = height * 0.02;
 
   // Top fraction: baseline positioned above center
-  // curX/curY is already at visual center (centerOffsetY = -halfAsc applied)
   if (stackedTop) {
     const topOffsetY = vGap;
     const topX = curX - topOffsetY * sin;
     const topY = curY + topOffsetY * cos;
-    addTextToCollector(
-      collector,
-      layer,
-      color,
-      font,
-      stackedTop,
-      stackedHeight,
-      topX,
-      topY,
-      posZ,
-      rotation,
-      HAlign.LEFT,
-      VAlign.BASELINE,
-      1,
-      undefined,
-      undefined,
-      transform,
-      bold,
-      italic,
-    );
+    addTextToCollector({
+      collector, layer, color, font, text: stackedTop, height: stackedHeight,
+      posX: topX, posY: topY, posZ,
+      rotation, hAlign: HAlign.LEFT, vAlign: VAlign.BASELINE,
+      transform, bold, italic,
+    });
   }
 
   // Bottom fraction: baseline positioned below center
@@ -465,26 +470,12 @@ function emitStackedText(
     const bottomOffsetY = -vGap - stackedAsc;
     const bottomX = curX - bottomOffsetY * sin;
     const bottomY = curY + bottomOffsetY * cos;
-    addTextToCollector(
-      collector,
-      layer,
-      color,
-      font,
-      stackedBottom,
-      stackedHeight,
-      bottomX,
-      bottomY,
-      posZ,
-      rotation,
-      HAlign.LEFT,
-      VAlign.BASELINE,
-      1,
-      undefined,
-      undefined,
-      transform,
-      bold,
-      italic,
-    );
+    addTextToCollector({
+      collector, layer, color, font, text: stackedBottom, height: stackedHeight,
+      posX: bottomX, posY: bottomY, posZ,
+      rotation, hAlign: HAlign.LEFT, vAlign: VAlign.BASELINE,
+      transform, bold, italic,
+    });
   }
 }
 
@@ -492,36 +483,15 @@ function emitStackedText(
  * Add MTEXT entity lines to GeometryCollector as triangulated mesh.
  * Handles multiline text with word wrapping, 9 attachment points,
  * stacked text (fractions), and per-line color/height overrides.
- *
- * @param collector       GeometryCollector to write into
- * @param layer           Layer name for merge key
- * @param color           Default entity color (fallback when line.color undefined)
- * @param font            opentype.js Font
- * @param lines           Parsed MTEXT lines from parseMTextContent()
- * @param defaultHeight   Entity height (entity.height || $TEXTSIZE)
- * @param posX            Insertion point X
- * @param posY            Insertion point Y
- * @param posZ            Insertion point Z
- * @param rotation        Rotation in radians
- * @param attachmentPoint 1-9 (DXF code 71)
- * @param width           Column width for word wrapping (DXF code 41), world units
  */
-export function addMTextToCollector(
-  collector: GeometryCollector,
-  layer: string,
-  color: string,
-  font: Font,
-  lines: MTextLine[],
-  defaultHeight: number,
-  posX: number,
-  posY: number,
-  posZ: number,
-  rotation: number = 0,
-  attachmentPoint: number = 1,
-  width?: number,
-  serifFont?: Font,
-  lineSpacingFactor?: number,
-): void {
+export function addMTextToCollector(p: MTextParams): void {
+  const {
+    collector, layer, color, font, lines, defaultHeight,
+    posX, posY, posZ,
+    rotation = 0,
+    attachmentPoint = 1,
+    width, serifFont, lineSpacingFactor,
+  } = p;
   if (lines.length === 0 || defaultHeight <= 0) return;
   const lineSpacing = (lineSpacingFactor || 1) * DXF_LINE_SPACING_BASE;
 
@@ -568,10 +538,6 @@ export function addMTextToCollector(
   const hAlign: "left" | "center" | "right" = col === 1 ? "center" : col === 2 ? "right" : "left";
 
   // Vertical offset and VAlign depend on the attachment row.
-  // lineYOffset_last = -(totalHeight - lastLineHeight), so the formulas ensure:
-  //   Row 1 (top): first line's glyph top at insertion point
-  //   Row 2 (middle): text block visual center at insertion point
-  //   Row 3 (bottom): last line's glyph bottom at insertion point
   let groupYOffset = 0;
   let rowVAlign = VAlign.TOP;
   if (row === 2) {
@@ -602,7 +568,6 @@ export function addMTextToCollector(
     const indentX = (line.leftMargin || 0) + (line.firstIndent || 0);
 
     // Local offset from insertion point (in text-local coordinates)
-    // Lines stack downward from groupYOffset
     const localY = groupYOffset + lineYOffset;
 
     // Apply rotation to get world position, including paragraph indent
@@ -611,46 +576,19 @@ export function addMTextToCollector(
 
     if (line.stackedTop || line.stackedBottom) {
       emitStackedText(
-        collector,
-        layer,
-        lineColor,
-        lineFont,
-        line.text,
-        line.stackedTop || "",
-        line.stackedBottom || "",
-        lineHeight,
-        worldX,
-        worldY,
-        posZ,
-        rotation,
-        hAlign,
-        undefined,
-        line.bold,
-        line.italic,
+        collector, layer, lineColor, lineFont,
+        line.text, line.stackedTop || "", line.stackedBottom || "",
+        lineHeight, worldX, worldY, posZ, rotation, hAlign,
+        undefined, line.bold, line.italic,
       );
     } else {
-      // MTEXT: VAlign per attachment row ensures correct positioning:
-      //   TOP → glyph top at worldY, MIDDLE → glyph center, BOTTOM → glyph bottom
-      addTextToCollector(
-        collector,
-        layer,
-        lineColor,
-        lineFont,
-        line.text,
-        lineHeight,
-        worldX,
-        worldY,
-        posZ,
-        rotation,
-        hAlignEnum,
-        rowVAlign,
-        1,
-        undefined,
-        undefined,
-        undefined,
-        line.bold,
-        line.italic,
-      );
+      addTextToCollector({
+        collector, layer, color: lineColor, font: lineFont,
+        text: line.text, height: lineHeight,
+        posX: worldX, posY: worldY, posZ,
+        rotation, hAlign: hAlignEnum, vAlign: rowVAlign,
+        bold: line.bold, italic: line.italic,
+      });
     }
 
     lineYOffset -= lineHeight * lineSpacing;
@@ -696,33 +634,15 @@ export function measureDimensionTextWidth(font: Font, rawText: string, height: n
  * Add DIMENSION text to GeometryCollector as triangulated mesh.
  * Cleans MTEXT formatting, applies baseline gap above the dimension line,
  * and handles stacked fractions (\S format).
- *
- * @param collector   GeometryCollector to write into
- * @param layer       Layer name for merge key
- * @param color       Color hex string for merge key
- * @param font        opentype.js Font
- * @param rawText     Raw dimension text (may contain MTEXT formatting codes)
- * @param height      Text height in world units
- * @param posX        Position X (on the dimension line)
- * @param posY        Position Y (on the dimension line)
- * @param posZ        Position Z
- * @param rotation    Rotation in radians (0 = horizontal)
- * @param hAlign      Horizontal alignment ("left" | "center" | "right")
  */
-export function addDimensionTextToCollector(
-  collector: GeometryCollector,
-  layer: string,
-  color: string,
-  font: Font,
-  rawText: string,
-  height: number,
-  posX: number,
-  posY: number,
-  posZ: number,
-  rotation: number = 0,
-  hAlign: "left" | "center" | "right" = "center",
-  transform?: readonly number[],
-): void {
+export function addDimensionTextToCollector(p: DimensionTextParams): void {
+  const {
+    collector, layer, color, font, rawText, height,
+    posX, posY, posZ,
+    rotation = 0,
+    hAlign = "center",
+    transform,
+  } = p;
   const cleaned = cleanDimensionMText(rawText);
   if (!cleaned.trim() || height <= 0) return;
 
@@ -752,36 +672,22 @@ export function addDimensionTextToCollector(
     if (hAlign === "center") offsetX = -totalWidth / 2;
     else if (hAlign === "right") offsetX = -totalWidth;
 
-    // posX/posY = visual center of the dimension text block
     let curX = posX + offsetX * cos;
     let curY = posY + offsetX * sin;
 
     // Emit main text centered on posY
     if (mainText) {
-      addTextToCollector(
-        collector,
-        layer,
-        color,
-        font,
-        mainText,
-        height,
-        curX,
-        curY,
-        posZ,
-        rotation,
-        HAlign.LEFT,
-        VAlign.MIDDLE,
-        1,
-        undefined,
-        undefined,
+      addTextToCollector({
+        collector, layer, color, font, text: mainText, height,
+        posX: curX, posY: curY, posZ,
+        rotation, hAlign: HAlign.LEFT, vAlign: VAlign.MIDDLE,
         transform,
-      );
+      });
       curX += (mainAdvance + gap) * cos;
       curY += (mainAdvance + gap) * sin;
     }
 
     // Fractions: centered vertically around posY (= dimension midpoint).
-    // Use actual glyph visual bounds for precise centering.
     const vGap = height * 0.04;
     const topMetrics = topText ? measureText(font, topText) : null;
     const bottomMetrics = bottomText ? measureText(font, bottomText) : null;
@@ -792,82 +698,41 @@ export function addDimensionTextToCollector(
       ? (bottomMetrics.bounds.yMax - bottomMetrics.bounds.yMin) * stackedHeight
       : 0;
     const totalStackH = topVisualH + vGap + bottomVisualH;
-    // halfStack = distance from center to the top edge of the top fraction
     const halfStack = totalStackH / 2;
 
-    // Top fraction: its top edge (yMax) at center + halfStack
-    // baseline = center + halfStack - yMax * stackedHeight
     if (topText && topMetrics) {
       const topBaseY = halfStack - topMetrics.bounds.yMax * stackedHeight;
       const topX = curX - topBaseY * sin;
       const topY = curY + topBaseY * cos;
-      addTextToCollector(
-        collector,
-        layer,
-        color,
-        font,
-        topText,
-        stackedHeight,
-        topX,
-        topY,
-        posZ,
-        rotation,
-        HAlign.LEFT,
-        VAlign.BASELINE,
-        1,
-        undefined,
-        undefined,
+      addTextToCollector({
+        collector, layer, color, font, text: topText, height: stackedHeight,
+        posX: topX, posY: topY, posZ,
+        rotation, hAlign: HAlign.LEFT, vAlign: VAlign.BASELINE,
         transform,
-      );
+      });
     }
 
-    // Bottom fraction: its bottom edge (yMin) at center - halfStack
-    // baseline = center - halfStack - yMin * stackedHeight
     if (bottomText && bottomMetrics) {
       const bottomBaseY = -halfStack - bottomMetrics.bounds.yMin * stackedHeight;
       const bottomX = curX - bottomBaseY * sin;
       const bottomY = curY + bottomBaseY * cos;
-      addTextToCollector(
-        collector,
-        layer,
-        color,
-        font,
-        bottomText,
-        stackedHeight,
-        bottomX,
-        bottomY,
-        posZ,
-        rotation,
-        HAlign.LEFT,
-        VAlign.BASELINE,
-        1,
-        undefined,
-        undefined,
+      addTextToCollector({
+        collector, layer, color, font, text: bottomText, height: stackedHeight,
+        posX: bottomX, posY: bottomY, posZ,
+        rotation, hAlign: HAlign.LEFT, vAlign: VAlign.BASELINE,
         transform,
-      );
+      });
     }
   } else {
     const plain = cleaned.replace(/\\S[^;]*;/g, "").trim();
     if (!plain) return;
 
     const hAlignEnum = mtextHAlignToEnum(hAlign);
-    addTextToCollector(
-      collector,
-      layer,
-      color,
-      font,
-      plain,
-      height,
-      posX,
-      posY,
-      posZ,
-      rotation,
-      hAlignEnum,
-      VAlign.MIDDLE,
-      1,
-      undefined,
-      undefined,
+    addTextToCollector({
+      collector, layer, color, font, text: plain, height,
+      posX, posY, posZ,
+      rotation, hAlign: hAlignEnum, vAlign: VAlign.MIDDLE,
       transform,
-    );
+    });
   }
 }

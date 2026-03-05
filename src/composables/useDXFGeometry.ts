@@ -730,15 +730,15 @@ const collectTextOrMText = (
       height *= Math.sqrt(m[4] * m[4] + m[5] * m[5]);
     }
 
-    addTextToCollector(
-      collector, layer, entityColor, font,
-      replaceSpecialChars(textContent), height,
-      pos.x, pos.y, pos.z, rotation,
-      entity.halign ?? HAlign.LEFT,
-      entity.valign ?? VAlign.BASELINE,
-      entity.xScale,
-      endX, endY,
-    );
+    addTextToCollector({
+      collector, layer, color: entityColor, font,
+      text: replaceSpecialChars(textContent), height,
+      posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
+      hAlign: entity.halign ?? HAlign.LEFT,
+      vAlign: entity.valign ?? VAlign.BASELINE,
+      widthFactor: entity.xScale,
+      endPosX: endX, endPosY: endY,
+    });
 
   } else {
     // MTEXT
@@ -765,16 +765,16 @@ const collectTextOrMText = (
     }
 
     const lines = parseMTextContent(textContent, height);
-    addMTextToCollector(
-      collector, layer, entityColor, font, lines, height,
-      pos.x, pos.y, pos.z, rotation,
-      entity.attachmentPoint,
+    addMTextToCollector({
+      collector, layer, color: entityColor, font, lines, defaultHeight: height,
+      posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
+      attachmentPoint: entity.attachmentPoint,
       // Skip word wrapping when width (code 41) is narrower than one character
       // (width < text height) — wrapping would put every character on its own line
-      entity.width && entity.width >= height ? entity.width : undefined,
-      colorCtx.serifFont,
-      entity.lineSpacingFactor,
-    );
+      width: entity.width && entity.width >= height ? entity.width : undefined,
+      serifFont: colorCtx.serifFont,
+      lineSpacingFactor: entity.lineSpacingFactor,
+    });
 
   }
 };
@@ -835,9 +835,12 @@ const collectDimensionEntity = (
 
     if (dimData.textPos) {
       const dimAngleRad = dimAngle !== 0 ? degreesToRadians(dimAngle) : 0;
-      addDimensionTextToCollector(collector, layer, entityColor, font,
-        dimData.dimensionText, dimData.textHeight,
-        dimData.textPos.x, dimData.textPos.y, 0.2, dimAngleRad, "center", transform);
+      addDimensionTextToCollector({
+        collector, layer, color: entityColor, font,
+        rawText: dimData.dimensionText, height: dimData.textHeight,
+        posX: dimData.textPos.x, posY: dimData.textPos.y, posZ: 0.2,
+        rotation: dimAngleRad, hAlign: "center", transform,
+      });
     }
   }
 
@@ -1005,10 +1008,10 @@ const collectLeaderEntity = (
           posX = v.x;
           posY = v.y;
         }
-        addTextToCollector(
-          collector, layer, entityColor, font, textContent, textHeight,
-          posX, posY, 0, 0, HAlign.LEFT, VAlign.MIDDLE,
-        );
+        addTextToCollector({
+          collector, layer, color: entityColor, font, text: textContent, height: textHeight,
+          posX, posY, posZ: 0, hAlign: HAlign.LEFT, vAlign: VAlign.MIDDLE,
+        });
       }
     }
   }
@@ -1159,11 +1162,15 @@ const collectInsertEntity = async (
 
         const rotation = attrib.rotation ? degreesToRadians(attrib.rotation) : 0;
         const attribFont = resolveEntityFont(attrib.textStyle, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
-        addTextToCollector(collector, insertLayer, attribColor, attribFont,
-          replaceSpecialChars(text), textHeight,
-          attribPos.x, attribPos.y, attribPos.z, rotation,
-          attrib.horizontalJustification ?? HAlign.LEFT,
-          attrib.verticalJustification ?? VAlign.BASELINE);
+        addTextToCollector({
+          collector, layer: insertLayer, color: attribColor, font: attribFont,
+          text: replaceSpecialChars(text), height: textHeight,
+          posX: attribPos.x, posY: attribPos.y, posZ: attribPos.z, rotation,
+          hAlign: attrib.horizontalJustification ?? HAlign.LEFT,
+          vAlign: attrib.verticalJustification ?? VAlign.BASELINE,
+          widthFactor: attrib.scale,
+          obliqueAngle: attrib.obliqueAngle,
+        });
       }
     }
 
@@ -1256,11 +1263,15 @@ const collectInsertEntity = async (
 
       const rotation = attrib.rotation ? degreesToRadians(attrib.rotation) : 0;
       const attribFont = resolveEntityFont(attrib.textStyle, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
-      addTextToCollector(collector, insertLayer, attribColor, attribFont,
-        replaceSpecialChars(text), textHeight,
-        attribPos.x, attribPos.y, attribPos.z, rotation,
-        attrib.horizontalJustification ?? HAlign.LEFT,
-        attrib.verticalJustification ?? VAlign.BASELINE);
+      addTextToCollector({
+        collector, layer: insertLayer, color: attribColor, font: attribFont,
+        text: replaceSpecialChars(text), height: textHeight,
+        posX: attribPos.x, posY: attribPos.y, posZ: attribPos.z, rotation,
+        hAlign: attrib.horizontalJustification ?? HAlign.LEFT,
+        vAlign: attrib.verticalJustification ?? VAlign.BASELINE,
+        widthFactor: attrib.scale,
+        obliqueAngle: attrib.obliqueAngle,
+      });
     }
   }
 };

@@ -561,8 +561,10 @@ export const createOrdinateDimension = (
   let actualTextWidth = 0;
   if (textPos) {
     actualTextWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
-    addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textPos.x, textPos.y, 0.2, 0, "center", transform);
+    addDimensionTextToCollector({
+      collector: collector!, layer: layer!, color, font: font!, rawText: dimensionText, height: textHeight,
+      posX: textPos.x, posY: textPos.y, posZ: 0.2, transform,
+    });
   }
 
   // X-ordinate (bit 0 set in dimensionType) or Y-ordinate (bit 0 clear)
@@ -719,8 +721,10 @@ export const createRadialDimension = (
     }
 
     const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
-    addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textPos.x, textPos.y, 0.2, 0, "center", transform);
+    addDimensionTextToCollector({
+      collector: collector!, layer: layer!, color, font: font!, rawText: dimensionText, height: textHeight,
+      posX: textPos.x, posY: textPos.y, posZ: 0.2, transform,
+    });
 
     const textLeft = textPos.x - textWidth / 2;
     const textRight = textPos.x + textWidth / 2;
@@ -846,8 +850,10 @@ export const createDiametricDimension = (
     let angle = Math.atan2(p10.y - p15.y, p10.x - p15.x);
     if (angle > Math.PI / 2) angle -= Math.PI;
     if (angle < -Math.PI / 2) angle += Math.PI;
-    addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textPos.x, textPos.y, 0.2, angle, "center", transform);
+    addDimensionTextToCollector({
+      collector: collector!, layer: layer!, color, font: font!, rawText: dimensionText, height: textHeight,
+      posX: textPos.x, posY: textPos.y, posZ: 0.2, rotation: angle, transform,
+    });
   } else if (textPos) {
     // Text offset outside -- leader from nearest line end toward text
     const dist10 = (textPos.x - p10.x) ** 2 + (textPos.y - p10.y) ** 2;
@@ -869,8 +875,10 @@ export const createDiametricDimension = (
     }
 
     const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
-    addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textPos.x, textPos.y, 0.2, 0, "center", transform);
+    addDimensionTextToCollector({
+      collector: collector!, layer: layer!, color, font: font!, rawText: dimensionText, height: textHeight,
+      posX: textPos.x, posY: textPos.y, posZ: 0.2, transform,
+    });
 
     const textLeft = textPos.x - textWidth / 2;
     const textRight = textPos.x + textWidth / 2;
@@ -893,8 +901,10 @@ export const createDiametricDimension = (
       new THREE.Vector3(p10.x, p10.y, 0),
     ]);
     objects.push(new THREE.Line(diamLineGeom2, lineMat));
-    addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      cx, cy, 0.2, 0, "center", transform);
+    addDimensionTextToCollector({
+      collector: collector!, layer: layer!, color, font: font!, rawText: dimensionText, height: textHeight,
+      posX: cx, posY: cy, posZ: 0.2, transform,
+    });
   }
 
   return objects.length > 0 ? objects : null;
@@ -1122,8 +1132,10 @@ export const createAngularDimension = (
       textRotation += Math.PI;
     }
 
-    addDimensionTextToCollector(collector!, layer!, color, font!, dimensionText, textHeight,
-      textX, textY, 0.2, textRotation, "center", transform);
+    addDimensionTextToCollector({
+      collector: collector!, layer: layer!, color, font: font!, rawText: dimensionText, height: textHeight,
+      posX: textX, posY: textY, posZ: 0.2, rotation: textRotation, transform,
+    });
   }
 
   return objects.length > 0 ? objects : null;
