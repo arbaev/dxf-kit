@@ -639,7 +639,7 @@ export function addMTextToCollector(
         posZ,
         rotation,
         hAlignEnum,
-        VAlign.MIDDLE,
+        VAlign.BASELINE,
         1,
         undefined,
         undefined,
