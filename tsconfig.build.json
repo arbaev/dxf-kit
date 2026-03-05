@@ -9,5 +9,5 @@
     "allowImportingTsExtensions": false
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue"],
-  "exclude": ["src/**/*.spec.ts"]
+  "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts"]
 }

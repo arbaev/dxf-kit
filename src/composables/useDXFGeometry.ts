@@ -93,7 +93,7 @@ import { loadSerifFont } from "./geometry/fontManager";
 /**
  * Compute polyline points (with bulge arcs) from entity vertices.
  */
-const computePolylinePoints = (entity: DxfEntity & { vertices: DxfVertex[]; shape?: boolean }): THREE.Vector3[] => {
+export const computePolylinePoints = (entity: DxfEntity & { vertices: DxfVertex[]; shape?: boolean }): THREE.Vector3[] => {
   const allPoints: THREE.Vector3[] = [];
 
   for (let i = 0; i < entity.vertices.length - 1; i++) {
@@ -117,7 +117,7 @@ const computePolylinePoints = (entity: DxfEntity & { vertices: DxfVertex[]; shap
   }
 
   // Closing segment for closed polylines (shape = true)
-  if (entity.shape && entity.vertices.length > 2) {
+  if (entity.shape && entity.vertices.length > 1) {
     const vLast = entity.vertices[entity.vertices.length - 1];
     const vFirst = entity.vertices[0];
     const pLast = new THREE.Vector3(vLast.x, vLast.y, 0);

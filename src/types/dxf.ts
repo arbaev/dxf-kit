@@ -43,6 +43,7 @@ export interface DxfPolylineEntity extends DxfEntityBase {
   type: "POLYLINE" | "LWPOLYLINE";
   vertices: DxfVertex[];
   shape?: boolean;
+  width?: number; // Constant width (DXF code 43) — used for donuts and wide polylines
   extrusionDirection?: DxfVertex;
 }
 
