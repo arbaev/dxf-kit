@@ -28,6 +28,7 @@ export interface EntityColorContext {
   pdMode?: number; // $PDMODE header variable (point display mode)
   pointDisplaySize?: number; // Computed PDSIZE in drawing units
   dimVars?: import("./dimensions").DimVars; // Resolved dimension variables
+  defaultTextHeight: number; // $TEXTSIZE from header (fallback for entities without explicit height)
 }
 
 export const degreesToRadians = (degrees: number): number =>

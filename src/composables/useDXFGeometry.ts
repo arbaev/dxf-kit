@@ -678,7 +678,7 @@ const collectTextOrMText = (
   if (!textContent) return;
 
   if (entity.type === "TEXT") {
-    const textHeight = entity.height || entity.textHeight || TEXT_HEIGHT;
+    const textHeight = entity.height || entity.textHeight || colorCtx.defaultTextHeight;
     const ocsMatrix = buildOcsMatrix(entity.extrusionDirection);
 
     // Use endPoint for justified text, startPoint for LEFT/BASELINE
@@ -742,7 +742,7 @@ const collectTextOrMText = (
 
   } else {
     // MTEXT
-    const defaultHeight = entity.height || entity.textHeight || TEXT_HEIGHT;
+    const defaultHeight = entity.height || entity.textHeight || colorCtx.defaultTextHeight;
     const ocsMatrix = buildOcsMatrix(entity.extrusionDirection);
     const textPosition = entity.position || entity.startPoint;
     if (!textPosition) return;
@@ -995,7 +995,7 @@ const collectLeaderEntity = (
     }
 
     if (entity.text && entity.textPosition) {
-      const textHeight = entity.textHeight || TEXT_HEIGHT;
+      const textHeight = entity.textHeight || colorCtx.defaultTextHeight;
       const textContent = replaceSpecialChars(entity.text);
       if (textContent) {
         let posX = entity.textPosition.x;
@@ -1140,7 +1140,7 @@ const collectInsertEntity = async (
         if (!text) continue;
 
         const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
-        const textHeight = attrib.textHeight || TEXT_HEIGHT;
+        const textHeight = attrib.textHeight || colorCtx.defaultTextHeight;
 
         const hasJustification =
           (attrib.horizontalJustification && attrib.horizontalJustification > 0) ||
@@ -1236,7 +1236,7 @@ const collectInsertEntity = async (
       if (!text) continue;
 
       const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
-      const textHeight = attrib.textHeight || TEXT_HEIGHT;
+      const textHeight = attrib.textHeight || colorCtx.defaultTextHeight;
 
       const hasJustification =
         (attrib.horizontalJustification && attrib.horizontalJustification > 0) ||
@@ -1660,6 +1660,10 @@ export async function createThreeObjectsFromDXF(
   // Dimension variables ($DIMSCALE, $DIMASZ, $DIMTXT, $DIMGAP)
   const dimVars = resolveDimVarsFromHeader(dxf.header);
 
+  // Default text height from $TEXTSIZE header variable
+  const headerTextSize = dxf.header?.["$TEXTSIZE"] as number | undefined;
+  const defaultTextHeight = (headerTextSize && headerTextSize > 0) ? headerTextSize : TEXT_HEIGHT;
+
   // Load serif font if any STYLE entry or MTEXT inline \f references a serif font
   const styles = dxf.tables?.style?.styles;
   let loadedSerifFont: import("opentype.js").Font | undefined;
@@ -1723,6 +1727,7 @@ export async function createThreeObjectsFromDXF(
     pdMode,
     pointDisplaySize,
     dimVars,
+    defaultTextHeight,
   };
 
   const collector = new GeometryCollector();

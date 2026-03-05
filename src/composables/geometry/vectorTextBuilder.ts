@@ -498,7 +498,7 @@ function emitStackedText(
  * @param color           Default entity color (fallback when line.color undefined)
  * @param font            opentype.js Font
  * @param lines           Parsed MTEXT lines from parseMTextContent()
- * @param defaultHeight   Entity height (entity.height || TEXT_HEIGHT)
+ * @param defaultHeight   Entity height (entity.height || $TEXTSIZE)
  * @param posX            Insertion point X
  * @param posY            Insertion point Y
  * @param posZ            Insertion point Z

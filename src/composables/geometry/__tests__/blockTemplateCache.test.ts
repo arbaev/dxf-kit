@@ -82,6 +82,7 @@ describe("buildBlockTemplate", () => {
     pointsMaterialCache: new Map(),
     lineTypes: {},
     globalLtScale: 1,
+    defaultTextHeight: 16,
   });
 
   // Simple collectEntityFn stub: pushes a line segment from (0,0,0)→(1,0,0) for LINE
