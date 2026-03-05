@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { NURBSCurve } from "three/examples/jsm/curves/NURBSCurve.js";
-import type { DxfVertex, DxfEntity, DxfData, DxfLayer, DxfSplineEntity, DxfTextEntity } from "@/types/dxf";
+import type { DxfVertex, DxfEntity, DxfData, DxfLayer, DxfSplineEntity, DxfTextEntity, DxfAttdefEntity } from "@/types/dxf";
 import {
   isLineEntity,
   isCircleEntity,
@@ -17,6 +17,7 @@ import {
   isHatchEntity,
   isLeaderEntity,
   isMLeaderEntity,
+  isAttdefEntity,
 } from "@/types/dxf";
 import {
   TEXT_HEIGHT,
@@ -795,6 +796,43 @@ const collectTextOrMText = (
     });
 
   }
+};
+
+/**
+ * Collect ATTDEF entity as visible text into GeometryCollector.
+ * AutoCAD displays ATTDEF tag (code 2) in model space when default value (code 1) is empty.
+ */
+const collectAttdefEntity = (
+  entity: DxfAttdefEntity,
+  colorCtx: EntityColorContext,
+  collector: GeometryCollector,
+  layer: string,
+): void => {
+  if (entity.invisible) return;
+  const text = entity.text || entity.tag;
+  if (!text) return;
+  const posCoord = entity.startPoint;
+  if (!posCoord) return;
+
+  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const textHeight = entity.textHeight || colorCtx.defaultTextHeight;
+  const ocsMatrix = buildOcsMatrix(entity.extrusionDirection);
+  const pos = transformOcsPoint(
+    new THREE.Vector3(posCoord.x, posCoord.y, posCoord.z || 0),
+    ocsMatrix,
+  );
+  const rotation = entity.rotation ? degreesToRadians(entity.rotation) : 0;
+  const font = resolveEntityFont(entity.textStyle, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
+
+  addTextToCollector({
+    collector, layer, color: entityColor, font,
+    text: replaceSpecialChars(text), height: textHeight,
+    posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
+    hAlign: entity.horizontalJustification ?? HAlign.LEFT,
+    vAlign: entity.verticalJustification ?? VAlign.BASELINE,
+    widthFactor: entity.scale,
+    obliqueAngle: entity.obliqueAngle,
+  });
 };
 
 /**
@@ -1646,7 +1684,6 @@ const processEntity = (
     case "VIEWPORT":
     case "IMAGE":
     case "WIPEOUT":
-    case "ATTDEF":
       return new THREE.Group();
 
     default:
@@ -1855,6 +1892,12 @@ export async function createThreeObjectsFromDXF(
       // Vector text: collect TEXT/MTEXT directly into GeometryCollector
       if ((entity.type === "TEXT" || entity.type === "MTEXT") && isTextEntity(entity)) {
         collectTextOrMText(entity, colorCtx, collector, layer);
+        continue;
+      }
+
+      // Vector text: collect ATTDEF as visible text (tag or default value)
+      if (entity.type === "ATTDEF" && isAttdefEntity(entity)) {
+        collectAttdefEntity(entity, colorCtx, collector, layer);
         continue;
       }
 
