@@ -450,14 +450,16 @@ const collectEntity = (p: CollectEntityParams): boolean => {
 
         const isFullEllipse =
           Math.abs(endAngle - startAngle - 2 * Math.PI) < EPSILON ||
-          (Math.abs(startAngle) < EPSILON && Math.abs(endAngle) < EPSILON);
+          Math.abs(endAngle - startAngle) < EPSILON;
 
         if (isFullEllipse) {
           startAngle = 0;
           endAngle = 2 * Math.PI;
         }
 
-        const sweepAngle = endAngle - startAngle;
+        let sweepAngle = endAngle - startAngle;
+        // DXF ELLIPSE arcs are always CCW
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
         const segments = Math.max(
           MIN_ARC_SEGMENTS,
           Math.floor((Math.abs(sweepAngle) * CIRCLE_SEGMENTS) / (2 * Math.PI)),
@@ -1440,14 +1442,16 @@ const processEntity = (
 
         const isFullEllipse =
           Math.abs(endAngle - startAngle - 2 * Math.PI) < EPSILON ||
-          (Math.abs(startAngle) < EPSILON && Math.abs(endAngle) < EPSILON);
+          Math.abs(endAngle - startAngle) < EPSILON;
 
         if (isFullEllipse) {
           startAngle = 0;
           endAngle = 2 * Math.PI;
         }
 
-        const sweepAngle = endAngle - startAngle;
+        let sweepAngle = endAngle - startAngle;
+        // DXF ELLIPSE arcs are always CCW
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
         const segments = Math.max(
           MIN_ARC_SEGMENTS,
           Math.floor((Math.abs(sweepAngle) * CIRCLE_SEGMENTS) / (2 * Math.PI)),

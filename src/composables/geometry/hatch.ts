@@ -44,7 +44,7 @@ const ellipseEdgeToPoints = (
 
   const isFullEllipse =
     Math.abs(endAngle - startAngle - 2 * Math.PI) < EPSILON ||
-    (Math.abs(startAngle) < EPSILON && Math.abs(endAngle) < EPSILON);
+    Math.abs(endAngle - startAngle) < EPSILON;
   if (isFullEllipse) {
     startAngle = 0;
     endAngle = 2 * Math.PI;
