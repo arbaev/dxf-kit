@@ -18,6 +18,7 @@ Vue 3 component for viewing DXF files in the browser. Built-in DXF parser, Three
 - **Linetype rendering** — DASHED, HIDDEN, CENTER, PHANTOM, DOT, DASHDOT and other DXF line patterns with entity/layer/block resolution and LTSCALE support
 - **Hatch patterns** — 25 built-in AutoCAD patterns (ANSI31–38, BRICK, DOTS, NET, HEX, GOST_* etc.) with scale, angle, dot elements, multi-boundary even-odd clipping
 - **OCS support** — Arbitrary Axis Algorithm for correct rendering of mirrored/rotated entities
+- **Vector text rendering** — crisp text at any zoom via opentype.js triangulated glyphs; embedded Noto Sans Light font with lazy-loaded Noto Serif; bold, italic, stacked fractions, and inline MTEXT formatting; custom font loading via `fontUrl` prop
 - **Built-in DXF parser** — no external parser dependencies, custom scanner with full type casting
 - **Parser-only entry point** — use `dxf-vuer/parser` in Node.js, React, or any JS/TS project (zero dependencies)
 - **TypeScript** — strict types, full `.d.ts` declarations
@@ -28,12 +29,12 @@ Vue 3 component for viewing DXF files in the browser. Built-in DXF parser, Three
 - **Export to PNG** — `exportToPNG()` method and optional toolbar button to save current view
 - **Loading by URL** — `url` prop to load DXF files from a remote URL
 - **Loading progress** — progress bar with percentage during rendering phase
-- **Performance optimizations** — geometry merging (–78% draw calls), block template caching, async parsing in Web Worker, time-sliced rendering
+- **Performance optimizations** — geometry merging (–78% draw calls), block template caching, async parsing in Web Worker, time-sliced rendering with progress bar
 - **Layer panel** — toggle layer visibility with color indicators; frozen/locked layer support
 - **Paper space filtering** — paper space entities (title blocks, borders) automatically excluded
 - **World coordinates** — optional cursor position display in drawing units
 - **Fullscreen mode** — built-in fullscreen button in the viewer toolbar
-- **Lightweight** — ~145 KB main bundle, ~41 KB parser chunk (minified)
+- **Bundle sizes** — ~790 KB main bundle (includes embedded font + opentype.js), ~43 KB parser-only chunk (zero dependencies), ~646 KB serif font chunk (lazy-loaded only when needed)
 
 ## Installation
 
@@ -110,6 +111,7 @@ async function loadFile(file) {
 | `allowDrop` | `boolean` | `false` | Enable drag-and-drop of DXF files onto the viewer |
 | `darkTheme` | `boolean` | `false` | Dark theme for scene, entity colors, and overlays |
 | `autoFit` | `boolean` | `true` | Auto-fit camera to content |
+| `fontUrl` | `string` | `""` | URL to a custom .ttf/.otf font for text rendering |
 
 ### Events
 
@@ -201,7 +203,7 @@ Override CSS custom properties to match your app's theme:
 
 ## Tech Stack
 
-Vue 3.5, TypeScript 5.9, Three.js 0.182, Vite 7.
+Vue 3.5, TypeScript 5.9, Three.js 0.182, Vite 7, opentype.js 1.3.
 
 ## Performance
 
@@ -209,7 +211,7 @@ Vue 3.5, TypeScript 5.9, Three.js 0.182, Vite 7.
 - **Block template caching** — frequently used INSERT blocks are parsed once, then instantiated via matrix transforms
 - **Web Worker parsing** — DXF parsing runs in a Web Worker to keep the UI responsive
 - **Time-sliced rendering** — entity processing yields to the main thread every ~16ms with a progress bar
-- **Shared canvas for text** — single canvas reused for all text textures instead of DOM allocation per entity
+- **Vector text** — text rendered as triangulated mesh geometry, batched with other entities via GeometryCollector; no per-entity canvas/texture allocations
 
 ## Acknowledgements
 

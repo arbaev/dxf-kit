@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-03-05
+
+### Added
+
+- **Vector text rendering** — replaced canvas-based text textures with opentype.js triangulated vector glyphs; text is now rendered as geometry (mesh triangles) batched into GeometryCollector alongside lines and other entities; eliminates per-entity canvas allocations and produces sharp text at any zoom level
+- **Font management** — embedded Noto Sans Light (.ttf) as default font; glyph triangulation cache with `ShapePath`/`ShapeUtils` (curveSubdivision=2); fallback characters for missing glyphs
+- **Sans/serif font classification** — `fontClassifier.ts` classifies DXF font names (e.g. "Times New Roman" → serif, "Arial" → sans); Noto Serif Light loaded lazily as a separate chunk (~646 KB) only when serif fonts are referenced
+- **STYLE table parsing** — DXF STYLE table entries (code 7) parsed and used for font resolution in TEXT, MTEXT, DIMENSION, ATTRIB entities
+- **Bold & italic** — faux bold (duplicate shifted triangles) and faux italic (shear transform) for MTEXT inline formatting (`\fArial|b1|i1;`)
+- **Custom glyphs** — hand-crafted vector glyphs for degree (%%d), plus-minus (%%p), and diameter (%%c) symbols that may be missing from the font
+- **`fontUrl` prop** — new DXFViewer prop to load a custom .ttf/.otf font instead of the built-in Noto Sans Light
+- Test suite expanded from 492 to 648 cases across 27 files
+
+### Fixed
+
+- MTEXT word wrapping with very small width (code 41 < text height) no longer produces single-character columns; wrapping is skipped when width is too narrow for even one character
+- Rendering progress bar restored — yield-to-browser check was unreachable for collected entity types (TEXT, MTEXT, DIMENSION, LEADER, etc.) due to early `continue`; moved to loop start
+- MTEXT vertical alignment (attachment points 4-9) positioning corrected
+- MTEXT line spacing factor applied correctly
+- Dimension stacked fraction text positioning improved
+- Relative height multiplier (`\H<value>x;`) in MTEXT now works correctly
+
+### Changed
+
+- Text rendering pipeline: canvas-based → vector-based (opentype.js); text entities go through GeometryCollector like all other geometry
+- Main bundle size: ~145 KB → ~790 KB (includes inline Noto Sans Light font ~290 KB + opentype.js)
+- New lazy-loaded serif font chunk: ~646 KB (only loaded when serif fonts are referenced)
+- Parser chunk unchanged: ~43 KB
+
 ## [1.2.0] - 2026-03-03
 
 ### Added
@@ -20,7 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Block template caching** — frequently used INSERT blocks parsed once and instantiated via matrix transforms; `INSTANCING_THRESHOLD=2`
 - **Web Worker parsing** — DXF parsing offloaded to an inline Web Worker to keep UI responsive; automatic fallback to main thread if Workers are unavailable
 - **Time-sliced rendering** — entity processing yields to the main thread every ~16ms, preventing UI freezes on large files; cancellation support for fast file switching
-- **Shared canvas for text** — single canvas reused for all text/dimension textures, eliminating per-entity DOM allocations
 - **Camera fit from header extents** — uses `$EXTMIN`/`$EXTMAX` from DXF header for instant camera fitting instead of computing bounding box from geometry
 - Test suite expanded from 465 to 492 cases across 22 files
 
@@ -106,6 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dual package exports**: `dxf-vuer` (full library) and `dxf-vuer/parser` (parser only), plus `dxf-vuer/style.css`
 - **Demo application** deployed at [dxf-vuer.netlify.app](https://dxf-vuer.netlify.app)
 
+[1.3.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.3.0
 [1.2.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.2.0
 [1.1.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.1.0
 [1.0.1]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.0.1

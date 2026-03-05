@@ -5,8 +5,22 @@
 
       <FileUploader @file-selected="handleFileSelected" />
 
-      <button class="theme-toggle" @click="isDark = !isDark" :title="isDark ? 'Light mode' : 'Dark mode'">
-        <svg v-if="isDark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <button
+        class="theme-toggle"
+        @click="isDark = !isDark"
+        :title="isDark ? 'Light mode' : 'Dark mode'"
+      >
+        <svg
+          v-if="isDark"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <circle cx="12" cy="12" r="5" />
           <line x1="12" y1="1" x2="12" y2="3" />
           <line x1="12" y1="21" x2="12" y2="23" />
@@ -17,7 +31,17 @@
           <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
         </svg>
-        <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg
+          v-else
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
         </svg>
       </button>
@@ -27,8 +51,8 @@
       <section class="hero">
         <h1>DXF Viewer for Vue 3</h1>
         <p class="hero-subtitle">
-          View AutoCAD DXF drawings in the browser. Built-in parser,
-          Three.js rendering, TypeScript-ready.
+          View AutoCAD DXF drawings in the browser. Built-in parser, Three.js rendering,
+          TypeScript-ready.
         </p>
         <code class="hero-install">npm install dxf-vuer three</code>
       </section>
@@ -66,41 +90,65 @@
           @error="handleError"
           @dxf-loaded="handleDXFLoaded"
           @reset-view="resetView"
-          @file-dropped="(name: string) => currentFileName = name"
+          @file-dropped="(name: string) => (currentFileName = name)"
         />
       </div>
 
       <section class="features">
         <div class="feature-card">
           <h3>Built-in Parser</h3>
-          <p>Custom DXF parser with zero external dependencies.
-            16 entity types including dimensions, hatches, splines, and block attributes.
-            Async parsing in a Web Worker keeps the UI responsive.</p>
+          <p>
+            Custom DXF parser with zero external dependencies. 16 entity types including dimensions,
+            hatches, splines, and block attributes. Async parsing in a Web Worker keeps the UI
+            responsive.
+          </p>
+        </div>
+        <div class="feature-card">
+          <h3>Vector Text</h3>
+          <p>
+            Crisp text at any zoom level via opentype.js triangulated glyphs. Sans and serif fonts,
+            bold and italic, stacked fractions, MTEXT formatting. Custom font loading supported.
+          </p>
         </div>
         <div class="feature-card">
           <h3>WebGL Rendering</h3>
-          <p>Three.js-powered rendering with pan, zoom, layer visibility,
-            linetypes, hatch patterns, OCS transforms, dark theme,
-            drag-and-drop, and PNG export.</p>
+          <p>
+            Three.js-powered rendering with pan, zoom, layer visibility, dark theme, drag-and-drop,
+            and PNG export.
+          </p>
         </div>
         <div class="feature-card">
           <h3>High Performance</h3>
-          <p>Geometry merging cuts draw calls by 78%.
-            Block template caching, time-sliced rendering with progress bar,
-            and shared canvas for text textures.</p>
+          <p>
+            Geometry merging cuts draw calls by 78%. Block template caching, time-sliced rendering
+            with progress bar. Text batched as geometry with all other entities.
+          </p>
+        </div>
+        <div class="feature-card">
+          <h3>16 Entity Types</h3>
+          <p>
+            Lines, arcs, splines, hatches with 25 AutoCAD patterns, dimensions, block inserts with
+            attributes, leader/multileader. Linetypes, OCS transforms, and paper space filtering.
+          </p>
         </div>
         <div class="feature-card">
           <h3>Framework Flexible</h3>
-          <p>Vue 3 component or standalone parser via dxf-vuer/parser.
-            Works in Node.js, React, or any JS runtime.
-            Full TypeScript support with composables for custom builds.</p>
+          <p>
+            Vue 3 component or standalone parser via dxf-vuer/parser. Works in Node.js, React, or
+            any JS runtime. Full TypeScript support with composables for custom builds.
+          </p>
         </div>
       </section>
 
       <footer class="app-footer">
         MIT License &middot;
-        <a href="https://www.npmjs.com/package/dxf-vuer" target="_blank" rel="noopener noreferrer">npm</a> &middot;
-        <a href="https://github.com/arbaev/dxf-vuer" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://www.npmjs.com/package/dxf-vuer" target="_blank" rel="noopener noreferrer"
+          >npm</a
+        >
+        &middot;
+        <a href="https://github.com/arbaev/dxf-vuer" target="_blank" rel="noopener noreferrer"
+          >GitHub</a
+        >
       </footer>
     </main>
   </div>
@@ -122,7 +170,6 @@ const unsupportedEntities = ref<string[]>([]);
 const error = ref<string | null>(null);
 const currentFileName = ref<string>("");
 const dxfViewerRef = ref<InstanceType<typeof DXFViewer> | null>(null);
-
 
 onMounted(async () => {
   await nextTick();
