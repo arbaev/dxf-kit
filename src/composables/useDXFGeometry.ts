@@ -55,6 +55,8 @@ import {
   createRadialDimension,
   createDiametricDimension,
   createAngularDimension,
+  resolveDimVarsFromHeader,
+  mergeEntityDimVars,
 } from "./geometry/dimensions";
 import {
   replaceSpecialChars,
@@ -797,20 +799,24 @@ const collectDimensionEntity = (
   const transform = worldMatrix ? Array.from(worldMatrix.elements) : undefined;
   const matrix = worldMatrix ?? new THREE.Matrix4();
 
+  // Resolve dimension variables: header defaults merged with per-entity XDATA overrides
+  const baseDv = colorCtx.dimVars ?? resolveDimVarsFromHeader(undefined);
+  const dv = mergeEntityDimVars(baseDv, entity);
+
   let result: THREE.Object3D[] | null = null;
 
   // Ordinate dimension (type 6 = Y-ordinate, type 7 = X-ordinate)
   if ((baseDimType & 0x0e) === 6) {
-    result = createOrdinateDimension(entity, entityColor, font, collector, layer, transform);
+    result = createOrdinateDimension(entity, entityColor, font, collector, layer, transform, dv);
   } else if (baseDimType === 2) {
-    result = createAngularDimension(entity, entityColor, colorCtx.globalLtScale, font, collector, layer, transform);
+    result = createAngularDimension(entity, entityColor, font, collector, layer, transform, dv);
   } else if (baseDimType === 3) {
-    result = createDiametricDimension(entity, entityColor, font, collector, layer, transform);
+    result = createDiametricDimension(entity, entityColor, font, collector, layer, transform, dv);
   } else if (baseDimType === 4) {
-    result = createRadialDimension(entity, entityColor, font, collector, layer, transform);
+    result = createRadialDimension(entity, entityColor, font, collector, layer, transform, dv);
   } else {
     // Linear/aligned dimension
-    const dimData = extractDimensionData(entity);
+    const dimData = extractDimensionData(entity, dv);
     if (!dimData) return;
 
     let dimAngle = dimData.angle;
@@ -823,7 +829,7 @@ const collectDimensionEntity = (
     const dimGroup = createDimensionGroup(
       dimData.point1, dimData.point2, dimData.anchorPoint,
       dimData.textPos, dimData.textHeight, dimData.isRadial,
-      entityColor, dimAngle, colorCtx.globalLtScale,
+      entityColor, dimAngle, dv,
     );
     result = [dimGroup];
 
@@ -1651,6 +1657,9 @@ export async function createThreeObjectsFromDXF(
   const pdMode = (dxf.header?.["$PDMODE"] as number) ?? 0;
   const pointDisplaySize = pdMode !== 0 ? computePointDisplaySize(dxf.header) : undefined;
 
+  // Dimension variables ($DIMSCALE, $DIMASZ, $DIMTXT, $DIMGAP)
+  const dimVars = resolveDimVarsFromHeader(dxf.header);
+
   // Load serif font if any STYLE entry or MTEXT inline \f references a serif font
   const styles = dxf.tables?.style?.styles;
   let loadedSerifFont: import("opentype.js").Font | undefined;
@@ -1713,6 +1722,7 @@ export async function createThreeObjectsFromDXF(
     styles,
     pdMode,
     pointDisplaySize,
+    dimVars,
   };
 
   const collector = new GeometryCollector();

@@ -27,6 +27,7 @@ export interface EntityColorContext {
   styles?: Record<string, DxfStyle>; // STYLE table for font classification
   pdMode?: number; // $PDMODE header variable (point display mode)
   pointDisplaySize?: number; // Computed PDSIZE in drawing units
+  dimVars?: import("./dimensions").DimVars; // Resolved dimension variables
 }
 
 export const degreesToRadians = (degrees: number): number =>

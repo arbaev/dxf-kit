@@ -99,6 +99,8 @@ export interface DxfDimensionEntity extends DxfEntityBase {
   linearOrAngularPoint2?: DxfVertex; // code 14
   diameterOrRadiusPoint?: DxfVertex; // code 15
   arcPoint?: DxfVertex; // code 16
+  arrowSize?: number; // DIMASZ from XDATA DSTYLE override
+  dimScale?: number; // DIMSCALE from XDATA DSTYLE override
 }
 
 export interface DxfAttribEntity extends DxfEntityBase {

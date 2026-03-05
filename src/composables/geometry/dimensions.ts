@@ -4,6 +4,7 @@ import type { DxfVertex, DxfDimensionEntity } from "@/types/dxf";
 import {
   DIM_TEXT_HEIGHT,
   DIM_TEXT_GAP,
+  DIM_TEXT_GAP_MULTIPLIER,
   DIM_TEXT_DECIMAL_PLACES,
   ARROW_SIZE,
   EXTENSION_LINE_DASH_SIZE,
@@ -17,6 +18,75 @@ import { createArrow } from "./primitives";
 import { replaceSpecialChars } from "./text";
 import type { GeometryCollector } from "./mergeCollectors";
 import { addDimensionTextToCollector, measureDimensionTextWidth } from "./vectorTextBuilder";
+
+/**
+ * Resolved dimension variable set. Values are final (already scaled by DIMSCALE).
+ * Priority: entity XDATA override > header $DIM* × $DIMSCALE > hardcoded defaults.
+ */
+export interface DimVars {
+  arrowSize: number;
+  textHeight: number;
+  textGap: number;
+  extLineDash: number;
+  extLineGap: number;
+}
+
+/** Default DimVars using hardcoded constants (backward compatibility) */
+export const DEFAULT_DIM_VARS: DimVars = {
+  arrowSize: ARROW_SIZE,
+  textHeight: DIM_TEXT_HEIGHT,
+  textGap: DIM_TEXT_GAP,
+  extLineDash: EXTENSION_LINE_DASH_SIZE,
+  extLineGap: EXTENSION_LINE_GAP_SIZE,
+};
+
+/**
+ * Resolve dimension variables from DXF header.
+ * $DIMSCALE multiplies all other $DIM* values.
+ */
+export function resolveDimVarsFromHeader(
+  header: Record<string, unknown> | undefined,
+): DimVars {
+  if (!header) return { ...DEFAULT_DIM_VARS };
+
+  const dimScale = (header["$DIMSCALE"] as number) ?? 1;
+  const scale = dimScale > 0 ? dimScale : 1;
+
+  const arrowSize = ((header["$DIMASZ"] as number) ?? ARROW_SIZE) * scale;
+  const textHeight = ((header["$DIMTXT"] as number) ?? DIM_TEXT_HEIGHT) * scale;
+  const dimGap = (header["$DIMGAP"] as number) ?? undefined;
+  const textGap = dimGap !== undefined
+    ? dimGap * scale * DIM_TEXT_GAP_MULTIPLIER * 2
+    : textHeight * DIM_TEXT_GAP_MULTIPLIER;
+  const extLineDash = EXTENSION_LINE_DASH_SIZE * scale;
+  const extLineGap = EXTENSION_LINE_GAP_SIZE * scale;
+
+  return { arrowSize, textHeight, textGap, extLineDash, extLineGap };
+}
+
+/**
+ * Merge per-entity XDATA overrides into resolved DimVars.
+ * Entity textHeight (code 140) is treated as the final value.
+ * Entity arrowSize from XDATA is scaled by entity dimScale.
+ */
+export function mergeEntityDimVars(
+  base: DimVars,
+  entity: DxfDimensionEntity,
+): DimVars {
+  const result = { ...base };
+
+  if (entity.textHeight !== undefined) {
+    result.textHeight = entity.textHeight;
+    result.textGap = entity.textHeight * DIM_TEXT_GAP_MULTIPLIER;
+  }
+
+  if (entity.arrowSize !== undefined) {
+    const scale = entity.dimScale ?? 1;
+    result.arrowSize = entity.arrowSize * scale;
+  }
+
+  return result;
+}
 
 const EXTENSION_LINE_OVERSHOOT = 2;
 
@@ -63,6 +133,7 @@ export const createLinearDimensionLines = (
   extensionLineMaterial: THREE.LineDashedMaterial,
   arrowMaterial: THREE.MeshBasicMaterial,
   isHorizontal: boolean,
+  dv: DimVars = DEFAULT_DIM_VARS,
 ): THREE.Object3D[] => {
   const objects: THREE.Object3D[] = [];
 
@@ -77,8 +148,8 @@ export const createLinearDimensionLines = (
 
   // Split dimension line around text if text lies on the line
   if (textPos && Math.abs(getFixedCoord(textPos) - anchorFixed) < 1) {
-    const gapStart = getMainCoord(textPos) - DIM_TEXT_GAP / 2;
-    const gapEnd = getMainCoord(textPos) + DIM_TEXT_GAP / 2;
+    const gapStart = getMainCoord(textPos) - dv.textGap / 2;
+    const gapEnd = getMainCoord(textPos) + dv.textGap / 2;
 
     if (min < gapStart) {
       objects.push(
@@ -131,7 +202,7 @@ export const createLinearDimensionLines = (
   const arrow1 = createArrow(
     createVec3(max, anchorFixed, 0.1),
     createVec3(min, anchorFixed, 0.1),
-    ARROW_SIZE,
+    dv.arrowSize,
     arrowMaterial,
   );
   objects.push(arrow1);
@@ -139,7 +210,7 @@ export const createLinearDimensionLines = (
   const arrow2 = createArrow(
     createVec3(min, anchorFixed, 0.1),
     createVec3(max, anchorFixed, 0.1),
-    ARROW_SIZE,
+    dv.arrowSize,
     arrowMaterial,
   );
   objects.push(arrow2);
@@ -160,6 +231,7 @@ export const createRotatedDimensionLines = (
   extensionLineMaterial: THREE.LineDashedMaterial,
   arrowMaterial: THREE.MeshBasicMaterial,
   angleRad: number,
+  dv: DimVars = DEFAULT_DIM_VARS,
 ): THREE.Object3D[] => {
   const objects: THREE.Object3D[] = [];
 
@@ -203,8 +275,8 @@ export const createRotatedDimensionLines = (
     );
 
     if (perpDist < 1) {
-      const gapStart = tText - DIM_TEXT_GAP / 2;
-      const gapEnd = tText + DIM_TEXT_GAP / 2;
+      const gapStart = tText - dv.textGap / 2;
+      const gapEnd = tText + dv.textGap / 2;
 
       if (tMin < gapStart) {
         objects.push(
@@ -253,7 +325,7 @@ export const createRotatedDimensionLines = (
     createArrow(
       new THREE.Vector3(maxPt.x, maxPt.y, 0.1),
       new THREE.Vector3(minPt.x, minPt.y, 0.1),
-      ARROW_SIZE,
+      dv.arrowSize,
       arrowMaterial,
     ),
   );
@@ -261,7 +333,7 @@ export const createRotatedDimensionLines = (
     createArrow(
       new THREE.Vector3(minPt.x, minPt.y, 0.1),
       new THREE.Vector3(maxPt.x, maxPt.y, 0.1),
-      ARROW_SIZE,
+      dv.arrowSize,
       arrowMaterial,
     ),
   );
@@ -269,7 +341,7 @@ export const createRotatedDimensionLines = (
   return objects;
 };
 
-export const extractDimensionData = (entity: DxfDimensionEntity) => {
+export const extractDimensionData = (entity: DxfDimensionEntity, dv: DimVars = DEFAULT_DIM_VARS) => {
   let point1 = entity.linearOrAngularPoint1;
   let point2 = entity.linearOrAngularPoint2;
   const anchorPoint = entity.anchorPoint;
@@ -314,7 +386,7 @@ export const extractDimensionData = (entity: DxfDimensionEntity) => {
   if (!point1 || !point2 || !anchorPoint || !dimensionText) {
     return null;
   }
-  const textHeight = entity.textHeight || DIM_TEXT_HEIGHT;
+  const textHeight = entity.textHeight || dv.textHeight;
 
   return {
     point1,
@@ -337,15 +409,15 @@ export const createDimensionGroup = (
   isRadial: boolean,
   color: string,
   angle: number = 0,
-  dimScale: number = 1,
+  dv: DimVars = DEFAULT_DIM_VARS,
 ): THREE.Group => {
   const dimGroup = new THREE.Group();
 
   const dimLineMaterial = new THREE.LineBasicMaterial({ color });
   const extensionLineMaterial = new THREE.LineDashedMaterial({
     color,
-    dashSize: EXTENSION_LINE_DASH_SIZE * dimScale,
-    gapSize: EXTENSION_LINE_GAP_SIZE * dimScale,
+    dashSize: dv.extLineDash,
+    gapSize: dv.extLineGap,
   });
   const arrowMaterial = new THREE.MeshBasicMaterial({
     color,
@@ -369,7 +441,7 @@ export const createDimensionGroup = (
     const arrow = createArrow(
       new THREE.Vector3(centerX, centerY, 0.1),
       new THREE.Vector3(edgeX, edgeY, 0.1),
-      ARROW_SIZE,
+      dv.arrowSize,
       arrowMaterial,
     );
     dimGroup.add(arrow);
@@ -390,6 +462,7 @@ export const createDimensionGroup = (
       extensionLineMaterial,
       arrowMaterial,
       angleRad,
+      dv,
     );
   } else {
     // Determine orientation by comparing point spread in X vs Y
@@ -406,6 +479,7 @@ export const createDimensionGroup = (
       extensionLineMaterial,
       arrowMaterial,
       isHorizontal,
+      dv,
     );
   }
 
@@ -458,6 +532,7 @@ export const createOrdinateDimension = (
   collector?: GeometryCollector,
   layer?: string,
   transform?: readonly number[],
+  dv: DimVars = DEFAULT_DIM_VARS,
 ): THREE.Object3D[] | null => {
   const feature = entity.linearOrAngularPoint1; // Code 13 -- point on object
   const leader = entity.linearOrAngularPoint2; // Code 14 -- end of diagonal
@@ -478,7 +553,7 @@ export const createOrdinateDimension = (
 
   if (!dimensionText) return null;
 
-  const textHeight = entity.textHeight || DIM_TEXT_HEIGHT;
+  const textHeight = entity.textHeight || dv.textHeight;
   const objects: THREE.Object3D[] = [];
   const material = new THREE.LineBasicMaterial({ color });
 
@@ -592,6 +667,7 @@ export const createRadialDimension = (
   collector?: GeometryCollector,
   layer?: string,
   transform?: readonly number[],
+  dv: DimVars = DEFAULT_DIM_VARS,
 ): THREE.Object3D[] | null => {
   const center = entity.anchorPoint; // code 10
   const arcPt = entity.diameterOrRadiusPoint; // code 15
@@ -613,7 +689,7 @@ export const createRadialDimension = (
     dimensionText = "R" + formatDimNumber(measurement);
   }
 
-  const textHeight = entity.textHeight || DIM_TEXT_HEIGHT;
+  const textHeight = entity.textHeight || dv.textHeight;
   const objects: THREE.Object3D[] = [];
   const lineMat = new THREE.LineBasicMaterial({ color });
   const arrowMat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
@@ -671,7 +747,7 @@ export const createRadialDimension = (
   const arrow = createArrow(
     arrowFrom,
     new THREE.Vector3(arcPt.x, arcPt.y, 0.1),
-    ARROW_SIZE,
+    dv.arrowSize,
     arrowMat,
   );
   objects.push(arrow);
@@ -691,6 +767,7 @@ export const createDiametricDimension = (
   collector?: GeometryCollector,
   layer?: string,
   transform?: readonly number[],
+  dv: DimVars = DEFAULT_DIM_VARS,
 ): THREE.Object3D[] | null => {
   const p10 = entity.anchorPoint; // code 10 -- first point on circle
   const p15 = entity.diameterOrRadiusPoint; // code 15 -- opposite point
@@ -710,7 +787,7 @@ export const createDiametricDimension = (
     dimensionText = formatDimNumber(measurement);
   }
 
-  const textHeight = entity.textHeight || DIM_TEXT_HEIGHT;
+  const textHeight = entity.textHeight || dv.textHeight;
   const objects: THREE.Object3D[] = [];
   const lineMat = new THREE.LineBasicMaterial({ color });
   const arrowMat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
@@ -742,20 +819,20 @@ export const createDiametricDimension = (
   // Arrow direction: outward (from center) when text inside, inward when text offset
   const arrowSign = textOnLine ? 1 : -1;
   const arrow10From = new THREE.Vector3(
-    p10.x + arrowSign * dir10x * ARROW_SIZE,
-    p10.y + arrowSign * dir10y * ARROW_SIZE,
+    p10.x + arrowSign * dir10x * dv.arrowSize,
+    p10.y + arrowSign * dir10y * dv.arrowSize,
     0.1,
   );
   objects.push(
-    createArrow(arrow10From, new THREE.Vector3(p10.x, p10.y, 0.1), ARROW_SIZE, arrowMat),
+    createArrow(arrow10From, new THREE.Vector3(p10.x, p10.y, 0.1), dv.arrowSize, arrowMat),
   );
   const arrow15From = new THREE.Vector3(
-    p15.x - arrowSign * dir10x * ARROW_SIZE,
-    p15.y - arrowSign * dir10y * ARROW_SIZE,
+    p15.x - arrowSign * dir10x * dv.arrowSize,
+    p15.y - arrowSign * dir10y * dv.arrowSize,
     0.1,
   );
   objects.push(
-    createArrow(arrow15From, new THREE.Vector3(p15.x, p15.y, 0.1), ARROW_SIZE, arrowMat),
+    createArrow(arrow15From, new THREE.Vector3(p15.x, p15.y, 0.1), dv.arrowSize, arrowMat),
   );
 
   const diamLineGeom = new THREE.BufferGeometry().setFromPoints([
@@ -872,11 +949,11 @@ export const isAngleInSweep = (startAngle: number, endAngle: number, testAngle: 
 export const createAngularDimension = (
   entity: DxfDimensionEntity,
   color: string,
-  dimScale: number = 1,
   font?: Font,
   collector?: GeometryCollector,
   layer?: string,
   transform?: readonly number[],
+  dv: DimVars = DEFAULT_DIM_VARS,
 ): THREE.Object3D[] | null => {
   const p13 = entity.linearOrAngularPoint1; // code 13 -- end 1 of first line
   const p14 = entity.linearOrAngularPoint2; // code 14 -- end 2 of first line
@@ -943,8 +1020,8 @@ export const createAngularDimension = (
   const lineMat = new THREE.LineBasicMaterial({ color });
   const dashedMat = new THREE.LineDashedMaterial({
     color,
-    dashSize: EXTENSION_LINE_DASH_SIZE * dimScale,
-    gapSize: EXTENSION_LINE_GAP_SIZE * dimScale,
+    dashSize: dv.extLineDash,
+    gapSize: dv.extLineGap,
   });
   const arrowMat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
 
@@ -986,7 +1063,7 @@ export const createAngularDimension = (
   objects.push(extLineB);
 
   // Arrows follow arc curvature (chord direction, not pure tangent)
-  const arrowArcAngle = ARROW_SIZE / radius;
+  const arrowArcAngle = dv.arrowSize / radius;
 
   const innerStartA = startAngle + arrowArcAngle;
   const arrowStartFrom = new THREE.Vector3(
@@ -994,7 +1071,7 @@ export const createAngularDimension = (
     vertex.y + radius * Math.sin(innerStartA),
     0.1,
   );
-  objects.push(createArrow(arrowStartFrom, new THREE.Vector3(arcStartPt.x, arcStartPt.y, 0.1), ARROW_SIZE, arrowMat));
+  objects.push(createArrow(arrowStartFrom, new THREE.Vector3(arcStartPt.x, arcStartPt.y, 0.1), dv.arrowSize, arrowMat));
 
   const innerEndA = endAngle - arrowArcAngle;
   const arrowEndFrom = new THREE.Vector3(
@@ -1002,7 +1079,7 @@ export const createAngularDimension = (
     vertex.y + radius * Math.sin(innerEndA),
     0.1,
   );
-  objects.push(createArrow(arrowEndFrom, new THREE.Vector3(arcEndPt.x, arcEndPt.y, 0.1), ARROW_SIZE, arrowMat));
+  objects.push(createArrow(arrowEndFrom, new THREE.Vector3(arcEndPt.x, arcEndPt.y, 0.1), dv.arrowSize, arrowMat));
 
   let dimensionText = entity.text;
   const measurement = entity.actualMeasurement;
@@ -1019,7 +1096,7 @@ export const createAngularDimension = (
   }
 
   if (dimensionText) {
-    const textHeight = entity.textHeight || DIM_TEXT_HEIGHT;
+    const textHeight = entity.textHeight || dv.textHeight;
 
     let textAngle: number;
     let textX: number;

@@ -6,6 +6,9 @@ import {
   intersectLines2D,
   normalizeAngle,
   isAngleInSweep,
+  resolveDimVarsFromHeader,
+  mergeEntityDimVars,
+  DEFAULT_DIM_VARS,
 } from "../dimensions";
 import type { DxfDimensionEntity } from "@/types/dxf";
 
@@ -341,5 +344,119 @@ describe("isAngleInSweep", () => {
 
   it("returns true when testAngle equals endAngle", () => {
     expect(isAngleInSweep(1.0, 2.0, 2.0)).toBe(true);
+  });
+});
+
+// =====================================================================
+// resolveDimVarsFromHeader
+// =====================================================================
+
+describe("resolveDimVarsFromHeader", () => {
+  it("returns defaults when header is undefined", () => {
+    const dv = resolveDimVarsFromHeader(undefined);
+    expect(dv).toEqual(DEFAULT_DIM_VARS);
+  });
+
+  it("returns defaults when header has no DIM variables", () => {
+    const dv = resolveDimVarsFromHeader({});
+    expect(dv.arrowSize).toBe(DEFAULT_DIM_VARS.arrowSize);
+    expect(dv.textHeight).toBe(DEFAULT_DIM_VARS.textHeight);
+  });
+
+  it("scales $DIMASZ by $DIMSCALE", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMSCALE": 2, "$DIMASZ": 2.5 });
+    expect(dv.arrowSize).toBe(5);
+  });
+
+  it("scales $DIMTXT by $DIMSCALE", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMSCALE": 3, "$DIMTXT": 2 });
+    expect(dv.textHeight).toBe(6);
+  });
+
+  it("uses $DIMSCALE=1 by default", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMASZ": 4 });
+    expect(dv.arrowSize).toBe(4);
+  });
+
+  it("handles $DIMSCALE=0 (treats as 1)", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMSCALE": 0, "$DIMASZ": 4 });
+    expect(dv.arrowSize).toBe(4);
+  });
+
+  it("scales extension line dash/gap by $DIMSCALE", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMSCALE": 5 });
+    expect(dv.extLineDash).toBe(10); // 2 * 5
+    expect(dv.extLineGap).toBe(5);  // 1 * 5
+  });
+});
+
+// =====================================================================
+// mergeEntityDimVars
+// =====================================================================
+
+describe("mergeEntityDimVars", () => {
+  it("returns base when entity has no overrides", () => {
+    const entity = makeDimEntity({});
+    const result = mergeEntityDimVars(DEFAULT_DIM_VARS, entity);
+    expect(result).toEqual(DEFAULT_DIM_VARS);
+  });
+
+  it("uses entity textHeight and recomputes textGap", () => {
+    const entity = makeDimEntity({ textHeight: 10 });
+    const result = mergeEntityDimVars(DEFAULT_DIM_VARS, entity);
+    expect(result.textHeight).toBe(10);
+    expect(result.textGap).toBe(15); // 10 * 1.5
+  });
+
+  it("uses entity arrowSize with dimScale", () => {
+    const entity = makeDimEntity({ arrowSize: 3, dimScale: 2 });
+    const result = mergeEntityDimVars(DEFAULT_DIM_VARS, entity);
+    expect(result.arrowSize).toBe(6);
+  });
+
+  it("uses entity arrowSize without dimScale (scale=1)", () => {
+    const entity = makeDimEntity({ arrowSize: 4 });
+    const result = mergeEntityDimVars(DEFAULT_DIM_VARS, entity);
+    expect(result.arrowSize).toBe(4);
+  });
+
+  it("does not modify base object", () => {
+    const base = { ...DEFAULT_DIM_VARS };
+    const entity = makeDimEntity({ textHeight: 99 });
+    mergeEntityDimVars(base, entity);
+    expect(base.textHeight).toBe(DEFAULT_DIM_VARS.textHeight);
+  });
+});
+
+// =====================================================================
+// extractDimensionData with DimVars
+// =====================================================================
+
+describe("extractDimensionData with DimVars", () => {
+  it("uses DimVars textHeight as fallback when entity has none", () => {
+    const entity = makeDimEntity({
+      linearOrAngularPoint1: { x: 0, y: 0, z: 0 },
+      linearOrAngularPoint2: { x: 10, y: 0, z: 0 },
+      anchorPoint: { x: 0, y: 5, z: 0 },
+      actualMeasurement: 10,
+    });
+    const dv = { ...DEFAULT_DIM_VARS, textHeight: 8 };
+    const data = extractDimensionData(entity, dv);
+    expect(data).not.toBeNull();
+    expect(data!.textHeight).toBe(8);
+  });
+
+  it("entity textHeight takes priority over DimVars", () => {
+    const entity = makeDimEntity({
+      linearOrAngularPoint1: { x: 0, y: 0, z: 0 },
+      linearOrAngularPoint2: { x: 10, y: 0, z: 0 },
+      anchorPoint: { x: 0, y: 5, z: 0 },
+      actualMeasurement: 10,
+      textHeight: 3,
+    });
+    const dv = { ...DEFAULT_DIM_VARS, textHeight: 8 };
+    const data = extractDimensionData(entity, dv);
+    expect(data).not.toBeNull();
+    expect(data!.textHeight).toBe(3);
   });
 });
