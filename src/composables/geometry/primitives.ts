@@ -29,6 +29,7 @@ export interface EntityColorContext {
   pointDisplaySize?: number; // Computed PDSIZE in drawing units
   dimVars?: import("./dimensions").DimVars; // Resolved dimension variables
   defaultTextHeight: number; // $TEXTSIZE from header (fallback for entities without explicit height)
+  mirrText?: boolean; // $MIRRTEXT: true = mirror text with geometry, false (default) = keep readable
 }
 
 export const degreesToRadians = (degrees: number): number =>

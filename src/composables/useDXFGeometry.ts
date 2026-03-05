@@ -719,6 +719,7 @@ const collectTextOrMText = (
       }
     }
 
+    let mirrorWidthFactor = 1;
     if (worldMatrix) {
       pos.applyMatrix4(worldMatrix);
       if (endX !== undefined && endY !== undefined) {
@@ -726,11 +727,18 @@ const collectTextOrMText = (
         endX = ep.x;
         endY = ep.y;
       }
-      // Extract rotation from world matrix
       const m = worldMatrix.elements;
-      rotation += Math.atan2(m[1], m[0]);
-      // Scale height by Y component of matrix scale
+      const det2x2 = m[0] * m[5] - m[1] * m[4];
+      const isMirrored = det2x2 < 0;
+      // When mirrored, negate direction to extract correct rotation without flip
+      rotation += isMirrored
+        ? Math.atan2(-m[1], -m[0])
+        : Math.atan2(m[1], m[0]);
       height *= Math.sqrt(m[4] * m[4] + m[5] * m[5]);
+      // $MIRRTEXT=1: mirror text with geometry; default (0): keep text readable
+      if (isMirrored && colorCtx.mirrText) {
+        mirrorWidthFactor = -1;
+      }
     }
 
     addTextToCollector({
@@ -739,7 +747,7 @@ const collectTextOrMText = (
       posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
       hAlign: entity.halign ?? HAlign.LEFT,
       vAlign: entity.valign ?? VAlign.BASELINE,
-      widthFactor: entity.xScale,
+      widthFactor: (entity.xScale ?? 1) * mirrorWidthFactor,
       endPosX: endX, endPosY: endY,
     });
 
@@ -763,7 +771,11 @@ const collectTextOrMText = (
     if (worldMatrix) {
       pos.applyMatrix4(worldMatrix);
       const m = worldMatrix.elements;
-      rotation += Math.atan2(m[1], m[0]);
+      const det2x2 = m[0] * m[5] - m[1] * m[4];
+      const isMirrored = det2x2 < 0;
+      rotation += isMirrored
+        ? Math.atan2(-m[1], -m[0])
+        : Math.atan2(m[1], m[0]);
       height *= Math.sqrt(m[4] * m[4] + m[5] * m[5]);
     }
 
@@ -1697,6 +1709,9 @@ export async function createThreeObjectsFromDXF(
   const headerTextSize = dxf.header?.["$TEXTSIZE"] as number | undefined;
   const defaultTextHeight = (headerTextSize && headerTextSize > 0) ? headerTextSize : TEXT_HEIGHT;
 
+  // $MIRRTEXT: 0 (default) = keep text readable in mirrored blocks, 1 = mirror text with geometry
+  const mirrText = (dxf.header?.["$MIRRTEXT"] as number | undefined) === 1;
+
   // Load serif font if any STYLE entry or MTEXT inline \f references a serif font
   const styles = dxf.tables?.style?.styles;
   let loadedSerifFont: import("opentype.js").Font | undefined;
@@ -1761,6 +1776,7 @@ export async function createThreeObjectsFromDXF(
     pointDisplaySize,
     dimVars,
     defaultTextHeight,
+    mirrText,
   };
 
   const collector = new GeometryCollector();
