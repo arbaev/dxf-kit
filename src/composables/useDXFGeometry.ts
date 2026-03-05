@@ -36,6 +36,7 @@ import { HATCH_PATTERNS } from "@/constants/hatchPatterns";
 import { resolveEntityColor } from "@/utils/colorResolver";
 import { resolveEntityLinetype, applyLinetypePattern, computeAutoLtScale } from "@/utils/linetypeResolver";
 import { buildOcsMatrix, transformOcsPoints, transformOcsPoint } from "@/utils/ocsTransform";
+import { getInsUnitsScale } from "@/utils/insUnitsScale";
 
 import {
   type EntityColorContext,
@@ -1079,6 +1080,13 @@ const collectInsertEntity = async (
 
   // Compute INSERT transform matrix: position + rotation + scale + array offset
   const pos = insertEntity.position;
+
+  // Auto-scale blocks by $INSUNITS vs BLOCK_RECORD units
+  const drawingUnits = (dxf.header?.["$INSUNITS"] as number) ?? 0;
+  const blockRecord = dxf.tables?.blockRecord;
+  const blockUnits = (blockRecord as { blockRecords?: Record<string, { units: number }> })?.blockRecords?.[insertEntity.name]?.units ?? 0;
+  const unitScale = getInsUnitsScale(drawingUnits, blockUnits);
+
   const insertMatrix = new THREE.Matrix4().compose(
     new THREE.Vector3(
       pos.x + col * colSpacing,
@@ -1090,9 +1098,9 @@ const collectInsertEntity = async (
       insertEntity.rotation ? degreesToRadians(insertEntity.rotation) : 0,
     ),
     new THREE.Vector3(
-      insertEntity.xScale || 1,
-      insertEntity.yScale || 1,
-      insertEntity.zScale || 1,
+      (insertEntity.xScale || 1) * unitScale,
+      (insertEntity.yScale || 1) * unitScale,
+      (insertEntity.zScale || 1) * unitScale,
     ),
   );
 

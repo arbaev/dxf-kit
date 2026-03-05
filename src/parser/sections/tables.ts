@@ -27,6 +27,11 @@ export interface IStyle {
   widthFactor?: number;
 }
 
+export interface IBlockRecord {
+  name: string;
+  units: number; // INSUNITS code (0=Unitless, 1=Inches, 4=mm, 6=Meters, ...)
+}
+
 interface IBaseTable {
   handle?: string;
   ownerHandle?: string;
@@ -68,6 +73,12 @@ export function parseTables(scanner: DxfScanner): Record<string, IBaseTable> {
       tableName: "style",
       dxfSymbolName: "STYLE",
       parseTableRecords: () => parseStyles(scanner),
+    },
+    BLOCK_RECORD: {
+      tableRecordsProperty: "blockRecords",
+      tableName: "blockRecord",
+      dxfSymbolName: "BLOCK_RECORD",
+      parseTableRecords: () => parseBlockRecords(scanner),
     },
   };
 
@@ -323,4 +334,38 @@ function parseViewPortRecords(scanner: DxfScanner): Record<string, unknown>[] {
   }
   viewPorts.push(viewPort);
   return viewPorts;
+}
+
+function parseBlockRecords(scanner: DxfScanner): Record<string, IBlockRecord> {
+  const records: Record<string, IBlockRecord> = {};
+  let rec = {} as IBlockRecord;
+  let recName = "";
+
+  let curr = scanner.next();
+  while (!(curr.code === 0 && curr.value === "ENDTAB")) {
+    switch (curr.code) {
+      case 2:
+        rec.name = curr.value as string;
+        recName = curr.value as string;
+        curr = scanner.next();
+        break;
+      case 70:
+        rec.units = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 0:
+        if (curr.value === "BLOCK_RECORD") {
+          if (recName) records[recName] = rec;
+          rec = {} as IBlockRecord;
+          recName = "";
+        }
+        curr = scanner.next();
+        break;
+      default:
+        curr = scanner.next();
+        break;
+    }
+  }
+  if (recName) records[recName] = rec;
+  return records;
 }

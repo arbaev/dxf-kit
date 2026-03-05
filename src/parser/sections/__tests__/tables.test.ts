@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createScanner } from "../../__tests__/test-helpers";
 import { parseTables } from "../tables";
-import type { ILayer, ILineType, IStyle } from "../tables";
+import type { ILayer, ILineType, IStyle, IBlockRecord } from "../tables";
 
 describe("parseTables", () => {
   // ── Layers ──────────────────────────────────────────────────────────
@@ -423,6 +423,59 @@ describe("parseTables", () => {
     expect(styles).toHaveProperty("Standard");
     const layers = tables.layer.layers as Record<string, ILayer>;
     expect(layers).toHaveProperty("Layer0");
+  });
+
+  // ── Block Records ──────────────────────────────────────────────────
+
+  describe("parseBlockRecords", () => {
+    it("parses BLOCK_RECORD with units", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "BLOCK_RECORD",
+        "70", "3",               // max entries (skipped)
+        "0", "BLOCK_RECORD",     // first record
+        "2", "*Model_Space",
+        "70", "0",               // Unitless
+        "0", "BLOCK_RECORD",
+        "2", "*Paper_Space",
+        "70", "0",
+        "0", "BLOCK_RECORD",
+        "2", "MyBlock",
+        "70", "4",               // Millimeters
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      expect(tables).toHaveProperty("blockRecord");
+      const records = tables.blockRecord.blockRecords as Record<string, IBlockRecord>;
+      expect(records).toHaveProperty("*Model_Space");
+      expect(records["*Model_Space"].units).toBe(0);
+      expect(records).toHaveProperty("MyBlock");
+      expect(records.MyBlock.name).toBe("MyBlock");
+      expect(records.MyBlock.units).toBe(4);
+    });
+
+    it("parses BLOCK_RECORD with inches units", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "BLOCK_RECORD",
+        "70", "1",
+        "0", "BLOCK_RECORD",
+        "2", "InchBlock",
+        "70", "1",               // Inches
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const records = tables.blockRecord.blockRecords as Record<string, IBlockRecord>;
+      expect(records.InchBlock.units).toBe(1);
+    });
   });
 
   // ── Empty TABLES section ────────────────────────────────────────────

@@ -1,5 +1,6 @@
 export { parseDxf } from "./parser";
 export { collectDXFStatistics } from "./utils/dxfStatistics";
+export { getInsUnitsScale } from "./utils/insUnitsScale";
 
 export type {
   DxfVertex,
@@ -34,6 +35,7 @@ export type {
   DxfEntity,
   DxfLayer,
   DxfTables,
+  DxfBlockRecord,
   DxfBlock,
   DxfData,
   DxfStatistics,

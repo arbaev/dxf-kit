@@ -403,6 +403,11 @@ export interface DxfLineType {
   patternLength: number;
 }
 
+export interface DxfBlockRecord {
+  name: string;
+  units: number; // INSUNITS code (0=Unitless, 1=Inches, 4=mm, 6=Meters, ...)
+}
+
 export interface DxfTables {
   layer?: {
     handle?: string;
@@ -418,6 +423,11 @@ export interface DxfTables {
     handle?: string;
     ownerHandle?: string;
     styles: Record<string, DxfStyle>;
+  };
+  blockRecord?: {
+    handle?: string;
+    ownerHandle?: string;
+    blockRecords: Record<string, DxfBlockRecord>;
   };
   [key: string]: unknown;
 }
