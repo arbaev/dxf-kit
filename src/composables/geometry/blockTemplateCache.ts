@@ -81,6 +81,9 @@ export function buildBlockTemplate(
   for (let i = 0; i < blockEntities.length; i++) {
     const entity = blockEntities[i];
 
+    // Skip explicitly invisible entities (DXF code 60 = 1)
+    if (entity.visible === false) continue;
+
     // Non-cacheable entity types → fallback
     if (!TEMPLATE_COLLECTABLE_TYPES.has(entity.type)) {
       fallbackEntityIndices.push(i);

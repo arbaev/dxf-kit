@@ -1082,6 +1082,7 @@ const collectInsertEntity = async (
     // Process fallback entities individually (TEXT, nested INSERT, etc.)
     for (const idx of template.fallbackEntityIndices) {
       const entity = block.entities[idx];
+      if (entity.visible === false) continue;
       try {
         const entityLayer = (!entity.layer || entity.layer === "0") ? insertLayer : entity.layer;
 
@@ -1171,6 +1172,7 @@ const collectInsertEntity = async (
 
   // Slow path: process every entity individually
   for (const entity of block.entities) {
+    if (entity.visible === false) continue;
     try {
       // Layer "0" inside block inherits INSERT's layer
       const entityLayer = (!entity.layer || entity.layer === "0") ? insertLayer : entity.layer;
@@ -1772,6 +1774,9 @@ export async function createThreeObjectsFromDXF(
     try {
       // Skip paper space entities — they belong to layouts, not model space
       if (entity.inPaperSpace) continue;
+
+      // Skip explicitly invisible entities (DXF code 60 = 1)
+      if (entity.visible === false) continue;
 
       const layer = entity.layer || "0";
 
