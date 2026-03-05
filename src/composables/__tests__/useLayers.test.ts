@@ -127,6 +127,59 @@ describe("initLayers", () => {
   });
 });
 
+// ── initLayers: entity-only layers (no TABLES section) ────────────────────
+
+describe("initLayers — entity-only layers", () => {
+  it("creates layers from entityLayerCounts when LAYER table is empty (no TABLES section)", () => {
+    const { initLayers, layers, visibleLayerNames } = useLayers();
+
+    initLayers({}, { "0": 452 });
+
+    expect(layers.value.size).toBe(1);
+    const layer0 = layers.value.get("0");
+    expect(layer0).toBeDefined();
+    expect(layer0!.name).toBe("0");
+    expect(layer0!.visible).toBe(true);
+    expect(layer0!.frozen).toBe(false);
+    expect(layer0!.locked).toBe(false);
+    expect(layer0!.entityCount).toBe(452);
+    expect(visibleLayerNames.value.has("0")).toBe(true);
+  });
+
+  it("does not duplicate layers that exist in both LAYER table and entityLayerCounts", () => {
+    const { initLayers, layers } = useLayers();
+
+    initLayers(
+      { Layer1: makeLayer({ name: "Layer1", colorIndex: 1 }) },
+      { Layer1: 10, Layer2: 5 },
+    );
+
+    expect(layers.value.size).toBe(2);
+    // Layer1 comes from the table (has ACI 1 = red color)
+    expect(layers.value.get("Layer1")!.color).toBe("#ff0000");
+    expect(layers.value.get("Layer1")!.entityCount).toBe(10);
+    // Layer2 is auto-created from entity counts
+    expect(layers.value.get("Layer2")!.visible).toBe(true);
+    expect(layers.value.get("Layer2")!.entityCount).toBe(5);
+  });
+
+  it("uses black color for entity-only layers on light theme", () => {
+    const { initLayers, layers } = useLayers();
+
+    initLayers({}, { test: 1 }, false);
+
+    expect(layers.value.get("test")!.color).toBe("#000000");
+  });
+
+  it("uses white color for entity-only layers on dark theme", () => {
+    const { initLayers, layers } = useLayers();
+
+    initLayers({}, { test: 1 }, true);
+
+    expect(layers.value.get("test")!.color).toBe("#ffffff");
+  });
+});
+
 // ── locked layers ──────────────────────────────────────────────────────────
 
 describe("locked layers", () => {

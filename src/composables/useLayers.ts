@@ -39,6 +39,22 @@ export function useLayers() {
         entityCount: entityLayerCounts[name] || 0,
       });
     }
+
+    // Add layers referenced by entities but missing from the LAYER table
+    const aci7Color = darkTheme ? "#ffffff" : "#000000";
+    for (const [name, count] of Object.entries(entityLayerCounts)) {
+      if (!newLayers.has(name)) {
+        newLayers.set(name, {
+          name,
+          visible: true,
+          frozen: false,
+          locked: false,
+          color: aci7Color,
+          entityCount: count,
+        });
+      }
+    }
+
     layers.value = newLayers;
   };
 
