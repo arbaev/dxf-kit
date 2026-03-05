@@ -683,7 +683,10 @@ const collectTextOrMText = (
     addMTextToCollector(
       collector, layer, entityColor, font, lines, height,
       pos.x, pos.y, pos.z, rotation,
-      entity.attachmentPoint, entity.width,
+      entity.attachmentPoint,
+      // Skip word wrapping when width (code 41) is narrower than one character
+      // (width < text height) — wrapping would put every character on its own line
+      entity.width && entity.width >= height ? entity.width : undefined,
       colorCtx.serifFont,
       entity.lineSpacingFactor,
     );
@@ -1645,6 +1648,13 @@ export async function createThreeObjectsFromDXF(
 
     const entity = dxf.entities[index];
 
+    // Yield to browser every ~16ms to keep UI responsive
+    if (performance.now() - yieldState.lastYield > CHUNK_TIME_MS) {
+      signal?.onProgress?.(index / dxf.entities.length);
+      await yieldToMain();
+      yieldState.lastYield = performance.now();
+    }
+
     try {
       // Skip paper space entities — they belong to layouts, not model space
       if (entity.inPaperSpace) continue;
@@ -1697,13 +1707,6 @@ export async function createThreeObjectsFromDXF(
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
       errors.push(`Entity ${index} (${entity.type || "unknown type"}): ${errorMsg}`);
-    }
-
-    // Yield to browser every ~16ms to keep UI responsive
-    if (performance.now() - yieldState.lastYield > CHUNK_TIME_MS) {
-      signal?.onProgress?.(index / dxf.entities.length);
-      await yieldToMain();
-      yieldState.lastYield = performance.now();
     }
   }
 

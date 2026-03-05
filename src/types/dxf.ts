@@ -76,7 +76,7 @@ export interface DxfTextEntity extends DxfEntityBase {
   halign?: number;
   valign?: number;
   xScale?: number; // TEXT: width factor (code 41)
-  width?: number; // MTEXT: column width for word wrap (code 41)
+  width?: number; // MTEXT: reference rectangle width (code 41)
   attachmentPoint?: number; // MTEXT: 1-9 (TopLeft..BottomRight)
   lineSpacingFactor?: number; // MTEXT: code 44, default 1.0
   extrusionDirection?: DxfVertex;
