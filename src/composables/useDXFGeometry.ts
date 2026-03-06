@@ -59,6 +59,7 @@ import {
   createAngularDimension,
   resolveDimVarsFromHeader,
   mergeEntityDimVars,
+  type DimFormatOptions,
 } from "./geometry/dimensions";
 import {
   replaceSpecialChars,
@@ -901,6 +902,12 @@ const collectDimensionEntity = (
   const baseDv = colorCtx.dimVars ?? resolveDimVarsFromHeader(undefined);
   const dv = mergeEntityDimVars(baseDv, entity);
 
+  // Resolve DIMLUNIT: DIMSTYLE → header $DIMLUNIT → undefined (decimal default)
+  const dimStyleEntry = entity.styleName && colorCtx.dimStyles?.[entity.styleName];
+  const dimlunit = dimStyleEntry ? dimStyleEntry.dimlunit : colorCtx.headerDimlunit;
+  const dimzin = dimStyleEntry ? dimStyleEntry.dimzin : undefined;
+  const dimFmt: DimFormatOptions | undefined = dimlunit !== undefined ? { dimlunit, dimzin } : undefined;
+
   let result: THREE.Object3D[] | null = null;
 
   // Ordinate dimension (type 6 = Y-ordinate, type 7 = X-ordinate)
@@ -915,7 +922,7 @@ const collectDimensionEntity = (
     result = createRadialDimension(dimParams);
   } else {
     // Linear/aligned dimension
-    const dimData = extractDimensionData(entity, dv);
+    const dimData = extractDimensionData(entity, dv, dimFmt);
     if (!dimData) return;
 
     let dimAngle = dimData.angle;
@@ -1854,6 +1861,10 @@ export async function createThreeObjectsFromDXF(
     }
   }
 
+  // DIMSTYLE table and header $DIMLUNIT for architectural dimension formatting
+  const dimStyles = dxf.tables?.dimStyle?.dimStyles;
+  const headerDimlunit = dxf.header?.["$DIMLUNIT"] as number | undefined;
+
   const colorCtx: EntityColorContext = {
     layers,
     materialCache: new Map(),
@@ -1870,6 +1881,8 @@ export async function createThreeObjectsFromDXF(
     dimVars,
     defaultTextHeight,
     mirrText,
+    dimStyles,
+    headerDimlunit,
   };
 
   // Compute clip size for XLINE/RAY from drawing extents

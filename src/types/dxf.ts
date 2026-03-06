@@ -450,6 +450,12 @@ export interface DxfBlockRecord {
   units: number; // INSUNITS code (0=Unitless, 1=Inches, 4=mm, 6=Meters, ...)
 }
 
+export interface DxfDimStyle {
+  name: string;
+  dimlunit?: number; // code 277: 2=Decimal, 4=Architectural
+  dimzin?: number;   // code 78: zero suppression flags
+}
+
 export interface DxfTables {
   layer?: {
     handle?: string;
@@ -470,6 +476,11 @@ export interface DxfTables {
     handle?: string;
     ownerHandle?: string;
     blockRecords: Record<string, DxfBlockRecord>;
+  };
+  dimStyle?: {
+    handle?: string;
+    ownerHandle?: string;
+    dimStyles: Record<string, DxfDimStyle>;
   };
   [key: string]: unknown;
 }

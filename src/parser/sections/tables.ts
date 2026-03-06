@@ -32,6 +32,12 @@ export interface IBlockRecord {
   units: number; // INSUNITS code (0=Unitless, 1=Inches, 4=mm, 6=Meters, ...)
 }
 
+export interface IDimStyle {
+  name: string;
+  dimlunit?: number; // code 277: 2=Decimal, 4=Architectural
+  dimzin?: number;   // code 78: zero suppression flags
+}
+
 interface IBaseTable {
   handle?: string;
   ownerHandle?: string;
@@ -79,6 +85,12 @@ export function parseTables(scanner: DxfScanner): Record<string, IBaseTable> {
       tableName: "blockRecord",
       dxfSymbolName: "BLOCK_RECORD",
       parseTableRecords: () => parseBlockRecords(scanner),
+    },
+    DIMSTYLE: {
+      tableRecordsProperty: "dimStyles",
+      tableName: "dimStyle",
+      dxfSymbolName: "DIMSTYLE",
+      parseTableRecords: () => parseDimStyles(scanner),
     },
   };
 
@@ -368,4 +380,42 @@ function parseBlockRecords(scanner: DxfScanner): Record<string, IBlockRecord> {
   }
   if (recName) records[recName] = rec;
   return records;
+}
+
+function parseDimStyles(scanner: DxfScanner): Record<string, IDimStyle> {
+  const dimStyles: Record<string, IDimStyle> = {};
+  let ds = {} as IDimStyle;
+  let dsName = "";
+
+  let curr = scanner.next();
+  while (!(curr.code === 0 && curr.value === "ENDTAB")) {
+    switch (curr.code) {
+      case 2:
+        ds.name = curr.value as string;
+        dsName = curr.value as string;
+        curr = scanner.next();
+        break;
+      case 78:
+        ds.dimzin = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 277:
+        ds.dimlunit = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 0:
+        if (curr.value === "DIMSTYLE") {
+          if (dsName) dimStyles[dsName] = ds;
+          ds = {} as IDimStyle;
+          dsName = "";
+        }
+        curr = scanner.next();
+        break;
+      default:
+        curr = scanner.next();
+        break;
+    }
+  }
+  if (dsName) dimStyles[dsName] = ds;
+  return dimStyles;
 }

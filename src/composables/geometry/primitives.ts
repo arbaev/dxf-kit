@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { Font } from "opentype.js";
-import type { DxfLayer, DxfLineType, DxfStyle } from "@/types/dxf";
+import type { DxfLayer, DxfLineType, DxfStyle, DxfDimStyle } from "@/types/dxf";
 import { applyLinetypePattern, type PatternGeometry } from "@/utils/linetypeResolver";
 import {
   EPSILON,
@@ -31,6 +31,8 @@ export interface EntityColorContext {
   defaultTextHeight: number; // $TEXTSIZE from header (fallback for entities without explicit height)
   mirrText?: boolean; // $MIRRTEXT: true = mirror text with geometry, false (default) = keep readable
   xlineClipSize?: number; // Half-length for clipping XLINE/RAY to drawing extents
+  dimStyles?: Record<string, DxfDimStyle>; // DIMSTYLE table for dimension formatting
+  headerDimlunit?: number; // $DIMLUNIT from header (fallback for dimension formatting)
 }
 
 export const degreesToRadians = (degrees: number): number =>

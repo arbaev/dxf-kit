@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   formatDimNumber,
+  formatArchitectural,
   cleanDimensionMText,
   extractDimensionData,
   intersectLines2D,
@@ -458,5 +459,122 @@ describe("extractDimensionData with DimVars", () => {
     const data = extractDimensionData(entity, dv);
     expect(data).not.toBeNull();
     expect(data!.textHeight).toBe(3);
+  });
+});
+
+// =====================================================================
+// formatArchitectural
+// =====================================================================
+
+describe("formatArchitectural", () => {
+  it("converts 172 inches to 14'-4\"", () => {
+    expect(formatArchitectural(172)).toBe("14'-4\"");
+  });
+
+  it("converts 88 inches to 7'-4\"", () => {
+    expect(formatArchitectural(88)).toBe("7'-4\"");
+  });
+
+  it("converts 84 inches to 7'", () => {
+    expect(formatArchitectural(84)).toBe("7'");
+  });
+
+  it("converts 696 inches to 58'", () => {
+    expect(formatArchitectural(696)).toBe("58'");
+  });
+
+  it("converts 0 inches to 0\"", () => {
+    expect(formatArchitectural(0)).toBe("0\"");
+  });
+
+  it("converts 4 inches to 4\"", () => {
+    expect(formatArchitectural(4)).toBe("4\"");
+  });
+
+  it("converts 12 inches to 1'", () => {
+    expect(formatArchitectural(12)).toBe("1'");
+  });
+
+  it("converts 24 inches to 2'", () => {
+    expect(formatArchitectural(24)).toBe("2'");
+  });
+
+  it("handles negative values", () => {
+    expect(formatArchitectural(-172)).toBe("-14'-4\"");
+  });
+
+  it("dimzin=0 suppresses zero feet and zero inches (default)", () => {
+    expect(formatArchitectural(4, 0)).toBe("4\"");
+    expect(formatArchitectural(12, 0)).toBe("1'");
+  });
+
+  it("dimzin=12 includes both zero feet and zero inches", () => {
+    // bits 2+3 NOT set, so no zero-part suppression; bits 2+3 are 4+8=12 for suppression
+    // Actually dimzin=12 means bit 2 (4) + bit 3 (8) are set: suppress 0 feet AND 0 inches
+    expect(formatArchitectural(4, 12)).toBe("4\"");
+    expect(formatArchitectural(12, 12)).toBe("1'");
+  });
+
+  it("dimzin with no suppression flags shows full format", () => {
+    // dimzin=3 (bits 0+1 only) — no feet/inch zero suppression
+    expect(formatArchitectural(4, 3)).toBe("0'-4\"");
+    expect(formatArchitectural(12, 3)).toBe("1'-0\"");
+    expect(formatArchitectural(0, 3)).toBe("0'-0\"");
+  });
+});
+
+// =====================================================================
+// extractDimensionData with DIMLUNIT=4 (Architectural)
+// =====================================================================
+
+describe("extractDimensionData with DIMLUNIT=4", () => {
+  it("formats measurement as architectural when dimlunit=4", () => {
+    const entity = makeDimEntity({
+      linearOrAngularPoint1: { x: 0, y: 0, z: 0 },
+      linearOrAngularPoint2: { x: 10, y: 0, z: 0 },
+      anchorPoint: { x: 0, y: 5, z: 0 },
+      actualMeasurement: 172,
+    });
+    const data = extractDimensionData(entity, DEFAULT_DIM_VARS, { dimlunit: 4 });
+    expect(data).not.toBeNull();
+    expect(data!.dimensionText).toBe("14'-4\"");
+  });
+
+  it("formats with dimzin=3 (no zero suppression)", () => {
+    const entity = makeDimEntity({
+      linearOrAngularPoint1: { x: 0, y: 0, z: 0 },
+      linearOrAngularPoint2: { x: 10, y: 0, z: 0 },
+      anchorPoint: { x: 0, y: 5, z: 0 },
+      actualMeasurement: 84,
+    });
+    const data = extractDimensionData(entity, DEFAULT_DIM_VARS, { dimlunit: 4, dimzin: 3 });
+    expect(data).not.toBeNull();
+    expect(data!.dimensionText).toBe("7'-0\"");
+  });
+
+  it("replaces <> placeholder with architectural format", () => {
+    const entity = makeDimEntity({
+      linearOrAngularPoint1: { x: 0, y: 0, z: 0 },
+      linearOrAngularPoint2: { x: 10, y: 0, z: 0 },
+      anchorPoint: { x: 0, y: 5, z: 0 },
+      text: "Length: <>",
+      actualMeasurement: 88,
+    });
+    const data = extractDimensionData(entity, DEFAULT_DIM_VARS, { dimlunit: 4 });
+    expect(data).not.toBeNull();
+    expect(data!.dimensionText).toBe("Length: 7'-4\"");
+  });
+
+  it("does not re-format explicit text when dimlunit=4", () => {
+    const entity = makeDimEntity({
+      linearOrAngularPoint1: { x: 0, y: 0, z: 0 },
+      linearOrAngularPoint2: { x: 10, y: 0, z: 0 },
+      anchorPoint: { x: 0, y: 5, z: 0 },
+      text: "custom",
+      actualMeasurement: 172,
+    });
+    const data = extractDimensionData(entity, DEFAULT_DIM_VARS, { dimlunit: 4 });
+    expect(data).not.toBeNull();
+    expect(data!.dimensionText).toBe("custom");
   });
 });

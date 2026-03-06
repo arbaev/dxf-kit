@@ -393,7 +393,12 @@ export const createRotatedDimensionLines = (p: RotatedDimensionLinesParams): THR
   return objects;
 };
 
-export const extractDimensionData = (entity: DxfDimensionEntity, dv: DimVars = DEFAULT_DIM_VARS) => {
+export interface DimFormatOptions {
+  dimlunit?: number; // 2=Decimal, 4=Architectural
+  dimzin?: number;   // Zero suppression flags
+}
+
+export const extractDimensionData = (entity: DxfDimensionEntity, dv: DimVars = DEFAULT_DIM_VARS, fmt?: DimFormatOptions) => {
   let point1 = entity.linearOrAngularPoint1;
   let point2 = entity.linearOrAngularPoint2;
   const anchorPoint = entity.anchorPoint;
@@ -402,6 +407,11 @@ export const extractDimensionData = (entity: DxfDimensionEntity, dv: DimVars = D
   const angle = entity.angle || 0;
   let dimensionText = entity.text;
   let isRadial = false;
+
+  const formatMeasurement = (value: number): string =>
+    fmt?.dimlunit === 4
+      ? formatArchitectural(value, fmt.dimzin)
+      : formatDimNumber(value);
 
   // Detect radial dimension BEFORE generating text to add "R" prefix
   if (!point1 && !point2 && diameterOrRadiusPoint && anchorPoint) {
@@ -413,13 +423,13 @@ export const extractDimensionData = (entity: DxfDimensionEntity, dv: DimVars = D
   // Replace <> placeholder with actual measurement (AutoCAD convention)
   if (dimensionText && typeof entity.actualMeasurement === "number") {
     const measStr =
-      (isRadial ? "R" : "") + formatDimNumber(entity.actualMeasurement);
+      (isRadial ? "R" : "") + formatMeasurement(entity.actualMeasurement);
     dimensionText = dimensionText.replace(/<>/g, measStr);
   }
 
   if (!dimensionText && typeof entity.actualMeasurement === "number") {
     dimensionText =
-      (isRadial ? "R" : "") + formatDimNumber(entity.actualMeasurement);
+      (isRadial ? "R" : "") + formatMeasurement(entity.actualMeasurement);
   }
 
   // Fallback: compute measurement from point coordinates
@@ -428,10 +438,10 @@ export const extractDimensionData = (entity: DxfDimensionEntity, dv: DimVars = D
     const dy = point2.y - point1.y;
     const dz = (point2.z || 0) - (point1.z || 0);
     const measurement = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    dimensionText = (isRadial ? "R" : "") + formatDimNumber(measurement);
+    dimensionText = (isRadial ? "R" : "") + formatMeasurement(measurement);
   }
 
-  if (!isRadial && dimensionText && !isNaN(parseFloat(dimensionText))) {
+  if (!isRadial && dimensionText && !isNaN(parseFloat(dimensionText)) && fmt?.dimlunit !== 4) {
     dimensionText = formatDimNumber(parseFloat(dimensionText));
   }
 
@@ -529,6 +539,46 @@ export const createDimensionGroup = (p: DimensionGroupParams): THREE.Group => {
  */
 export const formatDimNumber = (value: number): string =>
   parseFloat(value.toFixed(DIM_TEXT_DECIMAL_PLACES)).toString();
+
+/**
+ * Format a measurement in inches as architectural: feet'-inches".
+ * dimzin controls zero suppression (DXF code 78):
+ *   bit 0 (1): suppress leading zeros in decimals (not relevant here)
+ *   bit 1 (2): suppress trailing zeros in decimals (not relevant here)
+ *   bit 2 (4): suppress 0 feet → "4\"" instead of "0'-4\""
+ *   bit 3 (8): suppress 0 inches → "7'" instead of "7'-0\""
+ * Default (dimzin=0): suppress both zero feet and zero inches.
+ */
+export const formatArchitectural = (totalInches: number, dimzin?: number): string => {
+  const sign = totalInches < 0 ? "-" : "";
+  const abs = Math.abs(totalInches);
+  const feet = Math.floor(abs / 12);
+  const inches = Math.round(abs % 12);
+
+  // Handle rounding: 11.5+ inches rounds up to next foot
+  const finalFeet = inches >= 12 ? feet + 1 : feet;
+  const finalInches = inches >= 12 ? 0 : inches;
+
+  const zin = dimzin ?? 0;
+  const suppressZeroFeet = (zin & 4) !== 0;
+  const suppressZeroInches = (zin & 8) !== 0;
+
+  // dimzin=0: suppress both zero feet and zero inches (AutoCAD default for architectural)
+  if (zin === 0) {
+    if (finalFeet === 0 && finalInches === 0) return sign + "0\"";
+    if (finalFeet === 0) return sign + finalInches + "\"";
+    if (finalInches === 0) return sign + finalFeet + "'";
+    return sign + finalFeet + "'-" + finalInches + "\"";
+  }
+
+  if (finalFeet === 0 && suppressZeroFeet) {
+    return sign + finalInches + "\"";
+  }
+  if (finalInches === 0 && suppressZeroInches) {
+    return sign + finalFeet + "'";
+  }
+  return sign + finalFeet + "'-" + finalInches + "\"";
+};
 
 /**
  * Clean MTEXT formatting codes from dimension text (except \S for stacked fractions).
