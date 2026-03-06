@@ -675,6 +675,7 @@ const collectEntity = (p: CollectEntityParams): boolean => {
               polygons,
               effectiveScale,
               effectiveAngle,
+              hasEmbedded,
             );
             for (const seg of segments) {
               const transformed = transformOcsPoints(seg, hatchMatrix);
@@ -1806,6 +1807,7 @@ const processEntity = (
               polygons,
               effectiveScale,
               effectiveAngle,
+              hasEmbedded,
             );
             for (const seg of segments) {
               objects.push(createLine(transformOcsPoints(seg, hatchMatrix), lineMaterial));

@@ -433,6 +433,7 @@ export const generateHatchPattern = (
   polygons: Point2D[][],
   patternScale = 1,
   patternAngle = 0,
+  wcsOffset = false,
 ): HatchPatternGeometry => {
   // Compute bounding box across all polygons
   let minX = Infinity,
@@ -462,12 +463,38 @@ export const generateHatchPattern = (
     const perpX = -dirY;
     const perpY = dirX;
 
-    // Perpendicular distance between lines = |offset . perp| * scale
-    const spacing = Math.abs(pl.offset.x * perpX + pl.offset.y * perpY) * scale;
-    if (spacing < EPSILON) continue;
+    // Compute per-line step vector and perpendicular spacing.
+    // Embedded DXF patterns store offset in WCS (rotated by line angle).
+    // Built-in dictionary patterns store offset in line-local coordinates
+    // (offset.x = stagger along line, offset.y = perpendicular spacing).
+    let spacing: number;
+    let stagger: number;
+    let stepX: number;
+    let stepY: number;
 
-    // Shift along line direction between adjacent lines (for staggered patterns)
-    const stagger = (pl.offset.x * dirX + pl.offset.y * dirY) * scale;
+    if (wcsOffset) {
+      // Embedded DXF: offset is a WCS displacement vector.
+      // Ensure the perpendicular component is positive so that loop bounds
+      // (which use unsigned spacing) correctly map i to line positions.
+      // Negating the step just reverses line numbering — same set of lines.
+      stepX = pl.offset.x * scale;
+      stepY = pl.offset.y * scale;
+      const perpComp = stepX * perpX + stepY * perpY;
+      if (perpComp < 0) {
+        stepX = -stepX;
+        stepY = -stepY;
+      }
+      spacing = Math.abs(perpComp);
+      stagger = stepX * dirX + stepY * dirY;
+    } else {
+      // Built-in: offset.x = stagger, offset.y projected onto perp = spacing
+      spacing = Math.abs(pl.offset.x * perpX + pl.offset.y * perpY) * scale;
+      stagger = pl.offset.x * scale;
+      stepX = spacing * perpX + stagger * dirX;
+      stepY = spacing * perpY + stagger * dirY;
+    }
+
+    if (spacing < EPSILON) continue;
 
     // Scale base point
     const bpX = pl.basePoint.x * scale;
@@ -514,9 +541,9 @@ export const generateHatchPattern = (
     for (let i = startIdx; i <= endIdx; i++) {
       if (allSegments.length >= MAX_HATCH_SEGMENTS) break;
 
-      // Line origin: basePoint + i * spacing * perp + i * stagger * dir
-      const ox = bpX + i * spacing * perpX + i * stagger * dirX;
-      const oy = bpY + i * spacing * perpY + i * stagger * dirY;
+      // Line origin: basePoint + i * step
+      const ox = bpX + i * stepX;
+      const oy = bpY + i * stepY;
 
       if (isSolid) {
         const x1 = ox - diag * dirX,
