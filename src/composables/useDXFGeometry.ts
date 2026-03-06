@@ -47,6 +47,7 @@ import {
   getPointsMaterial,
   createBulgeArc,
   createArrow,
+  createTick,
   createLine,
   setLayerName,
 } from "./geometry/primitives";
@@ -64,6 +65,7 @@ import {
 } from "./geometry/dimensions";
 import {
   replaceSpecialChars,
+  parseTextWithUnderline,
   parseMTextContent,
 } from "./geometry/text";
 import {
@@ -790,14 +792,16 @@ const collectTextOrMText = (
       }
     }
 
+    const parsed = parseTextWithUnderline(textContent);
     addTextToCollector({
       collector, layer, color: entityColor, font,
-      text: replaceSpecialChars(textContent), height,
+      text: parsed.text, height,
       posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
       hAlign: entity.halign ?? HAlign.LEFT,
       vAlign: entity.valign ?? VAlign.BASELINE,
       widthFactor: (entity.xScale ?? 1) * mirrorWidthFactor,
       endPosX: endX, endPosY: endY,
+      underline: parsed.underline,
     });
 
   } else {
@@ -1098,14 +1102,83 @@ const collectLeaderEntity = (
     collector.addMesh(layer, entityColor, positions, indices);
   };
 
+  // Resolve arrow block for LEADER: DIMSTYLE code 341 (DIMLDRBLK) → block name
+  const leaderStyleName = isLeaderEntity(entity) ? entity.styleName : undefined;
+  const leaderDimStyle = leaderStyleName ? colorCtx.dimStyles?.[leaderStyleName] : undefined;
+  const baseDv = colorCtx.dimVars ?? resolveDimVarsFromHeader(undefined);
+
+  // Resolve leader arrow block name from DIMLDRBLK (code 341) or DIMBLK (code 342)
+  let leaderArrowBlockName: string | undefined;
+  if (colorCtx.blockHandleToName) {
+    const ldrHandle = leaderDimStyle?.dimldrblkHandle;
+    if (ldrHandle) leaderArrowBlockName = colorCtx.blockHandleToName.get(ldrHandle);
+    if (!leaderArrowBlockName) {
+      const blkHandle = leaderDimStyle?.dimblkHandle;
+      if (blkHandle) leaderArrowBlockName = colorCtx.blockHandleToName.get(blkHandle);
+    }
+  }
+
+  // Render a block definition at a point with rotation (for custom arrow blocks)
+  const addBlockArrowToCollector = (
+    blockName: string, tip: THREE.Vector3, angle: number, scale: number,
+  ) => {
+    const block = _dxf.blocks?.[blockName];
+    if (!block?.entities) return false;
+    const blockMatrix = new THREE.Matrix4()
+      .makeTranslation(tip.x, tip.y, tip.z)
+      .multiply(new THREE.Matrix4().makeRotationZ(angle))
+      .multiply(new THREE.Matrix4().makeScale(scale, scale, scale));
+    if (worldMatrix) blockMatrix.premultiply(worldMatrix);
+    for (const be of block.entities) {
+      if (be.type === "LINE" && "vertices" in be) {
+        const verts = be.vertices as { x: number; y: number; z?: number }[];
+        if (verts.length >= 2) {
+          v.set(verts[0].x, verts[0].y, verts[0].z || 0).applyMatrix4(blockMatrix);
+          const x1 = v.x, y1 = v.y, z1 = v.z;
+          v.set(verts[1].x, verts[1].y, verts[1].z || 0).applyMatrix4(blockMatrix);
+          collector.addLineSegments(layer, entityColor, [x1, y1, z1, v.x, v.y, v.z]);
+        }
+      }
+    }
+    return true;
+  };
+
+  const addTickToCollector = (point: THREE.Vector3, dimAngle: number) => {
+    const tick = createTick(point, baseDv.tickSize || baseDv.arrowSize, dimAngle,
+      getLineMaterial(entityColor, colorCtx.materialCache));
+    const geo = tick.geometry as THREE.BufferGeometry;
+    const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
+    const verts: number[] = [];
+    for (let i = 0; i < posAttr.count; i++) {
+      v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
+      verts.push(v.x, v.y, v.z);
+    }
+    collector.addLineSegments(layer, entityColor, verts);
+  };
+
   if (entity.type === "LEADER" && isLeaderEntity(entity) && entity.vertices.length >= 2) {
     const points = entity.vertices.map(
       (vt) => new THREE.Vector3(vt.x, vt.y, vt.z || 0),
     );
     addLineToCollector(points);
 
-    if (entity.arrowHeadFlag === 1 && points.length >= 2) {
-      addArrowToCollector(points[1], points[0], ARROW_SIZE);
+    // arrowHeadFlag: 0 = no arrow, 1 or undefined = with arrow (DXF default)
+    if (entity.arrowHeadFlag !== 0 && points.length >= 2) {
+      const dx = points[0].x - points[1].x;
+      const dy = points[0].y - points[1].y;
+      const angle = Math.atan2(dy, dx);
+      let drawn = false;
+      // Try custom arrow block from DIMLDRBLK
+      if (leaderArrowBlockName && !isTickBlock(leaderArrowBlockName)) {
+        drawn = addBlockArrowToCollector(leaderArrowBlockName, points[0], angle, baseDv.arrowSize);
+      }
+      if (!drawn) {
+        if (leaderArrowBlockName && isTickBlock(leaderArrowBlockName) || baseDv.useTicks) {
+          addTickToCollector(points[0], angle);
+        } else {
+          addArrowToCollector(points[1], points[0], baseDv.arrowSize);
+        }
+      }
     }
   } else if ((entity.type === "MULTILEADER" || entity.type === "MLEADER") && isMLeaderEntity(entity) && entity.leaders.length > 0) {
     const arrowSize = entity.arrowSize || ARROW_SIZE;

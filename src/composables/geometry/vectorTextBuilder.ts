@@ -120,6 +120,7 @@ export interface TextParams {
   bold?: boolean;
   italic?: boolean;
   obliqueAngle?: number;
+  underline?: boolean;
 }
 
 export interface MTextParams {
@@ -331,6 +332,33 @@ export function addTextToCollector(p: TextParams): void {
   if (allPositions.length >= 9 && allIndices.length >= 3) {
     collector.addMesh(layer, color, allPositions, allIndices);
   }
+
+  // Emit underline line segment below text
+  if (p.underline && m.totalAdvance > 0) {
+    const ulX1 = (m.bounds.xMin - originX) * scaleX;
+    const ulX2 = (m.bounds.xMax - originX) * scaleX;
+    const ulLocalY = (-UNDERLINE_OFFSET - originY) * scaleY;
+
+    let wx1 = posX + ulX1 * cos - ulLocalY * sin;
+    let wy1 = posY + ulX1 * sin + ulLocalY * cos;
+    let wz1 = posZ;
+    let wx2 = posX + ulX2 * cos - ulLocalY * sin;
+    let wy2 = posY + ulX2 * sin + ulLocalY * cos;
+    let wz2 = posZ;
+
+    if (transform) {
+      const t1x = transform[0] * wx1 + transform[4] * wy1 + transform[8] * wz1 + transform[12];
+      const t1y = transform[1] * wx1 + transform[5] * wy1 + transform[9] * wz1 + transform[13];
+      const t1z = transform[2] * wx1 + transform[6] * wy1 + transform[10] * wz1 + transform[14];
+      wx1 = t1x; wy1 = t1y; wz1 = t1z;
+      const t2x = transform[0] * wx2 + transform[4] * wy2 + transform[8] * wz2 + transform[12];
+      const t2y = transform[1] * wx2 + transform[5] * wy2 + transform[9] * wz2 + transform[13];
+      const t2z = transform[2] * wx2 + transform[6] * wy2 + transform[10] * wz2 + transform[14];
+      wx2 = t2x; wy2 = t2y; wz2 = t2z;
+    }
+
+    collector.addLineSegments(layer, color, [wx1, wy1, wz1, wx2, wy2, wz2]);
+  }
 }
 
 // ── Faux bold/italic constants ─────────────────────────────────────────
@@ -339,6 +367,8 @@ export function addTextToCollector(p: TextParams): void {
 const ITALIC_SLANT = Math.tan((12 * Math.PI) / 180);
 /** Bold offset as fraction of height (normalized units) */
 const BOLD_OFFSET = 0.02;
+/** Underline position below baseline as fraction of height (normalized units) */
+const UNDERLINE_OFFSET = 0.15;
 
 // ── MTEXT support ──────────────────────────────────────────────────────
 
@@ -596,6 +626,7 @@ export function addMTextToCollector(p: MTextParams): void {
         posX: worldX, posY: worldY, posZ,
         rotation, hAlign: hAlignEnum, vAlign: rowVAlign,
         bold: line.bold, italic: line.italic,
+        underline: line.underline,
       });
     }
 

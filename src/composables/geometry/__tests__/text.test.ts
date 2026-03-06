@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   replaceSpecialChars,
+  parseTextWithUnderline,
   parseMTextContent,
   getMTextHAlign,
   getTextHAlign,
@@ -65,6 +66,34 @@ describe("replaceSpecialChars", () => {
 
   it("returns empty string unchanged", () => {
     expect(replaceSpecialChars("")).toBe("");
+  });
+});
+
+// ── parseTextWithUnderline ───────────────────────────────────────────────
+
+describe("parseTextWithUnderline", () => {
+  it("detects underline from %%u prefix", () => {
+    const result = parseTextWithUnderline("%%uGREAT ROOM");
+    expect(result.text).toBe("GREAT ROOM");
+    expect(result.underline).toBe(true);
+  });
+
+  it("returns no underline for plain text", () => {
+    const result = parseTextWithUnderline("Plain text");
+    expect(result.text).toBe("Plain text");
+    expect(result.underline).toBe(false);
+  });
+
+  it("detects underline with %%U (uppercase)", () => {
+    const result = parseTextWithUnderline("%%UROOM NAME");
+    expect(result.text).toBe("ROOM NAME");
+    expect(result.underline).toBe(true);
+  });
+
+  it("replaces other special chars alongside %%u", () => {
+    const result = parseTextWithUnderline("%%u45%%d");
+    expect(result.text).toBe("45\u00B0");
+    expect(result.underline).toBe(true);
   });
 });
 
@@ -205,10 +234,31 @@ describe("parseMTextContent", () => {
     expect(result[0].text).toBe("grouped text");
   });
 
-  it("removes underline/overline/strikethrough codes (\\L, \\O, \\K)", () => {
+  it("sets underline with \\L and strips overline/strikethrough (\\O, \\K)", () => {
     const result = parseMTextContent("\\LUnderlined\\OOverlined\\KStrikethrough");
     expect(result).toHaveLength(1);
     expect(result[0].text).toBe("UnderlinedOverlinedStrikethrough");
+    expect(result[0].underline).toBe(true);
+  });
+
+  it("\\l turns off underline", () => {
+    const result = parseMTextContent("\\LUnderlined\\l Normal");
+    expect(result).toHaveLength(1);
+    expect(result[0].underline).toBe(true);
+    expect(result[0].text).toBe("Underlined Normal");
+  });
+
+  it("underline persists across \\P line breaks", () => {
+    const result = parseMTextContent("\\LLine 1\\PLine 2");
+    expect(result).toHaveLength(2);
+    expect(result[0].underline).toBe(true);
+    expect(result[1].underline).toBe(true);
+  });
+
+  it("no underline by default", () => {
+    const result = parseMTextContent("Normal text");
+    expect(result).toHaveLength(1);
+    expect(result[0].underline).toBeUndefined();
   });
 
   it("removes \\W, \\T, \\Q, \\A formatting codes", () => {

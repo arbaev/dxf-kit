@@ -38,7 +38,8 @@ export interface IDimStyle {
   dimlunit?: number; // code 277: 2=Decimal, 4=Architectural
   dimzin?: number;   // code 78: zero suppression flags
   dimtsz?: number;   // code 142: tick size (>0 = use ticks instead of arrows)
-  dimblkHandle?: string; // code 342: handle of arrow block (→ BLOCK_RECORD name)
+  dimblkHandle?: string; // code 342: handle of dimension arrow block (→ BLOCK_RECORD name)
+  dimldrblkHandle?: string; // code 341: handle of leader arrow block (→ BLOCK_RECORD name)
 }
 
 interface IBaseTable {
@@ -412,6 +413,10 @@ function parseDimStyles(scanner: DxfScanner): Record<string, IDimStyle> {
         break;
       case 277:
         ds.dimlunit = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 341:
+        ds.dimldrblkHandle = curr.value as string;
         curr = scanner.next();
         break;
       case 342:

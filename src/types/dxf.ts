@@ -456,7 +456,8 @@ export interface DxfDimStyle {
   dimlunit?: number; // code 277: 2=Decimal, 4=Architectural
   dimzin?: number;   // code 78: zero suppression flags
   dimtsz?: number;   // code 142: tick size (>0 = use ticks instead of arrows)
-  dimblkHandle?: string; // code 342: handle of arrow block (→ BLOCK_RECORD name)
+  dimblkHandle?: string; // code 342: handle of dimension arrow block (→ BLOCK_RECORD name)
+  dimldrblkHandle?: string; // code 341: handle of leader arrow block (→ BLOCK_RECORD name)
 }
 
 export interface DxfTables {

@@ -9,6 +9,7 @@ export interface MTextLine {
   bold?: boolean;
   italic?: boolean;
   fontFamily?: string;
+  underline?: boolean;
   stackedTop?: string; // \Stop^bottom; -> superscript
   stackedBottom?: string; // \Stop^bottom; -> subscript
   leftMargin?: number; // \p...l<value>... left margin (drawing units)
@@ -26,6 +27,15 @@ export const replaceSpecialChars = (text: string): string =>
     .replace(/%%[cC]/g, "\u2300")
     .replace(/%%[uUoO]/g, "") // toggle underline/overline — remove
     .replace(/%%(\d{3})/g, (_, code) => String.fromCharCode(parseInt(code)));
+
+/**
+ * Parse TEXT entity content: replace special chars and detect %%u underline.
+ * Returns cleaned text and whether the text has underline formatting.
+ */
+export function parseTextWithUnderline(rawText: string): { text: string; underline: boolean } {
+  const underline = /%%[uU]/i.test(rawText);
+  return { text: replaceSpecialChars(rawText), underline };
+}
 
 /**
  * Parse MTEXT formatting into an array of lines with color and height.
@@ -53,6 +63,7 @@ export const parseMTextContent = (rawText: string, defaultHeight?: number): MTex
   let currentBold = false;
   let currentItalic = false;
   let currentFont: string | undefined;
+  let currentUnderline = false;
 
   for (const rawLine of rawLines) {
     let clean = rawLine;
@@ -124,8 +135,14 @@ export const parseMTextContent = (rawText: string, defaultHeight?: number): MTex
     });
     // Width, tracking, oblique, alignment: \W, \T, \Q, \A
     clean = clean.replace(/\\[WTQA][\d.+-]+;/gi, "");
-    // Underline, overline, strikethrough: \L/\l, \O/\o, \K/\k
-    clean = clean.replace(/\\[LOKlok]/g, "");
+    // Underline toggle: \L starts, \l ends; track state across lines
+    let lineUnderline = currentUnderline;
+    clean = clean.replace(/\\([LOKlok])/g, (_, code: string) => {
+      if (code === "L") { currentUnderline = true; lineUnderline = true; }
+      else if (code === "l") currentUnderline = false;
+      // O, o, K, k: overline/strikethrough — strip silently
+      return "";
+    });
     // Fractions: \Stop^bottom; or \Stop/bottom; -> stacked fields
     // \Stop#bottom; -> inline flat text "top/bottom" (horizontal bar fraction)
     let lineStackedTop: string | undefined;
@@ -158,6 +175,7 @@ export const parseMTextContent = (rawText: string, defaultHeight?: number): MTex
       bold: lineBold,
       italic: lineItalic,
       fontFamily: lineFont,
+      underline: lineUnderline || undefined,
       stackedTop: lineStackedTop,
       stackedBottom: lineStackedBottom,
       leftMargin: lineLeftMargin,
