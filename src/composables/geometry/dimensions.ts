@@ -152,6 +152,11 @@ export function applyDimStyleVars(
     result.arrowSize = headerDimAsz * scale;
   }
 
+  // When ticks are derived from arrowSize (DIMTSZ=0 + tick block), keep them in sync
+  if (result.useTicks && result.tickSize > 0 && dimStyle.dimtsz === undefined) {
+    result.tickSize = result.arrowSize;
+  }
+
   // Re-scale extension line geometry
   if (styleDimScale !== undefined && styleDimScale !== headerDimScale) {
     result.extLineDash = EXTENSION_LINE_DASH_SIZE * scale;
