@@ -20,6 +20,7 @@ export interface EntityColorContext {
   pointsMaterialCache: Map<string, THREE.PointsMaterial>;
   lineTypes: Record<string, DxfLineType>;
   globalLtScale: number;
+  headerLtScale: number; // Original $LTSCALE value (before auto-scaling)
   blockLineType?: string;
   darkTheme?: boolean;
   font?: Font; // Vector text font (null = canvas fallback)

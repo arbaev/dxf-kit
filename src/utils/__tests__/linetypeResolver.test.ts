@@ -357,6 +357,27 @@ describe("resolveEntityLinetype", () => {
     expect(result!.pattern).toEqual([12.7, -6.35]);
   });
 
+  it("uses headerLtScale instead of globalLtScale when entity has explicit lineTypeScale", () => {
+    const entity = {
+      type: "LINE", layer: "0", lineType: "DASHED", lineTypeScale: 500, vertices: [],
+    } as unknown as DxfEntity;
+    // globalLtScale=60 (auto-computed), headerLtScale=1 (original $LTSCALE)
+    // With explicit entity scale, should use headerLtScale: 500 × 1 = 500
+    const result = resolveEntityLinetype(entity, layers, lineTypes, 60, undefined, 1);
+    expect(result).not.toBeNull();
+    expect(result!.pattern).toEqual([12.7 * 500, -6.35 * 500]);
+  });
+
+  it("uses globalLtScale when entity has no explicit lineTypeScale", () => {
+    const entity = {
+      type: "LINE", layer: "0", lineType: "DASHED", vertices: [],
+    } as unknown as DxfEntity;
+    // No explicit lineTypeScale → uses globalLtScale (auto-computed)
+    const result = resolveEntityLinetype(entity, layers, lineTypes, 60, undefined, 1);
+    expect(result).not.toBeNull();
+    expect(result!.pattern).toEqual([12.7 * 60, -6.35 * 60]);
+  });
+
   it("returns null for unknown lineType name", () => {
     const entity = {
       type: "LINE", layer: "0", lineType: "NONEXISTENT", vertices: [],

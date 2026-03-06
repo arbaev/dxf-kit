@@ -176,6 +176,7 @@ export function resolveEntityLinetype(
   lineTypes: Record<string, DxfLineType>,
   globalLtScale = 1,
   blockLineType?: string,
+  headerLtScale = 1,
 ): LinetypeInfo | null {
   let lineTypeName: string | undefined;
 
@@ -215,7 +216,12 @@ export function resolveEntityLinetype(
   if (!ltDef.pattern.some((v) => v < 0)) return null; // no gaps = solid
 
   const entityScale = entity.lineTypeScale ?? 1;
-  const scaled = scalePattern(ltDef.pattern, entityScale, globalLtScale);
+  // When entity has explicit lineTypeScale, use original $LTSCALE (not auto-computed).
+  // AutoLtScale is a heuristic for entities without explicit scale — applying it on top
+  // of an already-large entity scale produces invisible patterns.
+  const hasExplicitScale = entity.lineTypeScale != null;
+  const effectiveScale = hasExplicitScale ? headerLtScale : globalLtScale;
+  const scaled = scalePattern(ltDef.pattern, entityScale, effectiveScale);
   return { pattern: scaled };
 }
 

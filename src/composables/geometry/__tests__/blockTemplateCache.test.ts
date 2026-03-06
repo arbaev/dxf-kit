@@ -83,6 +83,7 @@ describe("buildBlockTemplate", () => {
     pointsMaterialCache: new Map(),
     lineTypes: {},
     globalLtScale: 1,
+    headerLtScale: 1,
     defaultTextHeight: 16,
   });
 

@@ -587,6 +587,7 @@ const collectEntity = (p: CollectEntityParams): boolean => {
     colorCtx.lineTypes,
     colorCtx.globalLtScale,
     colorCtx.blockLineType,
+    colorCtx.headerLtScale,
   );
   const pattern = ltInfo?.pattern;
 
@@ -1792,6 +1793,7 @@ const processEntity = (
     colorCtx.lineTypes,
     colorCtx.globalLtScale,
     colorCtx.blockLineType,
+    colorCtx.headerLtScale,
   );
   const lineMaterial = getLineMaterial(entityColor, colorCtx.materialCache);
 
@@ -2270,6 +2272,7 @@ export async function createThreeObjectsFromDXF(
     pointsMaterialCache: new Map(),
     lineTypes,
     globalLtScale,
+    headerLtScale,
     darkTheme,
     font,
     serifFont: loadedSerifFont,
