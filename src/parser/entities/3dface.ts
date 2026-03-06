@@ -5,8 +5,7 @@ import type { IPoint, IEntityBase } from "../parseHelpers";
 
 export interface I3DFaceEntity extends IEntityBase {
   type: "3DFACE";
-  shape?: boolean;
-  hasContinuousLinetypePattern?: boolean;
+  edgeFlags?: number;
   vertices: IPoint[];
 }
 
@@ -17,8 +16,7 @@ export function parse3DFace(scanner: DxfScanner, curr: IGroup): I3DFaceEntity {
     if (curr.code === 0) break;
     switch (curr.code) {
       case 70:
-        entity.shape = ((curr.value as number) & 1) === 1;
-        entity.hasContinuousLinetypePattern = ((curr.value as number) & 128) === 128;
+        entity.edgeFlags = curr.value as number;
         break;
       case 10:
         entity.vertices = parse3DFaceVertices(scanner, curr);

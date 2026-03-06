@@ -170,8 +170,7 @@ export interface DxfPointEntity extends DxfEntityBase {
 export interface Dxf3DFaceEntity extends DxfEntityBase {
   type: "3DFACE";
   vertices: DxfVertex[];
-  shape?: boolean;
-  hasContinuousLinetypePattern?: boolean;
+  edgeFlags?: number;
 }
 
 export interface HatchLineEdge {

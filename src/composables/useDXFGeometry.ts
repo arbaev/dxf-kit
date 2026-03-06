@@ -251,6 +251,36 @@ const computeFaceData = (pts: DxfVertex[]): { vertices: number[]; indices: numbe
   return { vertices, indices };
 };
 
+/**
+ * Add 3DFACE edges as lines, respecting edge visibility flags (DXF code 70).
+ * Bits 0-3: when set, the corresponding edge is INVISIBLE.
+ * Edge 0: vertex 0→1, Edge 1: vertex 1→2, Edge 2: vertex 2→3, Edge 3: vertex 3→0.
+ */
+const add3DFaceEdges = (
+  collector: GeometryCollector,
+  layer: string,
+  color: string,
+  pts: DxfVertex[],
+  edgeFlags?: number,
+): void => {
+  if (!pts || pts.length < 3) return;
+  const flags = edgeFlags ?? 0;
+  const n = pts.length;
+  // Edge pairs: [0,1], [1,2], [2,3], [3,0] (or [2,0] for triangles)
+  const edges: [number, number][] = n >= 4
+    ? [[0, 1], [1, 2], [2, 3], [3, 0]]
+    : [[0, 1], [1, 2], [2, 0]];
+  for (let i = 0; i < edges.length; i++) {
+    if (flags & (1 << i)) continue; // invisible edge
+    const [a, b] = edges[i];
+    const points = [
+      new THREE.Vector3(pts[a].x, pts[a].y, pts[a].z || 0),
+      new THREE.Vector3(pts[b].x, pts[b].y, pts[b].z || 0),
+    ];
+    collector.addLineFromPoints(layer, color, points);
+  }
+};
+
 // ─── PDMODE point symbol rendering ───────────────────────────────────
 
 interface PointSymbolParams {
@@ -611,11 +641,8 @@ const collectEntity = (p: CollectEntityParams): boolean => {
             return { x: v.x, y: v.y, z: v.z } as DxfVertex;
           });
         }
-        const faceData = computeFaceData(pts);
-        if (faceData) {
-          collector.addMesh(layer, entityColor, faceData.vertices, faceData.indices);
-          return true;
-        }
+        add3DFaceEdges(collector, layer, entityColor, pts, entity.edgeFlags);
+        return true;
       }
       return false;
     }
@@ -1725,8 +1752,24 @@ const processEntity = (
 
     case "3DFACE": {
       if (is3DFaceEntity(entity)) {
-        const meshMat = getMeshMaterial(entityColor, colorCtx.meshMaterialCache);
-        return createFaceMesh(entity.vertices, meshMat);
+        const pts = entity.vertices;
+        const flags = entity.edgeFlags ?? 0;
+        const n = pts.length;
+        if (n < 3) break;
+        const edges: [number, number][] = n >= 4
+          ? [[0, 1], [1, 2], [2, 3], [3, 0]]
+          : [[0, 1], [1, 2], [2, 0]];
+        const verts: number[] = [];
+        for (let i = 0; i < edges.length; i++) {
+          if (flags & (1 << i)) continue;
+          const [a, b] = edges[i];
+          verts.push(pts[a].x, pts[a].y, pts[a].z || 0, pts[b].x, pts[b].y, pts[b].z || 0);
+        }
+        if (verts.length === 0) break;
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+        const lineMat = getLineMaterial(entityColor, colorCtx.materialCache);
+        return new THREE.LineSegments(geom, lineMat);
       }
       break;
     }

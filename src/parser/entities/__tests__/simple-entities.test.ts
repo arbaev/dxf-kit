@@ -427,10 +427,10 @@ describe("parse3DFace", () => {
     expect(entity.vertices[3]).toEqual({ x: 0, y: 10, z: 0 });
   });
 
-  it("parses shape flag bits correctly", () => {
+  it("parses edge visibility flags correctly", () => {
     const { scanner, group } = createScannerAt(
       "0", "3DFACE",
-      "70", "129",
+      "70", "5",
       "10", "0.0",
       "20", "0.0",
       "30", "0.0",
@@ -450,9 +450,8 @@ describe("parse3DFace", () => {
     const entity = parse3DFace(scanner, group);
 
     expect(entity.type).toBe("3DFACE");
-    // 129 = 0b10000001 -> bit 1 (shape) = true, bit 128 (continuous) = true
-    expect(entity.shape).toBe(true);
-    expect(entity.hasContinuousLinetypePattern).toBe(true);
+    // 5 = 0b0101 -> edge 0 and edge 2 are invisible
+    expect(entity.edgeFlags).toBe(5);
   });
 
   it("handles fewer than 4 vertices when non-vertex code interrupts", () => {
