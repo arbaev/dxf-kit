@@ -23,6 +23,7 @@ import { parseMultiLeader } from "../entities/multileader";
 import { parseViewport } from "../entities/viewport";
 import { parseImage } from "../entities/image";
 import { parseWipeout } from "../entities/wipeout";
+import { parseMline } from "../entities/mline";
 
 type EntityHandler = (scanner: DxfScanner, curr: IGroup) => IEntityBase;
 
@@ -66,6 +67,7 @@ const entityHandlers: Record<string, EntityHandler> = {
   VIEWPORT: parseViewport,
   IMAGE: parseImage,
   WIPEOUT: parseWipeout,
+  MLINE: parseMline,
 };
 
 /**

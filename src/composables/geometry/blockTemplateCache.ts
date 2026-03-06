@@ -45,7 +45,7 @@ export const BYBLOCK_COLOR = "\0BYBLOCK";
 const TEMPLATE_COLLECTABLE_TYPES = new Set([
   "LINE", "CIRCLE", "ARC", "ELLIPSE",
   "LWPOLYLINE", "POLYLINE", "SPLINE",
-  "POINT", "SOLID", "3DFACE", "HATCH",
+  "POINT", "SOLID", "3DFACE", "HATCH", "MLINE",
 ]);
 
 // ─── Core functions ──────────────────────────────────────────────────

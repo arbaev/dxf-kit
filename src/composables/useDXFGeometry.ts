@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { NURBSCurve } from "three/examples/jsm/curves/NURBSCurve.js";
-import type { DxfVertex, DxfEntity, DxfData, DxfLayer, DxfSplineEntity, DxfTextEntity, DxfAttdefEntity } from "@/types/dxf";
+import type { DxfVertex, DxfEntity, DxfData, DxfLayer, DxfSplineEntity, DxfTextEntity, DxfAttdefEntity, DxfMlineEntity } from "@/types/dxf";
 import {
   isLineEntity,
   isCircleEntity,
@@ -490,6 +490,30 @@ const collectEntity = (p: CollectEntityParams): boolean => {
         const matrix = buildOcsMatrix(entity.extrusionDirection);
         const allPoints = computePolylinePoints(entity);
         addLineToCollector(collector, layer, entityColor, applyWorld(transformOcsPoints(allPoints, matrix), worldMatrix), pattern);
+        return true;
+      }
+      return false;
+    }
+
+    case "MLINE": {
+      const mline = entity as DxfMlineEntity;
+      if (mline.vertices?.length > 1 && mline.numElements > 0) {
+        const matrix = buildOcsMatrix(mline.extrusionDirection);
+        const closed = (mline.flags & 2) !== 0;
+        for (let i = 0; i < mline.numElements; i++) {
+          const points: THREE.Vector3[] = [];
+          for (const v of mline.vertices) {
+            const offset = v.elementParams[i]?.params[0] ?? 0;
+            points.push(new THREE.Vector3(
+              v.x + offset * v.miter.x,
+              v.y + offset * v.miter.y,
+              (v.z || 0) + offset * (v.miter.z || 0),
+            ));
+          }
+          if (closed && points.length > 1) points.push(points[0].clone());
+          addLineToCollector(collector, layer, entityColor,
+            applyWorld(transformOcsPoints(points, matrix), worldMatrix), pattern);
+        }
         return true;
       }
       return false;
@@ -1700,6 +1724,7 @@ const COLLECTABLE_TYPES = new Set([
   "LINE", "CIRCLE", "ARC", "ELLIPSE",
   "LWPOLYLINE", "POLYLINE", "SPLINE",
   "POINT", "SOLID", "3DFACE", "HATCH",
+  "MLINE",
 ]);
 
 /** Yield control to the browser so the UI stays responsive */

@@ -286,6 +286,31 @@ export interface DxfAttdefEntity extends DxfEntityBase {
   extrusionDirection?: DxfVertex;
 }
 
+export interface DxfMlineElementParams {
+  params: number[];
+}
+
+export interface DxfMlineVertex {
+  x: number;
+  y: number;
+  z: number;
+  direction: DxfVertex;
+  miter: DxfVertex;
+  elementParams: DxfMlineElementParams[];
+}
+
+export interface DxfMlineEntity extends DxfEntityBase {
+  type: "MLINE";
+  styleName?: string;
+  scale: number;
+  justification: number;
+  flags: number;
+  numVertices: number;
+  numElements: number;
+  vertices: DxfMlineVertex[];
+  extrusionDirection?: DxfVertex;
+}
+
 export interface DxfUnknownEntity extends DxfEntityBase {
   type: string;
   [key: string]: unknown;
@@ -309,6 +334,7 @@ export type DxfEntity =
   | DxfMLeaderEntity
   | DxfAttdefEntity
   | DxfAttribEntity
+  | DxfMlineEntity
   | DxfUnknownEntity;
 
 export function isLineEntity(entity: DxfEntity): entity is DxfLineEntity {
@@ -377,6 +403,10 @@ export function isAttdefEntity(entity: DxfEntity): entity is DxfAttdefEntity {
 
 export function isAttribEntity(entity: DxfEntity): entity is DxfAttribEntity {
   return entity.type === "ATTRIB";
+}
+
+export function isMlineEntity(entity: DxfEntity): entity is DxfMlineEntity {
+  return entity.type === "MLINE";
 }
 
 export interface DxfStyle {
