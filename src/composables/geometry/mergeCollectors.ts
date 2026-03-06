@@ -142,7 +142,22 @@ export class GeometryCollector {
   ): THREE.Object3D[] {
     const objects: THREE.Object3D[] = [];
 
-    // Merged LineSegments
+    // Merged Meshes — rendered first (behind lines/points)
+    for (const [key, vertices] of this.meshVertices) {
+      const indices = this.meshIndices.get(key);
+      if (!indices || vertices.length < 9 || indices.length < 3) continue;
+      const [layer, color] = parseKey(key);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+      geo.setIndex(indices);
+      const mat = getMeshMaterial(color, meshMaterialCache);
+      const obj = new THREE.Mesh(geo, mat);
+      obj.frustumCulled = false;
+      obj.userData.layerName = layer;
+      objects.push(obj);
+    }
+
+    // Merged LineSegments — on top of meshes
     for (const [key, data] of this.lineSegments) {
       if (data.length < 6) continue;
       const [layer, color] = parseKey(key);
@@ -187,21 +202,6 @@ export class GeometryCollector {
         dotMatCache.set(color, mat);
       }
       const obj = new THREE.Points(geo, mat);
-      obj.frustumCulled = false;
-      obj.userData.layerName = layer;
-      objects.push(obj);
-    }
-
-    // Merged Meshes
-    for (const [key, vertices] of this.meshVertices) {
-      const indices = this.meshIndices.get(key);
-      if (!indices || vertices.length < 9 || indices.length < 3) continue;
-      const [layer, color] = parseKey(key);
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
-      geo.setIndex(indices);
-      const mat = getMeshMaterial(color, meshMaterialCache);
-      const obj = new THREE.Mesh(geo, mat);
       obj.frustumCulled = false;
       obj.userData.layerName = layer;
       objects.push(obj);
