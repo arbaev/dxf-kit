@@ -154,20 +154,25 @@ function parseEdgeBoundary(scanner: DxfScanner, curr: IGroup): { path: IHatchBou
       // numKnots (95), numControlPoints (96), knots (40xN), controlPoints (10/20xN),
       // weights (42xN), numFitPoints (97), fitPoints (11/21xN)
       let degree = 3;
+      let numCP = 0;
+      let numFP = 0;
       const knots: number[] = [];
       const controlPoints: IPoint[] = [];
       const weights: number[] = [];
       const fitPoints: IPoint[] = [];
 
-      while (curr.code !== 0 && curr.code !== 72 && curr.code !== 92 && curr.code !== 93) {
+      while (curr.code !== 0 && curr.code !== 72 && curr.code !== 92 && curr.code !== 93
+        && curr.code !== 75 && curr.code !== 76 && curr.code !== 98) {
         switch (curr.code) {
           case 94: degree = curr.value as number; break;
           case 73: break; // rational flag
           case 74: break; // periodic flag
           case 95: break; // numKnots -- informational, actual count derived from code 40 occurrences
-          case 96: break; // numControlPoints -- informational
+          case 96: numCP = curr.value as number; break;
           case 40: knots.push(curr.value as number); break;
           case 10: {
+            // Guard: stop if we already have the expected number of control points
+            if (numCP > 0 && controlPoints.length >= numCP) break;
             const px = curr.value as number;
             curr = scanner.next();
             const py = curr.code === 20 ? (curr.value as number) : 0;
@@ -175,8 +180,9 @@ function parseEdgeBoundary(scanner: DxfScanner, curr: IGroup): { path: IHatchBou
             break;
           }
           case 42: weights.push(curr.value as number); break;
-          case 97: break; // numFitPoints -- informational
+          case 97: numFP = curr.value as number; break;
           case 11: {
+            if (numFP > 0 && fitPoints.length >= numFP) break;
             const fx = curr.value as number;
             curr = scanner.next();
             const fy = curr.code === 21 ? (curr.value as number) : 0;
