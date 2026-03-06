@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { NURBSCurve } from "three/examples/jsm/curves/NURBSCurve.js";
-import type { DxfVertex, DxfEntity, DxfData, DxfLayer, DxfSplineEntity, DxfTextEntity, DxfAttdefEntity, DxfMlineEntity, DxfXlineEntity, DxfPolylineVertex } from "@/types/dxf";
+import type { DxfVertex, DxfEntity, DxfData, DxfLayer, DxfSplineEntity, DxfTextEntity, DxfAttdefEntity, DxfMlineEntity, DxfXlineEntity, DxfPolylineVertex, DxfPolylineEntity } from "@/types/dxf";
 import {
   isLineEntity,
   isCircleEntity,
@@ -328,6 +328,54 @@ const addPolyfaceMeshEdges = (
   }
 };
 
+/**
+ * Render a 3D polygon mesh (POLYLINE code 70 bit 4) as wireframe edges.
+ * Vertices are laid out in an M×N grid. Edges connect adjacent cells
+ * horizontally and vertically (no diagonals).
+ * shape (bit 0) = closed in M direction, is3dPolygonMeshClosed (bit 5) = closed in N direction.
+ */
+const addPolygonMeshEdges = (
+  collector: GeometryCollector,
+  layer: string,
+  color: string,
+  entity: DxfPolylineEntity,
+  worldMatrix?: THREE.Matrix4,
+): void => {
+  const M = entity.meshMVertexCount!;
+  const N = entity.meshNVertexCount!;
+  const verts = entity.vertices;
+  if (verts.length < M * N) return;
+
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i < M * N; i++) {
+    const v = verts[i];
+    pts.push(new THREE.Vector3(v.x, v.y, v.z || 0));
+  }
+  if (worldMatrix) {
+    for (const p of pts) p.applyMatrix4(worldMatrix);
+  }
+
+  const closedM = entity.shape === true;
+  const closedN = entity.is3dPolygonMeshClosed === true;
+
+  const idx = (m: number, n: number) => m * N + n;
+
+  // Horizontal edges: along N direction
+  for (let m = 0; m < M; m++) {
+    const nEnd = closedN ? N : N - 1;
+    for (let n = 0; n < nEnd; n++) {
+      collector.addLineFromPoints(layer, color, [pts[idx(m, n)], pts[idx(m, (n + 1) % N)]]);
+    }
+  }
+  // Vertical edges: along M direction
+  for (let n = 0; n < N; n++) {
+    const mEnd = closedM ? M : M - 1;
+    for (let m = 0; m < mEnd; m++) {
+      collector.addLineFromPoints(layer, color, [pts[idx(m, n)], pts[idx((m + 1) % M, n)]]);
+    }
+  }
+};
+
 // ─── PDMODE point symbol rendering ───────────────────────────────────
 
 interface PointSymbolParams {
@@ -574,6 +622,11 @@ const collectEntity = (p: CollectEntityParams): boolean => {
         // Polyface mesh: vertices define positions + face indices
         if (entity.isPolyfaceMesh) {
           addPolyfaceMeshEdges(collector, layer, entityColor, entity.vertices, worldMatrix);
+          return true;
+        }
+        // 3D polygon mesh: vertices in M×N grid
+        if (entity.is3dPolygonMesh && entity.meshMVertexCount && entity.meshNVertexCount) {
+          addPolygonMeshEdges(collector, layer, entityColor, entity, worldMatrix);
           return true;
         }
         const matrix = buildOcsMatrix(entity.extrusionDirection);
@@ -1760,9 +1813,13 @@ const processEntity = (
     case "LWPOLYLINE":
     case "POLYLINE": {
       if (isPolylineEntity(entity) && entity.vertices.length > 1) {
-        if (entity.isPolyfaceMesh) {
+        if (entity.isPolyfaceMesh || (entity.is3dPolygonMesh && entity.meshMVertexCount && entity.meshNVertexCount)) {
           const tmpCollector = new GeometryCollector();
-          addPolyfaceMeshEdges(tmpCollector, entity.layer || "0", entityColor, entity.vertices);
+          if (entity.isPolyfaceMesh) {
+            addPolyfaceMeshEdges(tmpCollector, entity.layer || "0", entityColor, entity.vertices);
+          } else {
+            addPolygonMeshEdges(tmpCollector, entity.layer || "0", entityColor, entity);
+          }
           const objects = tmpCollector.flush(colorCtx.materialCache, colorCtx.meshMaterialCache, colorCtx.pointsMaterialCache);
           if (objects.length > 0) {
             const group = new THREE.Group();

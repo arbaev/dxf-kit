@@ -24,6 +24,8 @@ export interface IPolylineEntity extends IEntityBase {
   is3dPolygonMeshClosed?: boolean;
   isPolyfaceMesh?: boolean;
   hasContinuousLinetypePattern?: boolean;
+  meshMVertexCount?: number;
+  meshNVertexCount?: number;
   extrusionDirection?: IPoint;
 }
 
@@ -57,7 +59,11 @@ export function parsePolyline(scanner: DxfScanner, curr: IGroup): IPolylineEntit
         entity.hasContinuousLinetypePattern = ((curr.value as number) & 128) !== 0;
         break;
       case 71:
+        entity.meshMVertexCount = curr.value as number;
+        break;
       case 72:
+        entity.meshNVertexCount = curr.value as number;
+        break;
       case 73:
       case 74:
       case 75:
