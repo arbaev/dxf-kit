@@ -22,6 +22,7 @@ export const ARROW_BASE_WIDTH_DIVISOR = 4;
 export const CIRCLE_SEGMENTS = 128;
 export const EXTENSION_LINE_DASH_SIZE = 2;
 export const EXTENSION_LINE_GAP_SIZE = 1;
+export const EXTENSION_LINE_EXTENSION = 1.25; // DIMEXE default: extension past dim line
 // Threshold for near-zero checks (bulge, lengths, parallel lines)
 export const EPSILON = 0.0001;
 export const MIN_ARC_SEGMENTS = 8;

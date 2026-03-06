@@ -39,6 +39,7 @@ export interface IDimStyle {
   dimasz?: number;   // code 41: arrow size (unscaled)
   dimtxt?: number;   // code 140: text height (unscaled)
   dimtsz?: number;   // code 142: tick size (>0 = use ticks instead of arrows)
+  dimexe?: number;   // code 44: extension line extension past dimension line
   dimclrt?: number;  // code 178: dimension text color (ACI index)
   dimlunit?: number; // code 277: 2=Decimal, 4=Architectural
   dimzin?: number;   // code 78: zero suppression flags
@@ -413,6 +414,10 @@ function parseDimStyles(scanner: DxfScanner): Record<string, IDimStyle> {
         break;
       case 41:
         ds.dimasz = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 44:
+        ds.dimexe = curr.value as number;
         curr = scanner.next();
         break;
       case 78:

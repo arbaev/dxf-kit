@@ -9,6 +9,7 @@ import {
   ARROW_SIZE,
   EXTENSION_LINE_DASH_SIZE,
   EXTENSION_LINE_GAP_SIZE,
+  EXTENSION_LINE_EXTENSION,
   DEGREES_TO_RADIANS_DIVISOR,
   EPSILON,
   CIRCLE_SEGMENTS,
@@ -39,6 +40,7 @@ export interface DimVars {
   textGap: number;
   extLineDash: number;
   extLineGap: number;
+  extLineExtension: number; // DIMEXE: extension line overshoot past dimension line
   useTicks: boolean;
   tickSize: number;
 }
@@ -50,6 +52,7 @@ export const DEFAULT_DIM_VARS: DimVars = {
   textGap: DIM_TEXT_GAP,
   extLineDash: EXTENSION_LINE_DASH_SIZE,
   extLineGap: EXTENSION_LINE_GAP_SIZE,
+  extLineExtension: EXTENSION_LINE_EXTENSION,
   useTicks: false,
   tickSize: 0,
 };
@@ -74,6 +77,7 @@ export function resolveDimVarsFromHeader(
     : textHeight * DIM_TEXT_GAP_MULTIPLIER;
   const extLineDash = EXTENSION_LINE_DASH_SIZE * scale;
   const extLineGap = EXTENSION_LINE_GAP_SIZE * scale;
+  const extLineExtension = ((header["$DIMEXE"] as number) ?? EXTENSION_LINE_EXTENSION) * scale;
 
   const dimtsz = (header["$DIMTSZ"] as number) ?? 0;
   const dimblk = (header["$DIMBLK"] as string) ?? "";
@@ -81,7 +85,7 @@ export function resolveDimVarsFromHeader(
   // When using ticks: DIMTSZ provides explicit size, otherwise fall back to arrowSize
   const tickSize = !useTicks ? 0 : dimtsz > 0 ? dimtsz * scale : arrowSize;
 
-  return { arrowSize, textHeight, textGap, extLineDash, extLineGap, useTicks, tickSize };
+  return { arrowSize, textHeight, textGap, extLineDash, extLineGap, extLineExtension, useTicks, tickSize };
 }
 
 /**
@@ -154,6 +158,13 @@ export function applyDimStyleVars(
     result.extLineGap = EXTENSION_LINE_GAP_SIZE * scale;
   }
 
+  if (dimStyle.dimexe !== undefined) {
+    result.extLineExtension = dimStyle.dimexe * scale;
+  } else if (styleDimScale !== undefined && styleDimScale !== headerDimScale) {
+    const headerDimExe = (header?.["$DIMEXE"] as number | undefined) ?? EXTENSION_LINE_EXTENSION;
+    result.extLineExtension = headerDimExe * scale;
+  }
+
   return result;
 }
 
@@ -219,19 +230,15 @@ export interface Line2D {
   y2: number;
 }
 
-const EXTENSION_LINE_OVERSHOOT = 2;
-
 export const createExtensionLine = (
   from: THREE.Vector3,
   to: THREE.Vector3,
   material: THREE.LineBasicMaterial | THREE.LineDashedMaterial,
+  overshoot?: number,
 ): THREE.Line => {
-  // Dashed extension lines extend beyond the dimension line per AutoCAD convention
+  // Extension lines extend beyond the dimension line per AutoCAD convention (DIMEXE)
   let endPoint = to;
-  if (material instanceof THREE.LineDashedMaterial) {
-    // Scale overshoot proportionally to the dash size
-    const scale = material.dashSize / EXTENSION_LINE_DASH_SIZE;
-    const overshoot = EXTENSION_LINE_OVERSHOOT * scale;
+  if (overshoot && overshoot > 0) {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const len = Math.sqrt(dx * dx + dy * dy);
@@ -312,6 +319,7 @@ export const createLinearDimensionLines = (p: LinearDimensionLinesParams): THREE
         createVec3(getMainCoord(point1), getFixedCoord(point1), 0),
         createVec3(getMainCoord(point1), anchorFixed, 0),
         extensionLineMaterial,
+        dv.extLineExtension,
       ),
     );
   }
@@ -321,6 +329,7 @@ export const createLinearDimensionLines = (p: LinearDimensionLinesParams): THREE
         createVec3(getMainCoord(point2), getFixedCoord(point2), 0),
         createVec3(getMainCoord(point2), anchorFixed, 0),
         extensionLineMaterial,
+        dv.extLineExtension,
       ),
     );
   }
@@ -429,10 +438,10 @@ export const createRotatedDimensionLines = (p: RotatedDimensionLinesParams): THR
   const p2 = new THREE.Vector3(point2.x, point2.y, 0);
 
   if (p1.distanceTo(foot1) > 0.1) {
-    objects.push(createExtensionLine(p1, foot1, extensionLineMaterial));
+    objects.push(createExtensionLine(p1, foot1, extensionLineMaterial, dv.extLineExtension));
   }
   if (p2.distanceTo(foot2) > 0.1) {
-    objects.push(createExtensionLine(p2, foot2, extensionLineMaterial));
+    objects.push(createExtensionLine(p2, foot2, extensionLineMaterial, dv.extLineExtension));
   }
 
   if (dv.useTicks) {
@@ -1166,6 +1175,7 @@ export const createAngularDimension = (p: DimensionTypeParams): THREE.Object3D[]
     new THREE.Vector3(farA.x, farA.y, 0),
     startAngle === angleA ? arcStartPt : arcEndPt,
     dashedMat,
+    dv.extLineExtension,
   );
   objects.push(extLineA);
 
@@ -1173,6 +1183,7 @@ export const createAngularDimension = (p: DimensionTypeParams): THREE.Object3D[]
     new THREE.Vector3(farB.x, farB.y, 0),
     startAngle === angleA ? arcEndPt : arcStartPt,
     dashedMat,
+    dv.extLineExtension,
   );
   objects.push(extLineB);
 
