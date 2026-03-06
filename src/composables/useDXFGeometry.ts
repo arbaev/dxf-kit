@@ -77,6 +77,7 @@ import {
   addTextToCollector,
   addMTextToCollector,
   addDimensionTextToCollector,
+  measureDimensionTextWidth,
   HAlign,
   VAlign,
 } from "./geometry/vectorTextBuilder";
@@ -947,6 +948,13 @@ const collectDimensionEntity = (
       const dx = dimData.point2.x - dimData.point1.x;
       const dy = dimData.point2.y - dimData.point1.y;
       dimAngle = (Math.atan2(dy, dx) * DEGREES_TO_RADIANS_DIVISOR) / Math.PI;
+    }
+
+    // Compute text gap from actual text width so dimension line doesn't overlap text
+    if (dimData.textPos && dimData.dimensionText && font) {
+      const textWidth = measureDimensionTextWidth(font, dimData.dimensionText, dimData.textHeight);
+      const padding = dimData.textHeight * 0.5;
+      dv.textGap = Math.max(dv.textGap, textWidth + padding);
     }
 
     const dimGroup = createDimensionGroup({
