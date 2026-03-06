@@ -53,6 +53,8 @@ export interface DxfPolylineEntity extends DxfEntityBase {
   vertices: DxfPolylineVertex[];
   shape?: boolean;
   width?: number; // Constant width (DXF code 43) — used for donuts and wide polylines
+  defaultStartWidth?: number; // Code 40 — default start width for POLYLINE vertices
+  defaultEndWidth?: number;   // Code 41 — default end width for POLYLINE vertices
   isPolyfaceMesh?: boolean;
   is3dPolygonMesh?: boolean;
   is3dPolygonMeshClosed?: boolean;

@@ -24,6 +24,8 @@ export interface IPolylineEntity extends IEntityBase {
   is3dPolygonMeshClosed?: boolean;
   isPolyfaceMesh?: boolean;
   hasContinuousLinetypePattern?: boolean;
+  defaultStartWidth?: number;
+  defaultEndWidth?: number;
   meshMVertexCount?: number;
   meshNVertexCount?: number;
   extrusionDirection?: IPoint;
@@ -45,8 +47,10 @@ export function parsePolyline(scanner: DxfScanner, curr: IGroup): IPolylineEntit
         entity.thickness = curr.value as number;
         break;
       case 40:
+        entity.defaultStartWidth = curr.value as number;
         break;
       case 41:
+        entity.defaultEndWidth = curr.value as number;
         break;
       case 70:
         entity.shape = ((curr.value as number) & 1) !== 0;

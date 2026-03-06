@@ -329,6 +329,93 @@ const addPolyfaceMeshEdges = (
 };
 
 /**
+ * Render a wide polyline (width > 0) as a filled mesh.
+ * Generates the outline by offsetting the polyline path by ±width/2,
+ * then triangulates the result using ShapeGeometry.
+ */
+const addWidePolylineToCollector = (
+  collector: GeometryCollector,
+  layer: string,
+  color: string,
+  entity: DxfPolylineEntity,
+  ocsMatrix: THREE.Matrix4 | null,
+  worldMatrix?: THREE.Matrix4,
+): void => {
+  const halfW = (entity.width || entity.defaultStartWidth || 0) / 2;
+  if (halfW <= 0) return;
+
+  // Build the polyline center path as dense points
+  const centerPoints = computePolylinePoints(entity);
+  if (centerPoints.length < 2) return;
+
+  // Transform to WCS
+  const pts = worldMatrix
+    ? transformOcsPoints(centerPoints, ocsMatrix).map(p => p.applyMatrix4(worldMatrix))
+    : transformOcsPoints(centerPoints, ocsMatrix);
+
+  // Build left and right offset paths
+  const left: THREE.Vector2[] = [];
+  const right: THREE.Vector2[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    let nx: number, ny: number;
+    if (i === 0) {
+      nx = -(pts[1].y - pts[0].y);
+      ny = pts[1].x - pts[0].x;
+    } else if (i === pts.length - 1) {
+      nx = -(pts[i].y - pts[i - 1].y);
+      ny = pts[i].x - pts[i - 1].x;
+    } else {
+      nx = -(pts[i + 1].y - pts[i - 1].y);
+      ny = pts[i + 1].x - pts[i - 1].x;
+    }
+    const len = Math.sqrt(nx * nx + ny * ny);
+    if (len < EPSILON) {
+      // Degenerate: skip offset or use previous
+      if (left.length > 0) {
+        left.push(left[left.length - 1].clone());
+        right.push(right[right.length - 1].clone());
+      }
+      continue;
+    }
+    nx /= len;
+    ny /= len;
+    left.push(new THREE.Vector2(pts[i].x + nx * halfW, pts[i].y + ny * halfW));
+    right.push(new THREE.Vector2(pts[i].x - nx * halfW, pts[i].y - ny * halfW));
+  }
+
+  if (left.length < 2) return;
+
+  // Build a closed shape: left path forward + right path backward
+  const shape = new THREE.Shape();
+  shape.moveTo(left[0].x, left[0].y);
+  for (let i = 1; i < left.length; i++) {
+    shape.lineTo(left[i].x, left[i].y);
+  }
+  // If closed polyline, connect last left to first left via right side
+  for (let i = right.length - 1; i >= 0; i--) {
+    shape.lineTo(right[i].x, right[i].y);
+  }
+  shape.closePath();
+
+  const geometry = new THREE.ShapeGeometry(shape);
+  const posAttr = geometry.getAttribute("position");
+  const idxAttr = geometry.getIndex();
+  if (!posAttr || !idxAttr) { geometry.dispose(); return; }
+
+  const vertices: number[] = [];
+  for (let i = 0; i < posAttr.count; i++) {
+    vertices.push(posAttr.getX(i), posAttr.getY(i), 0);
+  }
+  const indices: number[] = [];
+  for (let i = 0; i < idxAttr.count; i++) {
+    indices.push(idxAttr.getX(i));
+  }
+  geometry.dispose();
+
+  collector.addMesh(layer, color, vertices, indices);
+};
+
+/**
  * Render a 3D polygon mesh (POLYLINE code 70 bit 4) as wireframe edges.
  * Vertices are laid out in an M×N grid. Edges connect adjacent cells
  * horizontally and vertically (no diagonals).
@@ -627,6 +714,13 @@ const collectEntity = (p: CollectEntityParams): boolean => {
         // 3D polygon mesh: vertices in M×N grid
         if (entity.is3dPolygonMesh && entity.meshMVertexCount && entity.meshNVertexCount) {
           addPolygonMeshEdges(collector, layer, entityColor, entity, worldMatrix);
+          return true;
+        }
+        // Wide polyline: render as filled shape
+        const polyWidth = entity.width || entity.defaultStartWidth || 0;
+        if (polyWidth > 0) {
+          const matrix = buildOcsMatrix(entity.extrusionDirection);
+          addWidePolylineToCollector(collector, layer, entityColor, entity, matrix, worldMatrix);
           return true;
         }
         const matrix = buildOcsMatrix(entity.extrusionDirection);
@@ -1820,6 +1914,19 @@ const processEntity = (
           } else {
             addPolygonMeshEdges(tmpCollector, entity.layer || "0", entityColor, entity);
           }
+          const objects = tmpCollector.flush(colorCtx.materialCache, colorCtx.meshMaterialCache, colorCtx.pointsMaterialCache);
+          if (objects.length > 0) {
+            const group = new THREE.Group();
+            for (const obj of objects) group.add(obj);
+            return group;
+          }
+          return null;
+        }
+        const polyWidth = entity.width || entity.defaultStartWidth || 0;
+        if (polyWidth > 0) {
+          const tmpCollector = new GeometryCollector();
+          const matrix = buildOcsMatrix(entity.extrusionDirection);
+          addWidePolylineToCollector(tmpCollector, entity.layer || "0", entityColor, entity, matrix);
           const objects = tmpCollector.flush(colorCtx.materialCache, colorCtx.meshMaterialCache, colorCtx.pointsMaterialCache);
           if (objects.length > 0) {
             const group = new THREE.Group();
