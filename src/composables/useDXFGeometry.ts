@@ -1726,6 +1726,7 @@ const processEntity = (
     case "VIEWPORT":
     case "IMAGE":
     case "WIPEOUT":
+    case "3DSOLID":
       return new THREE.Group();
 
     default:
