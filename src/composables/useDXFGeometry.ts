@@ -1168,7 +1168,9 @@ const collectDimensionEntity = (
       const blockName = colorCtx.blockHandleToName.get(dimStyleEntry.dimblkHandle);
       if (blockName && isTickBlock(blockName)) {
         dv.useTicks = true;
-        if (dv.tickSize === 0) dv.tickSize = dv.arrowSize;
+        // No explicit DIMTSZ → tick size always follows arrow size
+        // (entity XDATA may override arrowSize after base tickSize was set)
+        dv.tickSize = dv.arrowSize;
       }
     }
   }
@@ -1350,15 +1352,13 @@ const collectLeaderEntity = (
   const leaderDimStyle = leaderStyleName ? colorCtx.dimStyles?.[leaderStyleName] : undefined;
   const baseDv = colorCtx.dimVars ?? resolveDimVarsFromHeader(undefined);
 
-  // Resolve leader arrow block name from DIMLDRBLK (code 341) or DIMBLK (code 342)
+  // Resolve leader arrow block name from DIMLDRBLK (code 341) only.
+  // Do NOT fall back to DIMBLK (code 342) — that's for dimension arrowheads.
+  // When DIMLDRBLK is unset, leaders use the default filled arrow.
   let leaderArrowBlockName: string | undefined;
   if (colorCtx.blockHandleToName) {
     const ldrHandle = leaderDimStyle?.dimldrblkHandle;
     if (ldrHandle) leaderArrowBlockName = colorCtx.blockHandleToName.get(ldrHandle);
-    if (!leaderArrowBlockName) {
-      const blkHandle = leaderDimStyle?.dimblkHandle;
-      if (blkHandle) leaderArrowBlockName = colorCtx.blockHandleToName.get(blkHandle);
-    }
   }
 
   // Render a block definition at a point with rotation (for custom arrow blocks)
@@ -1416,7 +1416,9 @@ const collectLeaderEntity = (
         drawn = addBlockArrowToCollector(leaderArrowBlockName, points[0], angle, baseDv.arrowSize);
       }
       if (!drawn) {
-        if (leaderArrowBlockName && isTickBlock(leaderArrowBlockName) || baseDv.useTicks) {
+        // Leaders use ticks only if DIMLDRBLK explicitly specifies a tick block.
+        // Do NOT inherit useTicks from baseDv — that's for dimension arrowheads.
+        if (leaderArrowBlockName && isTickBlock(leaderArrowBlockName)) {
           addTickToCollector(points[0], angle);
         } else {
           addArrowToCollector(points[1], points[0], baseDv.arrowSize);

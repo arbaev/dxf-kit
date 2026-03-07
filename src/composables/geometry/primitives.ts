@@ -262,7 +262,8 @@ export const createArrow = (
 
 /**
  * Create an architectural tick mark (oblique stroke at 45°) for dimension lines.
- * The tick is a short line segment centered on `point`, rotated by `dimAngle + 45°`.
+ * Models the _ArchTick block: a line from (-0.5,-0.5) to (0.5,0.5), scaled by `size` (DIMASZ)
+ * and rotated by `dimAngle`.
  */
 export const createTick = (
   point: THREE.Vector3,
@@ -270,9 +271,13 @@ export const createTick = (
   dimAngle: number,
   material: THREE.LineBasicMaterial,
 ): THREE.LineSegments => {
-  const tickAngle = dimAngle + Math.PI / 4;
-  const dx = Math.cos(tickAngle) * size;
-  const dy = Math.sin(tickAngle) * size;
+  // _ArchTick block local endpoint: (0.5, 0.5) scaled by size
+  const half = size * 0.5;
+  // Rotate local endpoint by dimAngle
+  const cosA = Math.cos(dimAngle);
+  const sinA = Math.sin(dimAngle);
+  const dx = half * cosA - half * sinA;
+  const dy = half * sinA + half * cosA;
   const verts = new Float32Array([
     point.x - dx, point.y - dy, point.z,
     point.x + dx, point.y + dy, point.z,
