@@ -24,6 +24,11 @@ class MockCollector {
     this.meshCalls.push({ layer, color, vertices: [...vertices], indices: [...indices] });
   }
 
+  addOverlayMesh(layer: string, color: string, vertices: number[], indices: number[]): void {
+    if (vertices.length < 9 || indices.length < 3) return;
+    this.meshCalls.push({ layer, color, vertices: [...vertices], indices: [...indices] });
+  }
+
   lineCalls: number[][] = [];
   addLineSegments(_layer: string, _color: string, data: number[]): void {
     this.lineCalls.push([...data]);

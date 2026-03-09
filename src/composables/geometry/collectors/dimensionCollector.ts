@@ -175,7 +175,7 @@ export function collectDimensionEntity(
             if (indices.length === 0) {
               for (let i = 0; i < count; i++) indices.push(i);
             }
-            collector.addMesh(layer, entityColor, positions, indices);
+            collector.addOverlayMesh(layer, entityColor, positions, indices);
           }
         });
       } else {
@@ -206,7 +206,7 @@ export function collectDimensionEntity(
           if (indices.length === 0) {
             for (let i = 0; i < count; i++) indices.push(i);
           }
-          collector.addMesh(layer, entityColor, positions, indices);
+          collector.addOverlayMesh(layer, entityColor, positions, indices);
         }
       }
     }

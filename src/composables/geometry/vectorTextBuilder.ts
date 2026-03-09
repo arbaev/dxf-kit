@@ -354,7 +354,7 @@ export function addTextToCollector(p: TextParams): void {
   }
 
   if (allPositions.length >= 9 && allIndices.length >= 3) {
-    collector.addMesh(layer, color, allPositions, allIndices);
+    collector.addOverlayMesh(layer, color, allPositions, allIndices);
   }
 
   // Emit underline line segment below text

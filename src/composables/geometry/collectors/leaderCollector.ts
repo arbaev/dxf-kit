@@ -93,7 +93,7 @@ export function collectLeaderEntity(
     if (indices.length === 0) {
       for (let i = 0; i < count; i++) indices.push(i);
     }
-    collector.addMesh(layer, entityColor, positions, indices);
+    collector.addOverlayMesh(layer, entityColor, positions, indices);
   };
 
   // Resolve arrow block for LEADER: DIMSTYLE code 341 (DIMLDRBLK) -> block name

@@ -136,6 +136,10 @@ export class GeometryCollector {
   readonly meshVertices = new Map<string, GrowableFloat32Array>();
   /** Mesh triangle indices per key */
   readonly meshIndices = new Map<string, GrowableUint32Array>();
+  /** Overlay mesh vertices (text + arrows) rendered on top of everything */
+  readonly overlayVertices = new Map<string, GrowableFloat32Array>();
+  /** Overlay mesh triangle indices */
+  readonly overlayIndices = new Map<string, GrowableUint32Array>();
 
   private static makeKey(layer: string, color: string): string {
     return `${layer}::${color}`;
@@ -204,18 +208,34 @@ export class GeometryCollector {
    * Indices are offset by the current vertex count for this key.
    */
   addMesh(layer: string, color: string, vertices: number[], indices: number[]): void {
+    this.addMeshToBuffers(this.meshVertices, this.meshIndices, layer, color, vertices, indices);
+  }
+
+  /**
+   * Add overlay mesh triangles (text glyphs + dimension/leader arrows).
+   * Rendered last in flush() — on top of lines and regular meshes.
+   */
+  addOverlayMesh(layer: string, color: string, vertices: number[], indices: number[]): void {
+    this.addMeshToBuffers(this.overlayVertices, this.overlayIndices, layer, color, vertices, indices);
+  }
+
+  private addMeshToBuffers(
+    verticesMap: Map<string, GrowableFloat32Array>,
+    indicesMap: Map<string, GrowableUint32Array>,
+    layer: string, color: string, vertices: number[], indices: number[],
+  ): void {
     if (vertices.length < 9 || indices.length < 3) return;
     const key = GeometryCollector.makeKey(layer, color);
 
-    let vArr = this.meshVertices.get(key);
+    let vArr = verticesMap.get(key);
     if (!vArr) {
       vArr = new GrowableFloat32Array();
-      this.meshVertices.set(key, vArr);
+      verticesMap.set(key, vArr);
     }
-    let iArr = this.meshIndices.get(key);
+    let iArr = indicesMap.get(key);
     if (!iArr) {
       iArr = new GrowableUint32Array();
-      this.meshIndices.set(key, iArr);
+      indicesMap.set(key, iArr);
     }
 
     // Offset indices by existing vertex count
@@ -324,6 +344,38 @@ export class GeometryCollector {
         obj.userData.layerName = lyr;
         return obj;
       });
+    }
+
+    // Overlay Meshes (text glyphs + arrows) — rendered last, on top of everything
+    for (const [key, vArr] of this.overlayVertices) {
+      const iArr = this.overlayIndices.get(key);
+      if (!iArr || vArr.length < 9 || iArr.length < 3) continue;
+      const [layer, color] = parseKey(key);
+      const mat = getMeshMaterial(color, materials);
+
+      const totalVerts = vArr.length / 3;
+      if (totalVerts <= MAX_BUFFER_VERTICES) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.BufferAttribute(vArr.toFloat32Array(), 3));
+        geo.setIndex(new THREE.BufferAttribute(iArr.toUint32Array(), 1));
+        const obj = new THREE.Mesh(geo, mat);
+        obj.frustumCulled = false;
+        obj.userData.layerName = layer;
+        objects.push(obj);
+      } else {
+        const allPos = vArr.toFloat32Array();
+        const allIdx = iArr.toUint32Array();
+        for (let start = 0; start < allIdx.length; start += MAX_BUFFER_VERTICES * 3) {
+          const end = Math.min(start + MAX_BUFFER_VERTICES * 3, allIdx.length);
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute("position", new THREE.BufferAttribute(allPos, 3));
+          geo.setIndex(new THREE.BufferAttribute(allIdx.slice(start, end), 1));
+          const obj = new THREE.Mesh(geo, mat);
+          obj.frustumCulled = false;
+          obj.userData.layerName = layer;
+          objects.push(obj);
+        }
+      }
     }
 
     return objects;
