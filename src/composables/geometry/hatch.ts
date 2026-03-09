@@ -264,6 +264,125 @@ export interface Point2D {
   y: number;
 }
 
+/** Convert boundary path to Point2D array (no Vector3 allocation) for polygon clipping */
+export const boundaryPathToPoint2DArray = (bp: HatchBoundaryPath): Point2D[] => {
+  const points: Point2D[] = [];
+
+  if (bp.edges && bp.edges.length > 0) {
+    for (const edge of bp.edges) {
+      if (edge.type === "line") {
+        if (points.length === 0) {
+          points.push({ x: edge.start.x, y: edge.start.y });
+        }
+        points.push({ x: edge.end.x, y: edge.end.y });
+      } else if (edge.type === "arc") {
+        const startRad = (edge.startAngle * Math.PI) / 180;
+        const endRad = (edge.endAngle * Math.PI) / 180;
+        let sweep = endRad - startRad;
+        if (edge.ccw) {
+          if (sweep < 0) sweep += 2 * Math.PI;
+        } else {
+          if (sweep > 0) sweep -= 2 * Math.PI;
+        }
+        const segments = Math.max(
+          MIN_ARC_SEGMENTS,
+          Math.floor((Math.abs(sweep) * CIRCLE_SEGMENTS) / (2 * Math.PI)),
+        );
+        for (let i = 0; i <= segments; i++) {
+          const a = startRad + (i / segments) * sweep;
+          points.push({
+            x: edge.center.x + edge.radius * Math.cos(a),
+            y: edge.center.y + edge.radius * Math.sin(a),
+          });
+        }
+      } else if (edge.type === "ellipse") {
+        const majorX = edge.majorAxisEndPoint.x;
+        const majorY = edge.majorAxisEndPoint.y;
+        const majorLength = Math.sqrt(majorX * majorX + majorY * majorY);
+        if (majorLength < EPSILON) continue;
+        const minorLength = majorLength * edge.axisRatio;
+        const rotation = Math.atan2(majorY, majorX);
+        const cosR = Math.cos(rotation);
+        const sinR = Math.sin(rotation);
+        let startAngle = edge.startAngle;
+        let endAngle = edge.endAngle;
+        const isFullEllipse =
+          Math.abs(endAngle - startAngle - 2 * Math.PI) < EPSILON ||
+          Math.abs(endAngle - startAngle) < EPSILON;
+        if (isFullEllipse) { startAngle = 0; endAngle = 2 * Math.PI; }
+        let sweepAngle = endAngle - startAngle;
+        if (edge.ccw) { if (sweepAngle < 0) sweepAngle += 2 * Math.PI; }
+        else { if (sweepAngle > 0) sweepAngle -= 2 * Math.PI; }
+        const segments = Math.max(
+          MIN_ARC_SEGMENTS,
+          Math.floor((Math.abs(sweepAngle) * CIRCLE_SEGMENTS) / (2 * Math.PI)),
+        );
+        const startIdx = points.length > 0 ? 1 : 0;
+        for (let i = startIdx; i <= segments; i++) {
+          const t = startAngle + (i / segments) * sweepAngle;
+          const localX = majorLength * Math.cos(t);
+          const localY = minorLength * Math.sin(t);
+          points.push({
+            x: edge.center.x + localX * cosR - localY * sinR,
+            y: edge.center.y + localX * sinR + localY * cosR,
+          });
+        }
+      } else if (edge.type === "spline") {
+        const sPts = splineEdgeToPoints(edge);
+        const startIdx = points.length > 0 ? 1 : 0;
+        for (let i = startIdx; i < sPts.length; i++) {
+          points.push({ x: sPts[i].x, y: sPts[i].y });
+        }
+      }
+    }
+  } else if (bp.polylineVertices && bp.polylineVertices.length > 1) {
+    const verts = bp.polylineVertices;
+    points.push({ x: verts[0].x, y: verts[0].y });
+    for (let i = 0; i < verts.length - 1; i++) {
+      const v1 = verts[i];
+      const v2 = verts[i + 1];
+      if (v1.bulge && Math.abs(v1.bulge) > EPSILON) {
+        const dx = v2.x - v1.x;
+        const dy = v2.y - v1.y;
+        const chordLength = Math.sqrt(dx * dx + dy * dy);
+        if (chordLength < EPSILON) {
+          points.push({ x: v2.x, y: v2.y });
+          continue;
+        }
+        const theta = 4 * Math.atan(v1.bulge);
+        const radius = chordLength / (2 * Math.sin(theta / 2));
+        const h = radius * Math.cos(theta / 2);
+        const midX = (v1.x + v2.x) / 2;
+        const midY = (v1.y + v2.y) / 2;
+        const pX = -dy / chordLength;
+        const pY = dx / chordLength;
+        const cx = midX + pX * h;
+        const cy = midY + pY * h;
+        const sa = Math.atan2(v1.y - cy, v1.x - cx);
+        const ea = Math.atan2(v2.y - cy, v2.x - cx);
+        let sw = ea - sa;
+        while (sw > Math.PI) sw -= 2 * Math.PI;
+        while (sw < -Math.PI) sw += 2 * Math.PI;
+        if (v1.bulge > 0 && sw < 0) sw += 2 * Math.PI;
+        else if (v1.bulge < 0 && sw > 0) sw -= 2 * Math.PI;
+        const segs = Math.max(
+          MIN_ARC_SEGMENTS,
+          Math.floor((Math.abs(sw) * CIRCLE_SEGMENTS) / (2 * Math.PI)),
+        );
+        const absR = Math.abs(radius);
+        for (let j = 1; j <= segs; j++) {
+          const angle = sa + sw * (j / segs);
+          points.push({ x: cx + absR * Math.cos(angle), y: cy + absR * Math.sin(angle) });
+        }
+      } else {
+        points.push({ x: v2.x, y: v2.y });
+      }
+    }
+  }
+
+  return points;
+};
+
 /** Point-in-polygon test (ray casting algorithm) */
 export const pointInPolygon2D = (px: number, py: number, polygon: Point2D[]): boolean => {
   let inside = false;
@@ -335,23 +454,56 @@ export const clipSegmentToPolygon = (
     uniqueParams.push(params[i]);
   }
 
-  // Build intervals and check each midpoint with pointInPolygon2D.
-  // This correctly handles both vertex pass-through and tangential touch
-  // without relying on toggle logic.
   const boundaries = [0, ...uniqueParams, 1];
   const result: [number, number, number, number][] = [];
 
+  if (uniqueParams.length === 0) {
+    // No intersections — single PIP test
+    if (pointInPolygon2D(x1 + 0.5 * dx, y1 + 0.5 * dy, polygon)) {
+      result.push([x1, y1, x2, y2]);
+    }
+    return result;
+  }
+
+  // Toggle-PIP: compute PIP for first interval, verify with last interval.
+  // If verification passes, toggle state at each intersection (2 PIP calls total).
+  // If not, fallback to per-interval PIP (tangential vertex touch).
+  const firstMidT = boundaries[1] / 2;
+  const inside = pointInPolygon2D(x1 + firstMidT * dx, y1 + firstMidT * dy, polygon);
+
+  const lastMidT = (boundaries[boundaries.length - 2] + 1) / 2;
+  const lastInside = pointInPolygon2D(x1 + lastMidT * dx, y1 + lastMidT * dy, polygon);
+  const expectedLast = uniqueParams.length % 2 === 0 ? inside : !inside;
+
+  if (lastInside !== expectedLast) {
+    // Tangential touch — fallback to per-interval PIP
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      const tStart = boundaries[i];
+      const tEnd = boundaries[i + 1];
+      if (tEnd - tStart < 1e-9) continue;
+      const midT = (tStart + tEnd) / 2;
+      if (pointInPolygon2D(x1 + midT * dx, y1 + midT * dy, polygon)) {
+        result.push([
+          x1 + tStart * dx, y1 + tStart * dy,
+          x1 + tEnd * dx, y1 + tEnd * dy,
+        ]);
+      }
+    }
+    return result;
+  }
+
+  // Toggle logic — O(2) PIP calls instead of O(intervals)
+  let state = inside;
   for (let i = 0; i < boundaries.length - 1; i++) {
     const tStart = boundaries[i];
     const tEnd = boundaries[i + 1];
-    if (tEnd - tStart < 1e-9) continue;
-    const midT = (tStart + tEnd) / 2;
-    if (pointInPolygon2D(x1 + midT * dx, y1 + midT * dy, polygon)) {
+    if (state && tEnd - tStart > 1e-9) {
       result.push([
         x1 + tStart * dx, y1 + tStart * dy,
         x1 + tEnd * dx, y1 + tEnd * dy,
       ]);
     }
+    state = !state;
   }
 
   return result;
@@ -401,12 +553,13 @@ export const clipSegmentToPolygons = (
   // Check initial state
   let inside = isPointInsideHatch(x1, y1, polygons);
 
-  for (const t of params) {
+  for (let k = 0; k < params.length; k++) {
+    const t = params[k];
     if (inside) {
       result.push([x1 + prevT * dx, y1 + prevT * dy, x1 + t * dx, y1 + t * dy]);
     }
     // Re-evaluate state at midpoint after crossing
-    const midT = (t + (params[params.indexOf(t) + 1] ?? 1)) / 2;
+    const midT = (t + (params[k + 1] ?? 1)) / 2;
     inside = isPointInsideHatch(x1 + midT * dx, y1 + midT * dy, polygons);
     prevT = t;
   }
@@ -419,14 +572,17 @@ export const clipSegmentToPolygons = (
 };
 
 export interface HatchPatternGeometry {
-  segments: THREE.Vector3[][];
-  dots: THREE.Vector3[];
+  /** Flat: [x1,y1,z1, x2,y2,z2, ...] for LineSegments */
+  segmentVertices: number[];
+  /** Flat: [x,y,z, ...] for Points */
+  dotPositions: number[];
 }
 
 /**
  * Generate HATCH pattern geometry clipped to boundary polygons.
  * Supports multiple boundaries with even-odd fill rule (donut shapes),
  * pattern scale/angle, and dot rendering.
+ * Returns flat number arrays (no Vector3 allocation).
  */
 export const generateHatchPattern = (
   patternLines: HatchPatternLine[],
@@ -451,8 +607,8 @@ export const generateHatchPattern = (
 
   const bboxDiag = Math.sqrt((maxX - minX) ** 2 + (maxY - minY) ** 2);
 
-  const allSegments: THREE.Vector3[][] = [];
-  const allDots: THREE.Vector3[] = [];
+  const segVerts: number[] = [];
+  const dotPos: number[] = [];
   const scale = patternScale || 1;
   const extraAngle = patternAngle || 0;
 
@@ -539,7 +695,7 @@ export const generateHatchPattern = (
     const isSolid = scaledDashes.length === 0 || dashTotal < EPSILON;
 
     for (let i = startIdx; i <= endIdx; i++) {
-      if (allSegments.length >= MAX_HATCH_SEGMENTS) break;
+      if (segVerts.length / 6 >= MAX_HATCH_SEGMENTS) break;
 
       // Line origin: basePoint + i * step
       const ox = bpX + i * stepX;
@@ -552,54 +708,53 @@ export const generateHatchPattern = (
           y2 = oy + diag * dirY;
         const clipped = clipSegmentToPolygons(x1, y1, x2, y2, polygons);
         for (const seg of clipped) {
-          allSegments.push([
-            new THREE.Vector3(seg[0], seg[1], 0),
-            new THREE.Vector3(seg[2], seg[3], 0),
-          ]);
+          segVerts.push(seg[0], seg[1], 0, seg[2], seg[3], 0);
         }
       } else {
-        // Dash pattern: start near polygon, not at -diag (avoids millions of iterations
-        // when base point is far from polygon)
+        // Batch clipping: clip the whole line once, then overlay dash pattern
         const lineStart = minDirProj - i * stagger - bboxDiag;
         const lineEnd = maxDirProj - i * stagger + bboxDiag;
-        let t = lineStart;
-        // Align start to pattern period
-        const phase = ((t % dashTotal) + dashTotal) % dashTotal;
-        t -= phase;
+        const lx1 = ox + lineStart * dirX, ly1 = oy + lineStart * dirY;
+        const lx2 = ox + lineEnd * dirX, ly2 = oy + lineEnd * dirY;
+        const clipped = clipSegmentToPolygons(lx1, ly1, lx2, ly2, polygons);
 
-        while (t < lineEnd) {
-          for (const d of scaledDashes) {
-            const segLen = Math.abs(d);
-            if (d > 0) {
-              // Dash — line segment
-              const sx = ox + t * dirX,
-                sy = oy + t * dirY;
-              const ex = ox + (t + segLen) * dirX,
-                ey = oy + (t + segLen) * dirY;
-              const clipped = clipSegmentToPolygons(sx, sy, ex, ey, polygons);
-              for (const seg of clipped) {
-                allSegments.push([
-                  new THREE.Vector3(seg[0], seg[1], 0),
-                  new THREE.Vector3(seg[2], seg[3], 0),
-                ]);
+        for (const [cx1, cy1, cx2, cy2] of clipped) {
+          // Project clipped endpoints back to t-coordinate along line direction
+          const ct1 = (cx1 - ox) * dirX + (cy1 - oy) * dirY;
+          const ct2 = (cx2 - ox) * dirX + (cy2 - oy) * dirY;
+
+          // Align to dash pattern period
+          let t = ct1 - (((ct1 % dashTotal) + dashTotal) % dashTotal);
+
+          while (t < ct2) {
+            for (const d of scaledDashes) {
+              const segLen = Math.abs(d);
+              if (d > 0) {
+                // Dash segment — clamp to clipped interval
+                const segStart = Math.max(t, ct1);
+                const segEnd = Math.min(t + segLen, ct2);
+                if (segEnd > segStart + 1e-9) {
+                  segVerts.push(
+                    ox + segStart * dirX, oy + segStart * dirY, 0,
+                    ox + segEnd * dirX, oy + segEnd * dirY, 0,
+                  );
+                }
+              } else if (d === 0) {
+                // Dot — already inside clipped region
+                if (t >= ct1 && t <= ct2) {
+                  dotPos.push(ox + t * dirX, oy + t * dirY, 0);
+                }
               }
-            } else if (d === 0) {
-              // Dot — zero-length element at current position
-              const dotX = ox + t * dirX;
-              const dotY = oy + t * dirY;
-              if (isPointInsideHatch(dotX, dotY, polygons)) {
-                allDots.push(new THREE.Vector3(dotX, dotY, 0));
-              }
+              // d < 0 -> gap (advance without drawing)
+              t += segLen;
             }
-            // d < 0 -> gap (advance without drawing)
-            t += segLen;
           }
         }
       }
     }
 
-    if (allSegments.length >= MAX_HATCH_SEGMENTS) break;
+    if (segVerts.length / 6 >= MAX_HATCH_SEGMENTS) break;
   }
 
-  return { segments: allSegments, dots: allDots };
+  return { segmentVertices: segVerts, dotPositions: dotPos };
 };

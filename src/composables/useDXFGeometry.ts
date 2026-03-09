@@ -74,6 +74,7 @@ import {
 import {
   boundaryPathToShapePath,
   boundaryPathToLinePoints,
+  boundaryPathToPoint2DArray,
   generateHatchPattern,
   type Point2D,
 } from "./geometry/hatch";
@@ -876,6 +877,7 @@ const collectEntity = (p: CollectEntityParams): boolean => {
         const hatchMatrix = buildOcsMatrix(entity.extrusionDirection);
 
         if (entity.solid) {
+          // Direct triangulation via ShapeUtils (skip BufferGeometry overhead)
           const shapes: THREE.Shape[] = [];
           for (let i = 0; i < entity.boundaryPaths.length; i++) {
             const sp = boundaryPathToShapePath(entity.boundaryPaths[i]);
@@ -885,32 +887,31 @@ const collectEntity = (p: CollectEntityParams): boolean => {
           }
           if (shapes.length === 0) return false;
 
-          // Create temporary ShapeGeometry to extract vertices/indices
-          const geometry = new THREE.ShapeGeometry(shapes);
-          const posAttr = geometry.getAttribute("position");
-          const index = geometry.getIndex();
+          const v = new THREE.Vector3();
+          for (const shape of shapes) {
+            const shapePoints = shape.extractPoints(12);
+            const triangles = THREE.ShapeUtils.triangulateShape(shapePoints.shape, shapePoints.holes);
+            if (triangles.length === 0) continue;
 
-          if (posAttr && index) {
+            const allPts = shapePoints.shape.concat(...shapePoints.holes);
             const vertices: number[] = [];
-            for (let i = 0; i < posAttr.count; i++) {
-              const v = new THREE.Vector3(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+            for (const pt of allPts) {
+              v.set(pt.x, pt.y, 0);
               if (hatchMatrix) v.applyMatrix4(hatchMatrix);
               if (worldMatrix) v.applyMatrix4(worldMatrix);
               vertices.push(v.x, v.y, v.z);
             }
             const indices: number[] = [];
-            for (let i = 0; i < index.count; i++) {
-              indices.push(index.getX(i));
+            for (const tri of triangles) {
+              indices.push(tri[0], tri[1], tri[2]);
             }
             collector.addMesh(layer, entityColor, vertices, indices);
           }
-
-          geometry.dispose();
           return true;
         } else {
-          // Pattern hatch
+          // Pattern hatch — flat arrays, direct collector write
           const polygons: Point2D[][] = entity.boundaryPaths
-            .map((bp) => boundaryPathToLinePoints(bp).map((v) => ({ x: v.x, y: v.y })))
+            .map((bp) => boundaryPathToPoint2DArray(bp))
             .filter((p) => p.length > 2);
 
           const hasEmbedded = entity.patternLines && entity.patternLines.length > 0;
@@ -921,23 +922,41 @@ const collectEntity = (p: CollectEntityParams): boolean => {
           const effectiveAngle = hasEmbedded ? 0 : entity.patternAngle;
 
           if (patternLines && polygons.length > 0) {
-            const { segments, dots } = generateHatchPattern(
+            const { segmentVertices, dotPositions } = generateHatchPattern(
               patternLines,
               polygons,
               effectiveScale,
               effectiveAngle,
               hasEmbedded,
             );
-            for (const seg of segments) {
-              const transformed = transformOcsPoints(seg, hatchMatrix);
-              collector.addLineFromPoints(layer, entityColor, applyWorld(transformed, worldMatrix));
+
+            // In-place OCS/world transform on flat arrays
+            if ((hatchMatrix || worldMatrix) && segmentVertices.length > 0) {
+              const v = new THREE.Vector3();
+              for (let i = 0; i < segmentVertices.length; i += 3) {
+                v.set(segmentVertices[i], segmentVertices[i + 1], segmentVertices[i + 2]);
+                if (hatchMatrix) v.applyMatrix4(hatchMatrix);
+                if (worldMatrix) v.applyMatrix4(worldMatrix);
+                segmentVertices[i] = v.x;
+                segmentVertices[i + 1] = v.y;
+                segmentVertices[i + 2] = v.z;
+              }
             }
-            if (dots.length > 0) {
-              const dotPositions: number[] = [];
-              for (let i = 0; i < dots.length; i++) {
-                const d = hatchMatrix ? dots[i].clone().applyMatrix4(hatchMatrix) : dots[i];
-                if (worldMatrix) d.applyMatrix4(worldMatrix);
-                dotPositions.push(d.x, d.y, d.z);
+            if (segmentVertices.length > 0) {
+              collector.addLineSegments(layer, entityColor, segmentVertices);
+            }
+
+            if (dotPositions.length > 0) {
+              if (hatchMatrix || worldMatrix) {
+                const v = new THREE.Vector3();
+                for (let i = 0; i < dotPositions.length; i += 3) {
+                  v.set(dotPositions[i], dotPositions[i + 1], dotPositions[i + 2]);
+                  if (hatchMatrix) v.applyMatrix4(hatchMatrix);
+                  if (worldMatrix) v.applyMatrix4(worldMatrix);
+                  dotPositions[i] = v.x;
+                  dotPositions[i + 1] = v.y;
+                  dotPositions[i + 2] = v.z;
+                }
               }
               collector.addPoints(layer, entityColor, dotPositions);
             }
@@ -2125,7 +2144,7 @@ const processEntity = (
 
           // Build clipping polygons from all boundary paths
           const polygons: Point2D[][] = entity.boundaryPaths
-            .map((bp) => boundaryPathToLinePoints(bp).map((v) => ({ x: v.x, y: v.y })))
+            .map((bp) => boundaryPathToPoint2DArray(bp))
             .filter((p) => p.length > 2);
 
           // Embedded pattern lines are pre-scaled by AutoCAD — don't apply patternScale again.
@@ -2138,26 +2157,44 @@ const processEntity = (
           const effectiveAngle = hasEmbedded ? 0 : entity.patternAngle;
 
           if (patternLines && polygons.length > 0) {
-            const { segments, dots } = generateHatchPattern(
+            const { segmentVertices, dotPositions } = generateHatchPattern(
               patternLines,
               polygons,
               effectiveScale,
               effectiveAngle,
               hasEmbedded,
             );
-            for (const seg of segments) {
-              objects.push(createLine(transformOcsPoints(seg, hatchMatrix), lineMaterial));
+
+            // Transform flat segment vertices and build LineSegments
+            if (segmentVertices.length >= 6) {
+              if (hatchMatrix) {
+                const v = new THREE.Vector3();
+                for (let i = 0; i < segmentVertices.length; i += 3) {
+                  v.set(segmentVertices[i], segmentVertices[i + 1], segmentVertices[i + 2]);
+                  v.applyMatrix4(hatchMatrix);
+                  segmentVertices[i] = v.x;
+                  segmentVertices[i + 1] = v.y;
+                  segmentVertices[i + 2] = v.z;
+                }
+              }
+              const geo = new THREE.BufferGeometry();
+              geo.setAttribute("position", new THREE.Float32BufferAttribute(segmentVertices, 3));
+              objects.push(new THREE.LineSegments(geo, lineMaterial));
             }
-            if (dots.length > 0) {
-              const dotPositions = new Float32Array(dots.length * 3);
-              for (let i = 0; i < dots.length; i++) {
-                const d = hatchMatrix ? dots[i].clone().applyMatrix4(hatchMatrix) : dots[i];
-                dotPositions[i * 3] = d.x;
-                dotPositions[i * 3 + 1] = d.y;
-                dotPositions[i * 3 + 2] = d.z;
+
+            if (dotPositions.length >= 3) {
+              if (hatchMatrix) {
+                const v = new THREE.Vector3();
+                for (let i = 0; i < dotPositions.length; i += 3) {
+                  v.set(dotPositions[i], dotPositions[i + 1], dotPositions[i + 2]);
+                  v.applyMatrix4(hatchMatrix);
+                  dotPositions[i] = v.x;
+                  dotPositions[i + 1] = v.y;
+                  dotPositions[i + 2] = v.z;
+                }
               }
               const dotGeometry = new THREE.BufferGeometry();
-              dotGeometry.setAttribute("position", new THREE.BufferAttribute(dotPositions, 3));
+              dotGeometry.setAttribute("position", new THREE.Float32BufferAttribute(dotPositions, 3));
               const pointMat = getPointsMaterial(entityColor, colorCtx.pointsMaterialCache);
               objects.push(new THREE.Points(dotGeometry, pointMat));
             }

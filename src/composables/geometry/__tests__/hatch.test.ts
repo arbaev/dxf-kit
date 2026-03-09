@@ -5,9 +5,10 @@ import {
   isPointInsideHatch,
   clipSegmentToPolygons,
   generateHatchPattern,
+  boundaryPathToPoint2DArray,
 } from "../hatch";
 import type { Point2D } from "../hatch";
-import type { HatchPatternLine } from "@/types/dxf";
+import type { HatchPatternLine, HatchBoundaryPath } from "@/types/dxf";
 
 // ── pointInPolygon2D ──────────────────────────────────────────────────
 
@@ -265,8 +266,8 @@ describe("generateHatchPattern", () => {
       { angle: 0, basePoint: { x: 0, y: 0 }, offset: { x: 0, y: 2 }, dashes: [] },
     ];
     const result = generateHatchPattern(lines, [square]);
-    expect(result.segments.length).toBeGreaterThan(0);
-    expect(result.dots).toHaveLength(0);
+    expect(result.segmentVertices.length).toBeGreaterThan(0);
+    expect(result.dotPositions).toHaveLength(0);
   });
 
   it("returns dots for dash=0 elements", () => {
@@ -275,8 +276,8 @@ describe("generateHatchPattern", () => {
       { angle: 0, basePoint: { x: 0, y: 0 }, offset: { x: 0, y: 2 }, dashes: [1, -1, 0] },
     ];
     const result = generateHatchPattern(lines, [square]);
-    expect(result.segments.length).toBeGreaterThan(0);
-    expect(result.dots.length).toBeGreaterThan(0);
+    expect(result.segmentVertices.length).toBeGreaterThan(0);
+    expect(result.dotPositions.length).toBeGreaterThan(0);
   });
 
   it("applies pattern scale to spacing and dashes", () => {
@@ -285,8 +286,8 @@ describe("generateHatchPattern", () => {
     ];
     const result1 = generateHatchPattern(lines, [square], 1);
     const result2 = generateHatchPattern(lines, [square], 2);
-    // With scale=2, spacing doubles, so half as many lines
-    expect(result2.segments.length).toBeLessThan(result1.segments.length);
+    // With scale=2, spacing doubles, so half as many lines → fewer segment vertices
+    expect(result2.segmentVertices.length).toBeLessThan(result1.segmentVertices.length);
   });
 
   it("applies pattern angle rotation", () => {
@@ -296,8 +297,8 @@ describe("generateHatchPattern", () => {
     const result0 = generateHatchPattern(lines, [square], 1, 0);
     const result45 = generateHatchPattern(lines, [square], 1, 45);
     // Both should produce segments but with different angles
-    expect(result0.segments.length).toBeGreaterThan(0);
-    expect(result45.segments.length).toBeGreaterThan(0);
+    expect(result0.segmentVertices.length).toBeGreaterThan(0);
+    expect(result45.segmentVertices.length).toBeGreaterThan(0);
   });
 
   it("keeps all segments within polygon bounds (ANSI31 scenario)", () => {
@@ -317,15 +318,13 @@ describe("generateHatchPattern", () => {
       },
     ];
     const result = generateHatchPattern(lines, [poly1]);
-    expect(result.segments.length).toBeGreaterThan(0);
-    // Verify all segments are within polygon bbox [0,10] × [0,10]
-    for (const seg of result.segments) {
-      for (const pt of seg) {
-        expect(pt.x).toBeGreaterThanOrEqual(-0.001);
-        expect(pt.x).toBeLessThanOrEqual(10.001);
-        expect(pt.y).toBeGreaterThanOrEqual(-0.001);
-        expect(pt.y).toBeLessThanOrEqual(10.001);
-      }
+    expect(result.segmentVertices.length).toBeGreaterThan(0);
+    // Verify all segment vertices are within polygon bbox [0,10] × [0,10]
+    for (let i = 0; i < result.segmentVertices.length; i += 3) {
+      expect(result.segmentVertices[i]).toBeGreaterThanOrEqual(-0.001);
+      expect(result.segmentVertices[i]).toBeLessThanOrEqual(10.001);
+      expect(result.segmentVertices[i + 1]).toBeGreaterThanOrEqual(-0.001);
+      expect(result.segmentVertices[i + 1]).toBeLessThanOrEqual(10.001);
     }
   });
 
@@ -352,15 +351,13 @@ describe("generateHatchPattern", () => {
       },
     ];
     const result = generateHatchPattern(lines, [poly2]);
-    expect(result.segments.length).toBeGreaterThan(0);
-    // Verify all segments are within polygon bbox [10,20] × [0,10]
-    for (const seg of result.segments) {
-      for (const pt of seg) {
-        expect(pt.x).toBeGreaterThanOrEqual(10 - 0.001);
-        expect(pt.x).toBeLessThanOrEqual(20.001);
-        expect(pt.y).toBeGreaterThanOrEqual(-0.001);
-        expect(pt.y).toBeLessThanOrEqual(10.001);
-      }
+    expect(result.segmentVertices.length).toBeGreaterThan(0);
+    // Verify all segment vertices are within polygon bbox [10,20] × [0,10]
+    for (let i = 0; i < result.segmentVertices.length; i += 3) {
+      expect(result.segmentVertices[i]).toBeGreaterThanOrEqual(10 - 0.001);
+      expect(result.segmentVertices[i]).toBeLessThanOrEqual(20.001);
+      expect(result.segmentVertices[i + 1]).toBeGreaterThanOrEqual(-0.001);
+      expect(result.segmentVertices[i + 1]).toBeLessThanOrEqual(10.001);
     }
   });
 
@@ -385,7 +382,50 @@ describe("generateHatchPattern", () => {
     const resultSingle = generateHatchPattern(lines, [outer]);
     const resultDonut = generateHatchPattern(lines, [outer, inner]);
 
-    // Donut should have more segments (each line split into 2) but shorter total
-    expect(resultDonut.segments.length).toBeGreaterThan(resultSingle.segments.length);
+    // Donut should have more segment vertex pairs (each line split into 2)
+    // segmentVertices / 6 = number of segment pairs
+    expect(resultDonut.segmentVertices.length / 6).toBeGreaterThan(resultSingle.segmentVertices.length / 6);
+  });
+});
+
+// ── boundaryPathToPoint2DArray ──────────────────────────────────────
+
+describe("boundaryPathToPoint2DArray", () => {
+  it("converts line edges to Point2D array", () => {
+    const bp: HatchBoundaryPath = {
+      edges: [
+        { type: "line" as const, start: { x: 0, y: 0 }, end: { x: 10, y: 0 } },
+        { type: "line" as const, start: { x: 10, y: 0 }, end: { x: 10, y: 10 } },
+        { type: "line" as const, start: { x: 10, y: 10 }, end: { x: 0, y: 0 } },
+      ],
+    };
+    const pts = boundaryPathToPoint2DArray(bp);
+    expect(pts.length).toBe(4); // start + 3 ends
+    expect(pts[0]).toEqual({ x: 0, y: 0 });
+    expect(pts[1]).toEqual({ x: 10, y: 0 });
+    expect(pts[2]).toEqual({ x: 10, y: 10 });
+    expect(pts[3]).toEqual({ x: 0, y: 0 });
+  });
+
+  it("converts polyline vertices to Point2D array", () => {
+    const bp: HatchBoundaryPath = {
+      polylineVertices: [
+        { x: 0, y: 0 },
+        { x: 5, y: 0 },
+        { x: 5, y: 5 },
+        { x: 0, y: 5 },
+        { x: 0, y: 0 },
+      ],
+    };
+    const pts = boundaryPathToPoint2DArray(bp);
+    expect(pts.length).toBe(5);
+    expect(pts[0]).toEqual({ x: 0, y: 0 });
+    expect(pts[4]).toEqual({ x: 0, y: 0 });
+  });
+
+  it("returns empty array for empty boundary path", () => {
+    const bp: HatchBoundaryPath = {};
+    const pts = boundaryPathToPoint2DArray(bp);
+    expect(pts).toHaveLength(0);
   });
 });
