@@ -32,11 +32,23 @@ interface TextMetrics {
   bounds: { xMin: number; xMax: number; yMin: number; yMax: number };
 }
 
+/** Cache for measureText results keyed by "fontFamily::text" */
+const measureTextCache = new Map<string, TextMetrics>();
+
+/** Clear measureText cache (call between file reloads to prevent unbounded growth) */
+export function clearMeasureTextCache(): void {
+  measureTextCache.clear();
+}
+
 /**
  * Measure text: collect glyphs, compute total advance and visual bounds.
  * All values are in font units (divide by unitsPerEm to normalize).
+ * Results are cached by font+text key.
  */
 function measureText(font: Font, text: string): TextMetrics {
+  const cacheKey = (font.names?.fontFamily?.en ?? "font") + "::" + text;
+  const cached = measureTextCache.get(cacheKey);
+  if (cached) return cached;
   const glyphs = font.stringToGlyphs(text);
   const glyphDataArr: (GlyphData | null)[] = [];
 
@@ -76,12 +88,14 @@ function measureText(font: Font, text: string): TextMetrics {
     yMax = font.ascender * invEm;
   }
 
-  return {
+  const result: TextMetrics = {
     glyphs,
     glyphData: glyphDataArr,
     totalAdvance,
     bounds: { xMin, xMax, yMin, yMax },
   };
+  measureTextCache.set(cacheKey, result);
+  return result;
 }
 
 /**
@@ -475,6 +489,7 @@ function mtextHAlignToEnum(hAlign: "left" | "center" | "right"): number {
 /**
  * Word wrap text to fit within a maximum width (in world units).
  * Splits by spaces; single words wider than maxWidth stay on their own line.
+ * Uses incremental advance accumulation O(n) instead of re-measuring the full line O(n²).
  */
 function wrapTextToWidth(font: Font, text: string, height: number, maxWidth: number): string[] {
   if (!text) return [text];
@@ -482,18 +497,22 @@ function wrapTextToWidth(font: Font, text: string, height: number, maxWidth: num
   if (words.length <= 1) return [text];
 
   const emScale = height / getCapHeightRatio(font);
+  const spaceAdv = measureText(font, " ").totalAdvance;
+
   const lines: string[] = [];
   let currentLine = words[0];
+  let lineAdv = measureText(font, words[0]).totalAdvance;
 
   for (let i = 1; i < words.length; i++) {
-    const testLine = currentLine + " " + words[i];
-    const m = measureText(font, testLine);
-    // totalAdvance is normalized (unitsPerEm=1), multiply by emScale for world units
-    if (m.totalAdvance * emScale > maxWidth && currentLine.length > 0) {
+    const wordAdv = measureText(font, words[i]).totalAdvance;
+    const testAdv = lineAdv + spaceAdv + wordAdv;
+    if (testAdv * emScale > maxWidth && currentLine.length > 0) {
       lines.push(currentLine);
       currentLine = words[i];
+      lineAdv = wordAdv;
     } else {
-      currentLine = testLine;
+      currentLine += " " + words[i];
+      lineAdv = testAdv;
     }
   }
   lines.push(currentLine);

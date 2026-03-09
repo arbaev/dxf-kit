@@ -12,22 +12,37 @@ const SHX_SERIF = [
   "romans", "romanc", "romand", "romant", "scripts", "scriptc",
 ];
 
+/** Cache for classifyFont results */
+const classifyCache = new Map<string, "sans" | "serif">();
+
 /**
  * Classify a font name as "sans" or "serif".
  * Matches known serif patterns in TrueType font names and SHX font names.
+ * Results are cached by font name.
  */
 export function classifyFont(fontName?: string): "sans" | "serif" {
   if (!fontName) return "sans";
+
+  const cached = classifyCache.get(fontName);
+  if (cached) return cached;
+
   const lower = fontName.toLowerCase().replace(/\.shx$|\.ttf$|\.otf$/i, "");
 
   // SHX exact match
-  if (SHX_SERIF.includes(lower)) return "serif";
+  if (SHX_SERIF.includes(lower)) {
+    classifyCache.set(fontName, "serif");
+    return "serif";
+  }
 
   // Substring match for TrueType font names
   for (const pattern of SERIF_PATTERNS) {
-    if (lower.includes(pattern)) return "serif";
+    if (lower.includes(pattern)) {
+      classifyCache.set(fontName, "serif");
+      return "serif";
+    }
   }
 
+  classifyCache.set(fontName, "sans");
   return "sans";
 }
 

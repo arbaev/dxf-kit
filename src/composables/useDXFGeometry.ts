@@ -99,6 +99,7 @@ import {
 import { resolveEntityFont, classifyFont } from "./geometry/fontClassifier";
 import { loadSerifFont } from "./geometry/fontManager";
 import { clearGlyphCache } from "./geometry/glyphCache";
+import { clearMeasureTextCache } from "./geometry/vectorTextBuilder";
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -2243,8 +2244,9 @@ export async function createThreeObjectsFromDXF(
   warnings?: string;
   unsupportedEntities?: string[];
 }> {
-  // Clear glyph cache to prevent unbounded memory growth across reloads
+  // Clear caches to prevent unbounded memory growth across reloads
   clearGlyphCache();
+  clearMeasureTextCache();
 
   const tStart = performance.now();
   const group = new THREE.Group();
