@@ -86,7 +86,6 @@ export async function createThreeObjectsFromDXF(
   const darkTheme = options?.darkTheme;
   const font = options?.font;
 
-  const tStart = performance.now();
   const group = new THREE.Group();
 
   if (!dxf.entities || dxf.entities.length === 0) {
@@ -220,7 +219,6 @@ export async function createThreeObjectsFromDXF(
   const yieldState: YieldState = { lastYield: performance.now(), signal };
 
   // Pre-pass: count INSERT usage and build templates for frequently-used blocks
-  let tTemplates = performance.now();
   const blockRefCounts = new Map<string, number>();
   for (const entity of dxf.entities) {
     if (entity.type === "INSERT" && !entity.inPaperSpace && isInsertEntity(entity)) {
@@ -272,11 +270,6 @@ export async function createThreeObjectsFromDXF(
   for (const [name, template] of blockTemplates) {
     sharedBlockGeos.set(name, buildSharedBlockGeo(template));
   }
-  console.log(`[DXF]   Templates: ${blockTemplates.size} blocks, ${sharedBlockGeos.size} shared (${Math.round(performance.now() - tTemplates)}ms)`);
-
-  const tEntities = performance.now();
-  const typeTimers = new Map<string, number>();
-  const typeCounts = new Map<string, number>();
   for (let index = 0; index < dxf.entities.length; index++) {
     if (signal?.aborted) {
       colorCtx.materials.disposeAll();
@@ -292,7 +285,6 @@ export async function createThreeObjectsFromDXF(
       yieldState.lastYield = performance.now();
     }
 
-    const tEntity = performance.now();
     try {
       // Skip paper space entities -- they belong to layouts, not model space
       if (entity.inPaperSpace) continue;
@@ -349,16 +341,9 @@ export async function createThreeObjectsFromDXF(
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
       errors.push(`Entity ${index} (${entity.type || "unknown type"}): ${errorMsg}`);
-    } finally {
-      const t = entity.type || "UNKNOWN";
-      typeTimers.set(t, (typeTimers.get(t) ?? 0) + (performance.now() - tEntity));
-      typeCounts.set(t, (typeCounts.get(t) ?? 0) + 1);
     }
   }
 
-  console.log(`[DXF]   Entities: ${Math.round(performance.now() - tEntities)}ms`);
-  const sortedTypes = [...typeTimers.entries()].sort((a, b) => b[1] - a[1]);
-  console.log(`[DXF]   By type: ${sortedTypes.slice(0, 8).map(([t, ms]) => `${t}: ${Math.round(ms)}ms (${typeCounts.get(t) ?? 0})`).join(", ")}`);
   onProgress?.(1);
 
   if (signal?.aborted) {
@@ -367,20 +352,10 @@ export async function createThreeObjectsFromDXF(
   }
 
   // Flush merged geometry into Three.js objects
-  const tFlush = performance.now();
   const mergedObjects = collector.flush(colorCtx.materials);
   for (const obj of mergedObjects) {
     group.add(obj);
   }
-  // Count merged objects by type
-  let lineCount = 0, meshCount = 0, ptsCount = 0;
-  for (const obj of mergedObjects) {
-    if (obj instanceof THREE.LineSegments) lineCount++;
-    else if (obj instanceof THREE.Mesh) meshCount++;
-    else if (obj instanceof THREE.Points) ptsCount++;
-  }
-  console.log(`[DXF]   Flush: ${Math.round(performance.now() - tFlush)}ms -> ${lineCount} lines, ${meshCount} meshes, ${ptsCount} pts`);
-  console.log(`[DXF] Geometry total: ${Math.round(performance.now() - tStart)}ms (${dxf.entities.length} entities)`);
 
   const totalIssues = errors.length + unsupportedTypes.length;
   if (totalIssues > 0) {

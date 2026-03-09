@@ -233,41 +233,6 @@ export class GeometryCollector {
   flush(materials: MaterialCacheStore): THREE.Object3D[] {
     const objects: THREE.Object3D[] = [];
 
-    // Log buffer sizes for diagnostics
-    let totalFloats = 0;
-    for (const arr of this.lineSegments.values()) totalFloats += arr.length;
-    for (const arr of this.points.values()) totalFloats += arr.length;
-    for (const arr of this.linetypeDots.values()) totalFloats += arr.length;
-    for (const arr of this.meshVertices.values()) totalFloats += arr.length;
-    const totalMB = (totalFloats * 4 / 1048576).toFixed(1);
-    const totalVerts = Math.round(totalFloats / 3);
-    console.log(`[DXF]   Buffer totals: ${totalVerts} vertices (${totalMB} MB)`);
-
-    // Log per-category breakdown
-    const catSizes: string[] = [];
-    let linesTotal = 0;
-    for (const arr of this.lineSegments.values()) linesTotal += arr.length;
-    if (linesTotal) catSizes.push(`lines: ${Math.round(linesTotal / 3)} verts`);
-    let meshTotal = 0;
-    for (const arr of this.meshVertices.values()) meshTotal += arr.length;
-    if (meshTotal) catSizes.push(`mesh: ${Math.round(meshTotal / 3)} verts`);
-    let ptsTotal = 0;
-    for (const arr of this.points.values()) ptsTotal += arr.length;
-    if (ptsTotal) catSizes.push(`pts: ${Math.round(ptsTotal / 3)} verts`);
-    let dotsTotal = 0;
-    for (const arr of this.linetypeDots.values()) dotsTotal += arr.length;
-    if (dotsTotal) catSizes.push(`dots: ${Math.round(dotsTotal / 3)} verts`);
-    console.log(`[DXF]   Breakdown: ${catSizes.join(", ")}`);
-
-    // Log top 5 largest buffers by key
-    const allBufs: [string, string, number][] = [];
-    for (const [k, a] of this.lineSegments) allBufs.push(["line", k, a.length / 3]);
-    for (const [k, a] of this.meshVertices) allBufs.push(["mesh", k, a.length / 3]);
-    for (const [k, a] of this.points) allBufs.push(["pts", k, a.length / 3]);
-    for (const [k, a] of this.linetypeDots) allBufs.push(["dots", k, a.length / 3]);
-    allBufs.sort((a, b) => b[2] - a[2]);
-    console.log(`[DXF]   Top buffers: ${allBufs.slice(0, 5).map(([t, k, v]) => `${t}[${k}]: ${v}`).join(", ")}`);
-
     // Merged Meshes — rendered first (behind lines/points)
     for (const [key, vArr] of this.meshVertices) {
       const iArr = this.meshIndices.get(key);
