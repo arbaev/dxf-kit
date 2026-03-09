@@ -684,9 +684,17 @@ const collectEntity = (p: CollectEntityParams): boolean => {
 
     case "ELLIPSE": {
       if (isEllipseEntity(entity)) {
-        const matrix = buildOcsMatrix(entity.extrusionDirection);
-        const majorX = entity.majorAxisEndPoint.x;
-        const majorY = entity.majorAxisEndPoint.y;
+        // ELLIPSE center is in WCS — no OCS transform needed for position.
+        // The major axis direction vector is in OCS, so transform it to WCS
+        // for non-default extrusion (e.g. (0,0,-1) negates X, flipping arcs).
+        let majorX = entity.majorAxisEndPoint.x;
+        let majorY = entity.majorAxisEndPoint.y;
+        const ocsMat = buildOcsMatrix(entity.extrusionDirection);
+        if (ocsMat) {
+          const dir = new THREE.Vector3(majorX, majorY, 0).applyMatrix4(ocsMat);
+          majorX = dir.x;
+          majorY = dir.y;
+        }
         const majorLength = Math.sqrt(majorX * majorX + majorY * majorY);
         const minorLength = majorLength * entity.axisRatio;
         const rotation = Math.atan2(majorY, majorX);
@@ -723,7 +731,7 @@ const collectEntity = (p: CollectEntityParams): boolean => {
           points.push(new THREE.Vector3(worldX, worldY, entity.center.z || 0));
         }
 
-        addLineToCollector(collector, layer, entityColor, applyWorld(transformOcsPoints(points, matrix), worldMatrix), pattern);
+        addLineToCollector(collector, layer, entityColor, applyWorld(points, worldMatrix), pattern);
         return true;
       }
       return false;
@@ -1945,9 +1953,16 @@ const processEntity = (
 
     case "ELLIPSE": {
       if (isEllipseEntity(entity)) {
-        const matrix = buildOcsMatrix(entity.extrusionDirection);
-        const majorX = entity.majorAxisEndPoint.x;
-        const majorY = entity.majorAxisEndPoint.y;
+        // ELLIPSE center is in WCS — no OCS transform for position.
+        // Major axis direction is in OCS — transform for non-default extrusion.
+        let majorX = entity.majorAxisEndPoint.x;
+        let majorY = entity.majorAxisEndPoint.y;
+        const ocsMat = buildOcsMatrix(entity.extrusionDirection);
+        if (ocsMat) {
+          const dir = new THREE.Vector3(majorX, majorY, 0).applyMatrix4(ocsMat);
+          majorX = dir.x;
+          majorY = dir.y;
+        }
         const majorLength = Math.sqrt(majorX * majorX + majorY * majorY);
         const minorLength = majorLength * entity.axisRatio;
         const rotation = Math.atan2(majorY, majorX);
@@ -1984,7 +1999,7 @@ const processEntity = (
           points.push(new THREE.Vector3(worldX, worldY, entity.center.z || 0));
         }
 
-        return createLine(transformOcsPoints(points, matrix), lineMaterial, ltInfo?.pattern);
+        return createLine(points, lineMaterial, ltInfo?.pattern);
       }
       break;
     }
