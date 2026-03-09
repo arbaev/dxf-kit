@@ -8,11 +8,13 @@ import { useThreeScene, type ThreeJSOptions } from "./useThreeScene";
 import { useCamera } from "./useCamera";
 import { createThreeObjectsFromDXF } from "./createDXFScene";
 import { loadDefaultFont, loadFont } from "./geometry/fontManager";
+import type { MaterialCacheStore } from "./geometry/materialCache";
 import ParserWorker from "@/workers/parserWorker?worker&inline";
 
 /** Mutable internal state for the renderer composable. */
 interface RendererState {
   currentDXFGroup: Group | null;
+  currentMaterials: MaterialCacheStore | null;
   originOffset: THREE.Vector3;
   worker: Worker | null;
   workerFailed: boolean;
@@ -26,6 +28,7 @@ export function useDXFRenderer() {
 
   const state: RendererState = {
     currentDXFGroup: null,
+    currentMaterials: null,
     originOffset: new THREE.Vector3(),
     worker: null,
     workerFailed: false,
@@ -181,6 +184,7 @@ export function useDXFRenderer() {
     scene.add(result.group);
 
     state.currentDXFGroup = result.group;
+    state.currentMaterials = result.materials;
 
     let tCamera = performance.now();
     if (camera) {
@@ -249,6 +253,14 @@ export function useDXFRenderer() {
     render();
   };
 
+  const switchTheme = (darkTheme: boolean) => {
+    const scene = getScene();
+    if (!scene || !state.currentMaterials) return;
+    scene.background = new THREE.Color(darkTheme ? SCENE_BG_COLOR_DARK : SCENE_BG_COLOR);
+    state.currentMaterials.switchTheme(darkTheme);
+    render();
+  };
+
   const getOriginOffset = () => state.originOffset;
 
   const cleanup = () => {
@@ -261,6 +273,7 @@ export function useDXFRenderer() {
     cleanupScene(state.currentDXFGroup);
     // Reset all mutable state
     state.currentDXFGroup = null;
+    state.currentMaterials = null;
     state.originOffset = new THREE.Vector3();
     state.abortController = null;
     resetResizing();
@@ -279,6 +292,7 @@ export function useDXFRenderer() {
     handleResize,
     resetView,
     applyLayerVisibility,
+    switchTheme,
     cleanup,
     getCamera,
     getRenderer,

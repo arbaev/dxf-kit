@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import type { Font } from "opentype.js";
 import type { DxfLayer, DxfLineType, DxfStyle, DxfDimStyle } from "@/types/dxf";
-import type { MaterialCacheStore } from "./materialCache";
+import { MaterialCacheStore } from "./materialCache";
+import { ACI7_COLOR } from "@/utils/colorResolver";
 import { applyLinetypePattern, type PatternGeometry } from "@/utils/linetypeResolver";
 import {
   EPSILON,
@@ -17,7 +18,6 @@ import {
 export interface ColorContext {
   layers: Record<string, DxfLayer>;
   blockColor?: string;
-  darkTheme?: boolean;
 }
 
 /** Linetype resolution context */
@@ -70,42 +70,48 @@ export const degreesToRadians = (degrees: number): number =>
 
 export const getLineMaterial = (
   color: string,
-  cache: Map<string, THREE.LineBasicMaterial>,
+  store: MaterialCacheStore,
 ): THREE.LineBasicMaterial => {
-  let mat = cache.get(color);
+  let mat = store.line.get(color);
   if (!mat) {
-    mat = new THREE.LineBasicMaterial({ color, depthTest: false, depthWrite: false });
-    cache.set(color, mat);
+    const resolved = color === ACI7_COLOR ? store.resolveColor(color) : color;
+    mat = new THREE.LineBasicMaterial({ color: resolved, depthTest: false, depthWrite: false });
+    store.line.set(color, mat);
+    if (color === ACI7_COLOR) store.themeMaterials.add(mat);
   }
   return mat;
 };
 
 export const getMeshMaterial = (
   color: string,
-  cache: Map<string, THREE.MeshBasicMaterial>,
+  store: MaterialCacheStore,
 ): THREE.MeshBasicMaterial => {
-  let mat = cache.get(color);
+  let mat = store.mesh.get(color);
   if (!mat) {
-    mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
-    cache.set(color, mat);
+    const resolved = color === ACI7_COLOR ? store.resolveColor(color) : color;
+    mat = new THREE.MeshBasicMaterial({ color: resolved, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
+    store.mesh.set(color, mat);
+    if (color === ACI7_COLOR) store.themeMaterials.add(mat);
   }
   return mat;
 };
 
 export const getPointsMaterial = (
   color: string,
-  cache: Map<string, THREE.PointsMaterial>,
+  store: MaterialCacheStore,
 ): THREE.PointsMaterial => {
-  let mat = cache.get(color);
+  let mat = store.points.get(color);
   if (!mat) {
+    const resolved = color === ACI7_COLOR ? store.resolveColor(color) : color;
     mat = new THREE.PointsMaterial({
-      color,
+      color: resolved,
       size: POINT_MARKER_SIZE,
       sizeAttenuation: false,
       depthTest: false,
       depthWrite: false,
     });
-    cache.set(color, mat);
+    store.points.set(color, mat);
+    if (color === ACI7_COLOR) store.themeMaterials.add(mat);
   }
   return mat;
 };

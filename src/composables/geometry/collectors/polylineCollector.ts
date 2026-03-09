@@ -246,7 +246,7 @@ export function collectPolyline(p: CollectEntityParams): boolean {
 
   if (!isPolylineEntity(entity) || entity.vertices.length <= 1) return false;
 
-  const entityColor = overrideColor ?? resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const entityColor = overrideColor ?? resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
   const ltInfo = resolveEntityLinetype(
     entity, colorCtx.layers, colorCtx.lineTypes,
     colorCtx.globalLtScale, colorCtx.blockLineType, colorCtx.headerLtScale,

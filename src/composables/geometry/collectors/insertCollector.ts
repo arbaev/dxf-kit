@@ -78,7 +78,7 @@ function renderAttribs(
     const text = attrib.text;
     if (!text) continue;
 
-    const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+    const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor);
     const textHeight = attrib.textHeight || colorCtx.defaultTextHeight;
 
     const hasJustification =
@@ -169,7 +169,7 @@ export async function collectInsertEntity(
   const rowSpacing = insertEntity.rowSpacing ?? 0;
 
   // Block color context for ByBlock inheritance (shared across all array instances)
-  const insertColor = resolveEntityColor(insertEntity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const insertColor = resolveEntityColor(insertEntity, colorCtx.layers, colorCtx.blockColor);
   const blockColorCtx: RenderContext = {
     ...colorCtx,
     blockColor: insertColor,

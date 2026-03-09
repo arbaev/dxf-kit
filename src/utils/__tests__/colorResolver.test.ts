@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rgbNumberToHex, resolveEntityColor } from "@/utils/colorResolver";
-import { DEFAULT_ENTITY_COLOR } from "@/constants";
+import { rgbNumberToHex, resolveEntityColor, ACI7_COLOR, resolveAci7Hex } from "@/utils/colorResolver";
 import type { DxfEntity, DxfLayer } from "@/types/dxf";
 
 // Helper to create a minimal DxfEntity for testing color resolution.
@@ -52,6 +51,31 @@ describe("rgbNumberToHex", () => {
   });
 });
 
+// ── resolveAci7Hex ─────────────────────────────────────────────────────
+
+describe("resolveAci7Hex", () => {
+  it("returns black on light theme", () => {
+    expect(resolveAci7Hex(false)).toBe("#000000");
+  });
+
+  it("returns white on dark theme", () => {
+    expect(resolveAci7Hex(true)).toBe("#ffffff");
+  });
+
+  it("returns black when darkTheme is undefined", () => {
+    expect(resolveAci7Hex(undefined)).toBe("#000000");
+  });
+});
+
+// ── ACI7_COLOR sentinel ────────────────────────────────────────────────
+
+describe("ACI7_COLOR sentinel", () => {
+  it("is a non-empty string that is not a valid hex color", () => {
+    expect(ACI7_COLOR).toBeTruthy();
+    expect(ACI7_COLOR).not.toMatch(/^#[0-9a-f]{6}$/i);
+  });
+});
+
 // ── resolveEntityColor ─────────────────────────────────────────────────
 
 describe("resolveEntityColor", () => {
@@ -63,10 +87,10 @@ describe("resolveEntityColor", () => {
     expect(result).toBe("#abcdef");
   });
 
-  it("returns DEFAULT_ENTITY_COLOR when colorIndex is 0 (ByBlock) and no blockColor", () => {
+  it("returns ACI7_COLOR when colorIndex is 0 (ByBlock) and no blockColor", () => {
     const entity = makeEntity({ colorIndex: 0 });
     const result = resolveEntityColor(entity, {});
-    expect(result).toBe(DEFAULT_ENTITY_COLOR);
+    expect(result).toBe(ACI7_COLOR);
   });
 
   // -- ACI color (1-255) --
@@ -89,16 +113,16 @@ describe("resolveEntityColor", () => {
     expect(result).toBe("#00ff00");
   });
 
-  it("returns black for colorIndex=7 (white in ACI, rendered as black on light background)", () => {
+  it("returns ACI7_COLOR for colorIndex=7 (theme-dependent sentinel)", () => {
     const entity = makeEntity({ colorIndex: 7 });
     const result = resolveEntityColor(entity, {});
-    expect(result).toBe("#000000");
+    expect(result).toBe(ACI7_COLOR);
   });
 
-  it("returns black for colorIndex=255 (same rule as ACI 7)", () => {
+  it("returns ACI7_COLOR for colorIndex=255 (same rule as ACI 7)", () => {
     const entity = makeEntity({ colorIndex: 255 });
     const result = resolveEntityColor(entity, {});
-    expect(result).toBe("#000000");
+    expect(result).toBe(ACI7_COLOR);
   });
 
   // -- ByLayer (colorIndex=256, undefined, or out of range) --
@@ -110,11 +134,11 @@ describe("resolveEntityColor", () => {
     expect(result).toBe("#ff0000");
   });
 
-  it("returns black when ByLayer and layer colorIndex is 7", () => {
+  it("returns ACI7_COLOR when ByLayer and layer colorIndex is 7", () => {
     const layers = makeLayer("Default", { colorIndex: 7, color: 0xFFFFFF });
     const entity = makeEntity({ colorIndex: 256, layer: "Default" });
     const result = resolveEntityColor(entity, layers);
-    expect(result).toBe("#000000");
+    expect(result).toBe(ACI7_COLOR);
   });
 
   it("resolves ACI color from layer when colorIndex is undefined and layer has colorIndex", () => {
@@ -125,67 +149,37 @@ describe("resolveEntityColor", () => {
     expect(result).toBe("#ff0000");
   });
 
-  it("returns DEFAULT_ENTITY_COLOR when no colorIndex and no matching layer", () => {
+  it("returns ACI7_COLOR when no colorIndex and no matching layer", () => {
     const entity = makeEntity({ layer: "NonExistent" });
     const result = resolveEntityColor(entity, {});
-    expect(result).toBe(DEFAULT_ENTITY_COLOR);
+    expect(result).toBe(ACI7_COLOR);
   });
 
-  it("returns DEFAULT_ENTITY_COLOR when entity has no colorIndex and no layer", () => {
+  it("returns ACI7_COLOR when entity has no colorIndex and no layer", () => {
     const entity = makeEntity({});
     const result = resolveEntityColor(entity, {});
-    expect(result).toBe(DEFAULT_ENTITY_COLOR);
+    expect(result).toBe(ACI7_COLOR);
   });
 
-  // -- darkTheme --
+  // -- ACI7_COLOR sentinel for ByLayer --
 
-  it("returns white for colorIndex=7 when darkTheme is true", () => {
-    const entity = makeEntity({ colorIndex: 7 });
-    const result = resolveEntityColor(entity, {}, undefined, true);
-    expect(result).toBe("#ffffff");
-  });
-
-  it("returns black for colorIndex=7 when darkTheme is false (backward compat)", () => {
-    const entity = makeEntity({ colorIndex: 7 });
-    const result = resolveEntityColor(entity, {}, undefined, false);
-    expect(result).toBe("#000000");
-  });
-
-  it("returns black for colorIndex=7 when darkTheme is undefined (backward compat)", () => {
-    const entity = makeEntity({ colorIndex: 7 });
-    const result = resolveEntityColor(entity, {}, undefined, undefined);
-    expect(result).toBe("#000000");
-  });
-
-  it("returns white for colorIndex=255 when darkTheme is true", () => {
-    const entity = makeEntity({ colorIndex: 255 });
-    const result = resolveEntityColor(entity, {}, undefined, true);
-    expect(result).toBe("#ffffff");
-  });
-
-  it("returns white for ByLayer with layer colorIndex=7 when darkTheme is true", () => {
+  it("returns ACI7_COLOR for ByLayer with layer colorIndex=7", () => {
     const layers = makeLayer("Default", { colorIndex: 7, color: 0xFFFFFF });
     const entity = makeEntity({ colorIndex: 256, layer: "Default" });
-    const result = resolveEntityColor(entity, layers, undefined, true);
-    expect(result).toBe("#ffffff");
+    const result = resolveEntityColor(entity, layers);
+    expect(result).toBe(ACI7_COLOR);
   });
 
-  it("returns white for ByLayer with ACI-only layer colorIndex=7 when darkTheme is true", () => {
+  it("returns ACI7_COLOR for ByLayer with ACI-only layer colorIndex=7", () => {
     const layers = makeLayer("Default", { colorIndex: 7, color: 0 });
     const entity = makeEntity({ layer: "Default" });
-    const result = resolveEntityColor(entity, layers, undefined, true);
-    expect(result).toBe("#ffffff");
+    const result = resolveEntityColor(entity, layers);
+    expect(result).toBe(ACI7_COLOR);
   });
 
-  it("returns white default color for ByBlock without blockColor when darkTheme is true", () => {
+  it("returns ACI7_COLOR for ByBlock without blockColor", () => {
     const entity = makeEntity({ colorIndex: 0 });
-    const result = resolveEntityColor(entity, {}, undefined, true);
-    expect(result).toBe("#ffffff");
-  });
-
-  it("returns white default color when no colorIndex and no layer when darkTheme is true", () => {
-    const entity = makeEntity({});
-    const result = resolveEntityColor(entity, {}, undefined, true);
-    expect(result).toBe("#ffffff");
+    const result = resolveEntityColor(entity, {});
+    expect(result).toBe(ACI7_COLOR);
   });
 });

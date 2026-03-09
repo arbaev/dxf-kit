@@ -73,6 +73,7 @@ export async function createThreeObjectsFromDXF(
   options?: CreateDXFSceneOptions,
 ): Promise<{
   group: THREE.Group;
+  materials: MaterialCacheStore;
   warnings?: string;
   unsupportedEntities?: string[];
 }> {
@@ -90,7 +91,7 @@ export async function createThreeObjectsFromDXF(
 
   if (!dxf.entities || dxf.entities.length === 0) {
     console.warn("DXF does not contain entities!");
-    return { group };
+    return { group, materials: new MaterialCacheStore() };
   }
 
   const layers: Record<string, DxfLayer> = {};
@@ -181,13 +182,15 @@ export async function createThreeObjectsFromDXF(
     }
   }
 
+  const materials = new MaterialCacheStore();
+  materials.darkTheme = darkTheme ?? false;
+
   const colorCtx: RenderContext = {
     layers,
-    materials: new MaterialCacheStore(),
+    materials,
     lineTypes,
     globalLtScale,
     headerLtScale,
-    darkTheme,
     font,
     serifFont: loadedSerifFont,
     styles,
@@ -277,7 +280,7 @@ export async function createThreeObjectsFromDXF(
   for (let index = 0; index < dxf.entities.length; index++) {
     if (signal?.aborted) {
       colorCtx.materials.disposeAll();
-      return { group };
+      return { group, materials };
     }
 
     const entity = dxf.entities[index];
@@ -360,7 +363,7 @@ export async function createThreeObjectsFromDXF(
 
   if (signal?.aborted) {
     colorCtx.materials.disposeAll();
-    return { group };
+    return { group, materials };
   }
 
   // Flush merged geometry into Three.js objects
@@ -399,10 +402,11 @@ export async function createThreeObjectsFromDXF(
 
     return {
       group,
+      materials,
       warnings: errorSummary,
       unsupportedEntities: unsupportedTypes.length > 0 ? unsupportedTypes : undefined,
     };
   }
 
-  return { group };
+  return { group, materials };
 }

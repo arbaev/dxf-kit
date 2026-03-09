@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { getLineMaterial, getMeshMaterial, getPointsMaterial } from "./primitives";
-import type { MaterialCacheStore } from "./materialCache";
+import { MaterialCacheStore } from "./materialCache";
+import { ACI7_COLOR } from "@/utils/colorResolver";
 import { LINETYPE_DOT_SIZE } from "@/constants";
 
 // ─── Growable typed arrays ──────────────────────────────────────────
@@ -272,7 +273,7 @@ export class GeometryCollector {
       const iArr = this.meshIndices.get(key);
       if (!iArr || vArr.length < 9 || iArr.length < 3) continue;
       const [layer, color] = parseKey(key);
-      const mat = getMeshMaterial(color, materials.mesh);
+      const mat = getMeshMaterial(color, materials);
 
       // Split meshes by triangle: find split points in index array
       const totalVerts = vArr.length / 3;
@@ -306,7 +307,7 @@ export class GeometryCollector {
     for (const [key, arr] of this.lineSegments) {
       if (arr.length < 6) continue;
       const [layer, color] = parseKey(key);
-      const mat = getLineMaterial(color, materials.line);
+      const mat = getLineMaterial(color, materials);
       emitSplitBuffers(arr, layer, 3, objects, (posAttr, lyr) => {
         const geo = new THREE.BufferGeometry();
         geo.setAttribute("position", posAttr);
@@ -321,7 +322,7 @@ export class GeometryCollector {
     for (const [key, arr] of this.points) {
       if (arr.length < 3) continue;
       const [layer, color] = parseKey(key);
-      const mat = getPointsMaterial(color, materials.points);
+      const mat = getPointsMaterial(color, materials);
       emitSplitBuffers(arr, layer, 3, objects, (posAttr, lyr) => {
         const geo = new THREE.BufferGeometry();
         geo.setAttribute("position", posAttr);
@@ -339,14 +340,16 @@ export class GeometryCollector {
       const [layer, color] = parseKey(key);
       let mat = dotMatCache.get(color);
       if (!mat) {
+        const resolved = materials.resolveColor(color);
         mat = new THREE.PointsMaterial({
-          color,
+          color: resolved,
           size: LINETYPE_DOT_SIZE,
           sizeAttenuation: false,
           depthTest: false,
           depthWrite: false,
         });
         dotMatCache.set(color, mat);
+        if (color === ACI7_COLOR) materials.themeMaterials.add(mat);
       }
       emitSplitBuffers(arr, layer, 3, objects, (posAttr, lyr) => {
         const geo = new THREE.BufferGeometry();

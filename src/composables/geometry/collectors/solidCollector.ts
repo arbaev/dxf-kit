@@ -15,7 +15,7 @@ export function collectSolid(p: CollectEntityParams): boolean {
 
   if (!isSolidEntity(entity)) return false;
 
-  const entityColor = overrideColor ?? resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const entityColor = overrideColor ?? resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
 
   const matrix = buildOcsMatrix(entity.extrusionDirection);
   let pts: DxfVertex[] = entity.points;

@@ -25,7 +25,7 @@ export function collectTextOrMText(
   worldMatrix?: THREE.Matrix4,
 ): void {
   const font = resolveEntityFont(entity.textStyle, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
-  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
   const textContent = entity.text;
   if (!textContent) return;
 
@@ -161,7 +161,7 @@ export function collectAttdefEntity(
   const posCoord = entity.startPoint;
   if (!posCoord) return;
 
-  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
   const textHeight = entity.textHeight || colorCtx.defaultTextHeight;
   const ocsMatrix = buildOcsMatrix(entity.extrusionDirection);
   const pos = transformOcsPoint(

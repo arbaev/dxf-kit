@@ -44,7 +44,7 @@ export function collectFace(p: CollectEntityParams): boolean {
 
   if (!is3DFaceEntity(entity)) return false;
 
-  const entityColor = overrideColor ?? resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const entityColor = overrideColor ?? resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
 
   let pts: DxfVertex[] = entity.vertices;
   if (worldMatrix) {

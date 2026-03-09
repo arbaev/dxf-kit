@@ -17,7 +17,7 @@ export function collectMline(p: CollectEntityParams): boolean {
   const mline = entity as DxfMlineEntity;
   if (!mline.vertices?.length || mline.vertices.length <= 1 || mline.numElements <= 0) return false;
 
-  const entityColor = overrideColor ?? resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const entityColor = overrideColor ?? resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
   const ltInfo = resolveEntityLinetype(
     entity, colorCtx.layers, colorCtx.lineTypes,
     colorCtx.globalLtScale, colorCtx.blockLineType, colorCtx.headerLtScale,

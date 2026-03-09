@@ -10,6 +10,8 @@ export interface LayerState {
   locked: boolean;
   color: string;
   entityCount: number;
+  /** True when layer color is ACI 7/255 (theme-dependent) */
+  isAci7: boolean;
 }
 
 export function useLayers() {
@@ -22,10 +24,11 @@ export function useLayers() {
   ) => {
     const newLayers = new Map<string, LayerState>();
     for (const [name, layer] of Object.entries(dxfLayers)) {
+      const isAci7 = layer.colorIndex === 7 || layer.colorIndex === 255;
       let color = "#FFFFFF";
       if (layer.colorIndex >= 1 && layer.colorIndex <= 255) {
         // ACI 7 and 255 are white in the palette but rendered as black on light / white on dark
-        color = (layer.colorIndex === 7 || layer.colorIndex === 255)
+        color = isAci7
           ? (darkTheme ? "#ffffff" : "#000000")
           : rgbNumberToHex(ACI_PALETTE[layer.colorIndex]);
       }
@@ -37,6 +40,7 @@ export function useLayers() {
         locked: layer.locked ?? false,
         color,
         entityCount: entityLayerCounts[name] || 0,
+        isAci7,
       });
     }
 
@@ -51,6 +55,7 @@ export function useLayers() {
           locked: false,
           color: aci7Color,
           entityCount: count,
+          isAci7: true,
         });
       }
     }
@@ -87,6 +92,15 @@ export function useLayers() {
 
   const layerList = computed(() => Array.from(layers.value.values()));
 
+  const updateLayerThemeColors = (darkTheme: boolean) => {
+    const aci7Color = darkTheme ? "#ffffff" : "#000000";
+    for (const layer of layers.value.values()) {
+      if (layer.isAci7) {
+        layer.color = aci7Color;
+      }
+    }
+  };
+
   const clearLayers = () => {
     layers.value = new Map();
   };
@@ -99,6 +113,7 @@ export function useLayers() {
     toggleLayerVisibility,
     showAllLayers,
     hideAllLayers,
+    updateLayerThemeColors,
     clearLayers,
   };
 }

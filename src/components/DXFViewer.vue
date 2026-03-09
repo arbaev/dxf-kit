@@ -258,6 +258,7 @@ const {
   handleResize,
   resetView,
   applyLayerVisibility,
+  switchTheme,
   cleanup,
   getCamera,
   getRenderer,
@@ -345,6 +346,7 @@ const {
   toggleLayerVisibility,
   showAllLayers,
   hideAllLayers,
+  updateLayerThemeColors,
   clearLayers,
 } = useLayers();
 
@@ -500,13 +502,10 @@ watch(
 
 watch(
   () => props.darkTheme,
-  () => {
-    // Re-render with new theme colors (baked into materials)
-    if (lastLoadedDxf) {
-      loadDXFFromData(lastLoadedDxf);
-    } else if (props.dxfData && hasDXFData.value) {
-      loadDXFFromData(props.dxfData);
-    }
+  (newDark) => {
+    // Instant theme switch: update material colors + scene background without re-render
+    switchTheme(newDark);
+    updateLayerThemeColors(newDark);
   },
 );
 

@@ -118,7 +118,7 @@ export function collectPoint(p: CollectEntityParams): boolean {
 
   if (!isPointEntity(entity)) return false;
 
-  const entityColor = overrideColor ?? resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const entityColor = overrideColor ?? resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
 
   const matrix = buildOcsMatrix(entity.extrusionDirection);
   const pos = transformOcsPoint(

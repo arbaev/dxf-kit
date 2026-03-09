@@ -13,7 +13,7 @@ export { useOrbitControls } from "./composables/useOrbitControls";
 export { useLayers } from "./composables/useLayers";
 export { createThreeObjectsFromDXF, type CreateDXFSceneOptions } from "./composables/createDXFScene";
 
-export { resolveEntityColor, rgbNumberToHex } from "./utils/colorResolver";
+export { resolveEntityColor, rgbNumberToHex, ACI7_COLOR, resolveAci7Hex } from "./utils/colorResolver";
 
 export * from "./constants";
 

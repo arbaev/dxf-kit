@@ -39,7 +39,7 @@ export function collectDimensionEntity(
 ): void {
   if (!isDimensionEntity(entity)) return;
   const font = resolveEntityFont(entity.styleName, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
-  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
   const baseDimType = (entity.dimensionType ?? 0) & 0x0f;
   // Extract Matrix4 elements for text vertex transform inside block INSERTs
   const transform = worldMatrix ? Array.from(worldMatrix.elements) : undefined;
@@ -88,8 +88,11 @@ export function collectDimensionEntity(
 
   let result: THREE.Object3D[] | null = null;
 
+  // Resolve sentinel for Three.js material creation in dimension helpers
+  const resolvedColor = colorCtx.materials.resolveColor(entityColor);
+
   // Ordinate dimension (type 6 = Y-ordinate, type 7 = X-ordinate)
-  const dimParams = { entity, color: entityColor, font, collector, layer, transform, dv };
+  const dimParams = { entity, color: resolvedColor, font, collector, layer, transform, dv };
   if ((baseDimType & 0x0e) === 6) {
     result = createOrdinateDimension(dimParams);
   } else if (baseDimType === 2) {
@@ -120,7 +123,7 @@ export function collectDimensionEntity(
     const dimGroup = createDimensionGroup({
       point1: dimData.point1, point2: dimData.point2, anchorPoint: dimData.anchorPoint,
       textPos: dimData.textPos, textHeight: dimData.textHeight, isRadial: dimData.isRadial,
-      color: entityColor, angle: dimAngle, forceRotated: baseDimType === 0, dv,
+      color: resolvedColor, angle: dimAngle, forceRotated: baseDimType === 0, dv,
     });
     result = [dimGroup];
 
@@ -138,7 +141,8 @@ export function collectDimensionEntity(
     }
   }
 
-  // Decompose geometry objects (lines, arrows) into collector
+  // Decompose geometry objects (lines, arrows) into collector.
+  // Use entityColor (sentinel) for collector calls so theme-switching works.
   if (result) {
     for (const obj of result) {
       if (obj instanceof THREE.Group) {
@@ -149,8 +153,6 @@ export function collectDimensionEntity(
           if (!geo) return;
           const posAttr = geo.getAttribute("position") as THREE.BufferAttribute | undefined;
           if (!posAttr) return;
-          const mat = (child as THREE.Mesh).material as THREE.Material & { color?: THREE.Color };
-          const childColor = mat?.color ? "#" + mat.color.getHexString() : entityColor;
           const v = new THREE.Vector3();
 
           if (child instanceof THREE.LineSegments || child instanceof THREE.Line) {
@@ -159,7 +161,7 @@ export function collectDimensionEntity(
               v.fromBufferAttribute(posAttr, i).applyMatrix4(child.matrixWorld).applyMatrix4(matrix);
               const x1 = v.x, y1 = v.y, z1 = v.z;
               v.fromBufferAttribute(posAttr, i + 1).applyMatrix4(child.matrixWorld).applyMatrix4(matrix);
-              collector.addLineSegments(layer, childColor, [x1, y1, z1, v.x, v.y, v.z]);
+              collector.addLineSegments(layer, entityColor, [x1, y1, z1, v.x, v.y, v.z]);
             }
           } else if (child instanceof THREE.Mesh) {
             const count = posAttr.count;
@@ -173,7 +175,7 @@ export function collectDimensionEntity(
             if (indices.length === 0) {
               for (let i = 0; i < count; i++) indices.push(i);
             }
-            collector.addMesh(layer, childColor, positions, indices);
+            collector.addMesh(layer, entityColor, positions, indices);
           }
         });
       } else {
@@ -182,8 +184,6 @@ export function collectDimensionEntity(
         if (!geo) continue;
         const posAttr = geo.getAttribute("position") as THREE.BufferAttribute | undefined;
         if (!posAttr) continue;
-        const mat = (obj as THREE.Mesh).material as THREE.Material & { color?: THREE.Color };
-        const objColor = mat?.color ? "#" + mat.color.getHexString() : entityColor;
         const v = new THREE.Vector3();
 
         if (obj instanceof THREE.LineSegments || obj instanceof THREE.Line) {
@@ -192,7 +192,7 @@ export function collectDimensionEntity(
             v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
             const x1 = v.x, y1 = v.y, z1 = v.z;
             v.fromBufferAttribute(posAttr, i + 1).applyMatrix4(matrix);
-            collector.addLineSegments(layer, objColor, [x1, y1, z1, v.x, v.y, v.z]);
+            collector.addLineSegments(layer, entityColor, [x1, y1, z1, v.x, v.y, v.z]);
           }
         } else if (obj instanceof THREE.Mesh) {
           const count = posAttr.count;
@@ -206,7 +206,7 @@ export function collectDimensionEntity(
           if (indices.length === 0) {
             for (let i = 0; i < count; i++) indices.push(i);
           }
-          collector.addMesh(layer, objColor, positions, indices);
+          collector.addMesh(layer, entityColor, positions, indices);
         }
       }
     }

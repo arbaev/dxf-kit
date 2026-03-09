@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { DxfEntity } from "@/types/dxf";
-import { resolveEntityColor } from "@/utils/colorResolver";
+import { resolveEntityColor, ACI7_COLOR } from "@/utils/colorResolver";
 import { GeometryCollector } from "./mergeCollectors";
 import { type RenderContext, getLineMaterial, getMeshMaterial, getPointsMaterial } from "./primitives";
 import { LINETYPE_DOT_SIZE } from "@/constants";
@@ -119,7 +119,7 @@ export function buildBlockTemplate(
       overrideColor = BYBLOCK_COLOR;
     } else {
       // Resolve fixed color (ByLayer on named layer, or explicit ACI/trueColor)
-      overrideColor = resolveEntityColor(entity, colorCtx.layers, undefined, colorCtx.darkTheme);
+      overrideColor = resolveEntityColor(entity, colorCtx.layers, undefined);
     }
 
     // Collect geometry in local coordinates (no worldMatrix)
@@ -283,7 +283,7 @@ export function addSharedBlockInstance(
     const color = entry.rawColor === BYBLOCK_COLOR ? insertColor : entry.rawColor;
 
     if (entry.lineGeo) {
-      const mat = getLineMaterial(color, colorCtx.materials.line);
+      const mat = getLineMaterial(color, colorCtx.materials);
       const obj = new THREE.LineSegments(entry.lineGeo, mat);
       obj.matrixAutoUpdate = false;
       obj.matrix.copy(worldMatrix);
@@ -293,7 +293,7 @@ export function addSharedBlockInstance(
     }
 
     if (entry.meshGeo) {
-      const mat = getMeshMaterial(color, colorCtx.materials.mesh);
+      const mat = getMeshMaterial(color, colorCtx.materials);
       const obj = new THREE.Mesh(entry.meshGeo, mat);
       obj.matrixAutoUpdate = false;
       obj.matrix.copy(worldMatrix);
@@ -303,7 +303,7 @@ export function addSharedBlockInstance(
     }
 
     if (entry.pointsGeo) {
-      const mat = getPointsMaterial(color, colorCtx.materials.points);
+      const mat = getPointsMaterial(color, colorCtx.materials);
       const obj = new THREE.Points(entry.pointsGeo, mat);
       obj.matrixAutoUpdate = false;
       obj.matrix.copy(worldMatrix);
@@ -313,13 +313,15 @@ export function addSharedBlockInstance(
     }
 
     if (entry.dotsGeo) {
+      const resolved = colorCtx.materials.resolveColor(color);
       const mat = new THREE.PointsMaterial({
-        color,
+        color: resolved,
         size: LINETYPE_DOT_SIZE,
         sizeAttenuation: false,
         depthTest: false,
         depthWrite: false,
       });
+      if (color === ACI7_COLOR) colorCtx.materials.themeMaterials.add(mat);
       const obj = new THREE.Points(entry.dotsGeo, mat);
       obj.matrixAutoUpdate = false;
       obj.matrix.copy(worldMatrix);

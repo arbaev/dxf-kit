@@ -65,7 +65,7 @@ export function collectLeaderEntity(
 ): void {
   const styleName = isLeaderEntity(entity) ? entity.styleName : undefined;
   const font = resolveEntityFont(styleName, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
-  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor, colorCtx.darkTheme);
+  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
   const matrix = worldMatrix ?? new THREE.Matrix4();
   const v = new THREE.Vector3();
 
@@ -79,7 +79,7 @@ export function collectLeaderEntity(
   };
 
   const addArrowToCollector = (from: THREE.Vector3, to: THREE.Vector3, size: number) => {
-    const arrow = createArrow(from, to, size, getMeshMaterial(entityColor, colorCtx.materials.mesh));
+    const arrow = createArrow(from, to, size, getMeshMaterial(entityColor, colorCtx.materials));
     const geo = arrow.geometry as THREE.BufferGeometry;
     const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
     const count = posAttr.count;
@@ -137,7 +137,7 @@ export function collectLeaderEntity(
 
   const addTickToCollector = (point: THREE.Vector3, dimAngle: number) => {
     const tick = createTick(point, baseDv.tickSize || baseDv.arrowSize, dimAngle,
-      getLineMaterial(entityColor, colorCtx.materials.line));
+      getLineMaterial(entityColor, colorCtx.materials));
     const geo = tick.geometry as THREE.BufferGeometry;
     const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
     const verts: number[] = [];
