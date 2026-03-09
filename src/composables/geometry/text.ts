@@ -82,15 +82,33 @@ export const parseMTextContent = (rawText: string, defaultHeight?: number): MTex
     let lineItalic = currentItalic;
     let firstFontInLine = true;
 
-    // Brace scoping: strip formatting codes (\H, \f, \C) inside balanced
-    // brace groups {…} so they don't modify persistent state.
-    // Keeps text content and \S fractions intact.
-    clean = clean.replace(/\{([^{}]*)\}/g, (_, inner: string) =>
-      inner
-        .replace(/\\H[\d.]+x?;/gi, "")
+    // Brace scoping: formatting codes inside {…} are scoped — they apply
+    // within the braces but don't persist to subsequent lines.
+    // \H inside braces: apply to this line's height only when ALL text is
+    // inside brace groups (e.g. {\H0.75x;A4.2}). When there's content
+    // outside braces (e.g. {\H0.7x;text}rest), \H is stripped since our
+    // line-level model can't represent mixed heights within one line.
+    let bracedHeight: number | undefined;
+    const allContentInBraces = /^\s*(\{[^{}]*\}\s*)+$/.test(clean);
+    clean = clean.replace(/\{([^{}]*)\}/g, (_, inner: string) => {
+      // Extract \H from braces — apply scoped height without persisting
+      if (allContentInBraces) {
+        inner = inner.replace(/\\H([\d.]+)(x?);/gi, (__, val, suffix) => {
+          const v = parseFloat(val);
+          if (suffix === "x" || suffix === "X") {
+            bracedHeight = (currentHeight ?? defaultHeight ?? 1) * v;
+          } else {
+            bracedHeight = v;
+          }
+          return "";
+        });
+      } else {
+        inner = inner.replace(/\\H[\d.]+x?;/gi, "");
+      }
+      return inner
         .replace(/\\f[^|;]*\|?[^;]*;/g, "")
-        .replace(/\\[cC]\d+;/g, ""),
-    );
+        .replace(/\\[cC]\d+;/g, "");
+    });
 
     // Font: \fFontName|b1|i0|c0|p0; — extract font name, bold, italic
     // First \f in line determines the visible text style for this line,
@@ -180,7 +198,7 @@ export const parseMTextContent = (rawText: string, defaultHeight?: number): MTex
     lines.push({
       text: clean,
       color: currentColor,
-      height: currentHeight,
+      height: bracedHeight ?? currentHeight,
       bold: lineBold,
       italic: lineItalic,
       fontFamily: lineFont,

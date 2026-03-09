@@ -238,8 +238,23 @@ describe("parseMTextContent", () => {
     expect(result).toHaveLength(3);
     expect(result[0].height).toBeCloseTo(9); // 18 * 0.5
     expect(result[1].text).toBe("3/8rest"); // \S3#8; rendered as inline fraction
-    expect(result[1].height).toBeCloseTo(9); // \H0.7x inside braces stripped
+    expect(result[1].height).toBeCloseTo(9); // \H0.7x inside braces stripped (mixed content)
     expect(result[2].height).toBeCloseTo(9); // height unchanged
+  });
+
+  it("applies \\H inside braces when all content is braced (section marker)", () => {
+    // Section marker: {\H0.75x;A4.2} with base height 3.0
+    const result = parseMTextContent("{\\H0.75x;A4.2}", 3.0);
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toBe("A4.2");
+    expect(result[0].height).toBeCloseTo(2.25); // 3.0 * 0.75
+  });
+
+  it("applies absolute \\H inside braces when all content is braced", () => {
+    const result = parseMTextContent("{\\H1.5;Small text}", 5.0);
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toBe("Small text");
+    expect(result[0].height).toBeCloseTo(1.5); // absolute height
   });
 
   it("replaces \\~ (non-breaking space) with a regular space", () => {
