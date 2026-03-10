@@ -361,6 +361,9 @@ export function parseHatch(scanner: DxfScanner, curr: IGroup): IHatchEntity {
         boundaryPathsParsed++;
         continue;
       }
+      case 75:
+        entity.style = curr.value as number;
+        break;
       case 41:
         entity.patternScale = curr.value as number;
         break;

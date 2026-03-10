@@ -249,6 +249,7 @@ export interface DxfHatchEntity extends DxfEntityBase {
   patternLines?: HatchPatternLine[];
   patternScale?: number;  // code 41 -- pattern fill scale
   patternAngle?: number;  // code 52 -- pattern fill angle (degrees)
+  style?: number;         // code 75 -- 0=normal (even-odd), 1=outer, 2=ignore
   extrusionDirection?: DxfVertex;
 }
 

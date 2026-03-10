@@ -9,6 +9,9 @@ import {
   boundaryPathToPoint2DArray,
   addBoundaryPathToShapePath,
   buildSolidHatchShapes,
+  filterPolygonsByStyle,
+  hatchArcSweep,
+  hatchArcRadians,
 } from "../hatch";
 import type { Point2D } from "../hatch";
 import type { HatchPatternLine, HatchBoundaryPath } from "@/types/dxf";
@@ -640,5 +643,235 @@ describe("buildSolidHatchShapes - adjacent boundaries with shared vertices", () 
     expect(
       polygons.some(p => pointInPolygon2D(circleCenter.x, circleCenter.y, p)),
     ).toBe(false);
+  });
+});
+
+// ── hatchArcSweep ──────────────────────────────────────────────────────
+
+describe("hatchArcSweep", () => {
+  const deg = (d: number) => (d * Math.PI) / 180;
+
+  it("returns short CCW arc when ccw flag says CW but angles are close", () => {
+    // 349.95° → 351.37°, ccw=false: should be 1.42° (not 358.58° CW)
+    const sweep = hatchArcSweep(deg(349.95), deg(351.37), false);
+    expect(sweep).toBeCloseTo(deg(1.42), 3);
+  });
+
+  it("preserves CW direction for moderate arcs (< 350°) needed for connectivity", () => {
+    // 84.65° → 150.77°, ccw=false: CW 293.88° — needed for boundary connectivity
+    const sweep = hatchArcSweep(deg(84.65), deg(150.77), false);
+    expect(sweep).toBeCloseTo(deg(-293.88), 2);
+  });
+
+  it("returns correct sweep when ccw=true and end > start", () => {
+    // 43.33° → 136.67°, ccw=true: should be 93.34° CCW
+    const sweep = hatchArcSweep(deg(43.33), deg(136.67), true);
+    expect(sweep).toBeCloseTo(deg(93.34), 3);
+  });
+
+  it("returns full circle for sweep ≈ 360°", () => {
+    const sweep = hatchArcSweep(deg(0), deg(360), true);
+    expect(sweep).toBeCloseTo(2 * Math.PI, 5);
+  });
+
+  it("returns negative full circle for CW full circle", () => {
+    const sweep = hatchArcSweep(deg(0), deg(360), false);
+    expect(sweep).toBeCloseTo(-2 * Math.PI, 5);
+  });
+
+  it("handles angles crossing 0°/360° boundary", () => {
+    // 350° → 10°, ccw=true: should be 20° CCW
+    const sweep = hatchArcSweep(deg(350), deg(10), true);
+    expect(sweep).toBeCloseTo(deg(20), 3);
+  });
+
+  it("handles endAngle > 360° with CW direction", () => {
+    // 253.07° → 417.62°, ccw=false: CW 195.45° (respects ccw flag, < 350°)
+    const sweep = hatchArcSweep(deg(253.07), deg(417.62), false);
+    expect(sweep).toBeCloseTo(deg(-195.45), 2);
+  });
+
+  it("fixes near-full circle arcs (> 350°)", () => {
+    // 188.41° → 190.91°, ccw=false: CW would be 357.5° > 350° → fix to 2.5°
+    const sweep = hatchArcSweep(deg(188.41), deg(190.91), false);
+    expect(sweep).toBeCloseTo(deg(2.5), 3);
+  });
+
+  it("preserves 315° CW arc for boundary connectivity", () => {
+    // 270° → 315°, ccw=false: CW 315° — needed to connect through 90° point
+    const sweep = hatchArcSweep(deg(270), deg(315), false);
+    expect(sweep).toBeCloseTo(deg(-315), 2);
+  });
+});
+
+// ── hatchArcRadians ─────────────────────────────────────────────────────
+
+describe("hatchArcRadians", () => {
+  const deg = (d: number) => (d * Math.PI) / 180;
+
+  it("returns unchanged radians for CCW arcs", () => {
+    const [start, end] = hatchArcRadians(47.9, 90, true);
+    expect(start).toBeCloseTo(deg(47.9), 5);
+    expect(end).toBeCloseTo(deg(90), 5);
+  });
+
+  it("negates radians for CW arcs", () => {
+    const [start, end] = hatchArcRadians(348.8, 368.9, false);
+    expect(start).toBeCloseTo(deg(-348.8), 5);
+    expect(end).toBeCloseTo(deg(-368.9), 5);
+  });
+
+  it("combined with hatchArcSweep gives short CW arc", () => {
+    // Edge 4 from the bathroom hatch: 348.8° → 368.9°, ccw=false
+    // Without negation: hatchArcSweep gives -339.9° (wrong long arc)
+    // With negation: hatchArcSweep gives -20.1° (correct short arc)
+    const [start, end] = hatchArcRadians(348.8, 368.9, false);
+    const sweep = hatchArcSweep(start, end, false);
+    expect(sweep).toBeCloseTo(deg(-20.1), 1);
+  });
+
+  it("combined with hatchArcSweep gives correct CW 45° arc", () => {
+    // Edge 15: 270° → 315°, ccw=false → after negation gives -45° CW
+    const [start, end] = hatchArcRadians(270, 315, false);
+    const sweep = hatchArcSweep(start, end, false);
+    expect(sweep).toBeCloseTo(deg(-45), 1);
+  });
+
+  it("combined with hatchArcSweep gives correct CW 180° arc", () => {
+    // Edge 28: 360° → 540°, ccw=false → after negation gives -180° CW
+    const [start, end] = hatchArcRadians(360, 540, false);
+    const sweep = hatchArcSweep(start, end, false);
+    expect(sweep).toBeCloseTo(deg(-180), 1);
+  });
+});
+
+// ── CW arc boundary connectivity ────────────────────────────────────────
+
+describe("boundaryPathToPoint2DArray - CW arc connectivity", () => {
+  it("CW arc edge points connect to adjacent line edges", () => {
+    // A simple closed path: line → CW arc → line → line
+    // The CW arc uses DXF CW convention angles (negated internally).
+    // Arc center (0, 0), r=10, DXF angles 270° → 315°, ccw=false.
+    // After negation: math angles -270° (=90°) → -315° (=45°).
+    // Start at (0, 10), end at (7.07, 7.07).
+    const bp: HatchBoundaryPath = {
+      edges: [
+        { type: "line" as const, start: { x: 10, y: 10 }, end: { x: 0, y: 10 } },
+        {
+          type: "arc" as const,
+          center: { x: 0, y: 0 },
+          radius: 10,
+          startAngle: 270,
+          endAngle: 315,
+          ccw: false,
+        },
+        { type: "line" as const, start: { x: 7.07, y: 7.07 }, end: { x: 10, y: 10 } },
+      ],
+    };
+
+    const pts = boundaryPathToPoint2DArray(bp);
+    expect(pts.length).toBeGreaterThan(4);
+
+    // First point: line start (10, 10)
+    expect(pts[0].x).toBeCloseTo(10, 0);
+    expect(pts[0].y).toBeCloseTo(10, 0);
+
+    // Second point: line end / arc start (0, 10) — at math angle 90°
+    expect(pts[1].x).toBeCloseTo(0, 0);
+    expect(pts[1].y).toBeCloseTo(10, 0);
+
+    // Last 2 points: line start and end after arc
+    const last = pts[pts.length - 1];
+    expect(last.x).toBeCloseTo(10, 0);
+    expect(last.y).toBeCloseTo(10, 0);
+
+    // Arc end point at math angle 45° = (7.07, 7.07)
+    const arcEnd = pts[pts.length - 2]; // last arc point, before 1 line endpoint
+    expect(arcEnd.x).toBeCloseTo(7.07, 0);
+    expect(arcEnd.y).toBeCloseTo(7.07, 0);
+
+    // No large jumps between consecutive points
+    for (let i = 1; i < pts.length; i++) {
+      const dx = pts[i].x - pts[i - 1].x;
+      const dy = pts[i].y - pts[i - 1].y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      expect(dist).toBeLessThan(12); // Lines are up to ~10 units, arc segments smaller
+    }
+  });
+
+  it("CCW arc edge points remain correct (no negation applied)", () => {
+    // CCW arc from 0° to 90°: starts at (10, 0), ends at (0, 10)
+    const bp: HatchBoundaryPath = {
+      edges: [
+        { type: "line" as const, start: { x: 0, y: 0 }, end: { x: 10, y: 0 } },
+        {
+          type: "arc" as const,
+          center: { x: 0, y: 0 },
+          radius: 10,
+          startAngle: 0,
+          endAngle: 90,
+          ccw: true,
+        },
+        { type: "line" as const, start: { x: 0, y: 10 }, end: { x: 0, y: 0 } },
+      ],
+    };
+
+    const pts = boundaryPathToPoint2DArray(bp);
+
+    // First points: (0,0), (10,0), then arc from (10,0) to (0,10)
+    expect(pts[0].x).toBeCloseTo(0, 0);
+    expect(pts[0].y).toBeCloseTo(0, 0);
+    expect(pts[1].x).toBeCloseTo(10, 0);
+    expect(pts[1].y).toBeCloseTo(0, 0);
+
+    // Arc start at 0°: (10, 0)
+    expect(pts[2].x).toBeCloseTo(10, 0);
+    expect(pts[2].y).toBeCloseTo(0, 0);
+
+    // Last point: line end (0, 0)
+    const last = pts[pts.length - 1];
+    expect(last.x).toBeCloseTo(0, 0);
+    expect(last.y).toBeCloseTo(0, 0);
+  });
+});
+
+// ── filterPolygonsByStyle ───────────────────────────────────────────
+
+describe("filterPolygonsByStyle", () => {
+  // 3-level nesting: outer 30x30, middle 20x20, inner 10x10
+  const outer: Point2D[] = [
+    { x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 30 }, { x: 0, y: 30 },
+  ];
+  const middle: Point2D[] = [
+    { x: 5, y: 5 }, { x: 25, y: 5 }, { x: 25, y: 25 }, { x: 5, y: 25 },
+  ];
+  const inner: Point2D[] = [
+    { x: 10, y: 10 }, { x: 20, y: 10 }, { x: 20, y: 20 }, { x: 10, y: 20 },
+  ];
+
+  it("style 0 (normal) returns all polygons unchanged", () => {
+    const result = filterPolygonsByStyle([outer, middle, inner], 0);
+    expect(result).toHaveLength(3);
+  });
+
+  it("style 1 (outer) keeps only level 0 and level 1, drops level 2+", () => {
+    const result = filterPolygonsByStyle([outer, middle, inner], 1);
+    expect(result).toHaveLength(2);
+    // Center point (15,15) is inside outer, inside middle (hole) → even-odd = outside
+    expect(isPointInsideHatch(15, 15, result)).toBe(false);
+    // Corner (2,2) is inside outer only → inside
+    expect(isPointInsideHatch(2, 2, result)).toBe(true);
+  });
+
+  it("style 2 (ignore) keeps only level 0, drops all inner boundaries", () => {
+    const result = filterPolygonsByStyle([outer, middle, inner], 2);
+    expect(result).toHaveLength(1);
+    // Center (15,15) is inside outer only → inside (no holes)
+    expect(isPointInsideHatch(15, 15, result)).toBe(true);
+  });
+
+  it("returns all polygons when only 1 boundary", () => {
+    expect(filterPolygonsByStyle([outer], 1)).toHaveLength(1);
+    expect(filterPolygonsByStyle([outer], 2)).toHaveLength(1);
   });
 });

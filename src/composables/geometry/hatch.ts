@@ -10,11 +10,52 @@ import {
 import { createBulgeArc } from "./primitives";
 import { generateEllipsePoints } from "./curvePoints";
 
+/**
+ * Convert hatch arc edge angles from DXF degrees to standard math radians.
+ * CW arcs (ccw=false) in DXF store angles in clockwise-positive convention;
+ * negate them to convert to the standard counterclockwise-positive convention.
+ * This ensures arc start/end points connect properly to adjacent edges.
+ */
+export const hatchArcRadians = (startDeg: number, endDeg: number, ccw: boolean): [number, number] => {
+  const toRad = Math.PI / 180;
+  if (ccw) return [startDeg * toRad, endDeg * toRad];
+  return [-startDeg * toRad, -endDeg * toRad];
+};
+
+/**
+ * Compute arc/ellipse sweep for hatch boundary edges.
+ * Applies the ccw flag to determine CW/CCW direction, then fixes
+ * near-full circles (> 350°) that result from DXF exporters setting
+ * the ccw flag incorrectly. Arcs ≤ 350° are trusted because many
+ * boundary arcs legitimately exceed 180° for connectivity.
+ *
+ * NOTE: For arc edges, pass angles pre-converted via hatchArcRadians().
+ */
+export const hatchArcSweep = (startRad: number, endRad: number, ccw: boolean): number => {
+  let sweep = endRad - startRad;
+  if (Math.abs(sweep) < EPSILON || Math.abs(Math.abs(sweep) - 2 * Math.PI) < EPSILON) {
+    return ccw ? 2 * Math.PI : -2 * Math.PI;
+  }
+  // Apply ccw direction
+  if (ccw) {
+    if (sweep < 0) sweep += 2 * Math.PI;
+  } else {
+    if (sweep > 0) sweep -= 2 * Math.PI;
+  }
+  // Fix near-full circles from incorrect ccw flags: when the sweep is
+  // almost a complete circle (> ~350°), prefer the short complementary arc.
+  const NEAR_FULL = 2 * Math.PI - 10 * Math.PI / 180; // 350°
+  if (Math.abs(sweep) > NEAR_FULL) {
+    sweep = sweep > 0 ? sweep - 2 * Math.PI : sweep + 2 * Math.PI;
+  }
+  return sweep;
+};
+
 const getEdgeStartPoint = (edge: HatchEdge): { x: number; y: number } => {
   if (edge.type === "line") {
     return { x: edge.start.x, y: edge.start.y };
   } else if (edge.type === "arc") {
-    const startRad = (edge.startAngle * Math.PI) / 180;
+    const [startRad] = hatchArcRadians(edge.startAngle, edge.endAngle, edge.ccw);
     return {
       x: edge.center.x + edge.radius * Math.cos(startRad),
       y: edge.center.y + edge.radius * Math.sin(startRad),
@@ -103,12 +144,57 @@ const polygonCentroid = (pts: Point2D[]): Point2D => {
 };
 
 /**
+ * Compute signed area of a polygon using the shoelace formula.
+ */
+const polygonSignedArea = (pts: Point2D[]): number => {
+  let area = 0;
+  const n = pts.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    area += (pts[j].x - pts[i].x) * (pts[j].y + pts[i].y);
+  }
+  return area / 2;
+};
+
+/**
+ * Filter boundary polygons based on DXF hatch style (code 75).
+ * - Style 0 (Normal): all polygons, even-odd fill rule
+ * - Style 1 (Outer): only outermost boundaries + direct children (nesting 0 and 1)
+ * - Style 2 (Ignore): only outermost boundaries (nesting 0), no holes
+ */
+export const filterPolygonsByStyle = (polygons: Point2D[][], style: number): Point2D[][] => {
+  if (style === 0 || polygons.length <= 1) return polygons;
+
+  // Sort by area descending (outermost first)
+  const entries = polygons.map((pts) => ({
+    pts,
+    area: Math.abs(polygonSignedArea(pts)),
+  }));
+  entries.sort((a, b) => b.area - a.area);
+
+  const maxLevel = style === 1 ? 1 : 0;
+  const result: Point2D[][] = [];
+
+  for (let i = 0; i < entries.length; i++) {
+    const centroid = polygonCentroid(entries[i].pts);
+    let level = 0;
+    for (let j = 0; j < i; j++) {
+      if (pointInPolygon2D(centroid.x, centroid.y, entries[j].pts)) level++;
+    }
+    if (level <= maxLevel) result.push(entries[i].pts);
+  }
+
+  return result;
+};
+
+/**
  * Build THREE.Shape array from HATCH boundary paths with even-odd hole detection.
  * Handles the common DXF case where inner boundaries have the same winding direction
  * as outer boundaries (both CCW). Uses area-based sorting and containment testing
  * to manually assign holes to their parent shapes.
+ *
+ * @param style - DXF hatch style (code 75): 0=normal, 1=outer, 2=ignore
  */
-export const buildSolidHatchShapes = (boundaryPaths: HatchBoundaryPath[]): THREE.Shape[] => {
+export const buildSolidHatchShapes = (boundaryPaths: HatchBoundaryPath[], style = 0): THREE.Shape[] => {
   // Convert each boundary path to an independent Shape
   const entries: { shape: THREE.Shape; area: number; pts: THREE.Vector2[] }[] = [];
   for (const bp of boundaryPaths) {
@@ -143,6 +229,13 @@ export const buildSolidHatchShapes = (boundaryPaths: HatchBoundaryPath[]): THREE
       }
     }
 
+    // Style 1 (Outer): skip boundaries nested deeper than level 1
+    // Style 2 (Ignore): skip all inner boundaries
+    if ((style === 1 && nestLevel >= 2) || (style === 2 && nestLevel >= 1)) {
+      isHoleFlag[i] = true;
+      continue;
+    }
+
     if (nestLevel % 2 === 0) {
       // Outer shape
       result.push(entries[i].shape);
@@ -167,9 +260,7 @@ export const addEdgeToPath = (shapePath: THREE.ShapePath, edge: HatchEdge): void
   if (edge.type === "line") {
     shapePath.currentPath.lineTo(edge.end.x, edge.end.y);
   } else if (edge.type === "arc") {
-    // Arc edge angles are in degrees, convert to radians
-    const startRad = (edge.startAngle * Math.PI) / 180;
-    const endRad = (edge.endAngle * Math.PI) / 180;
+    const [startRad, endRad] = hatchArcRadians(edge.startAngle, edge.endAngle, edge.ccw);
     shapePath.currentPath.absarc(
       edge.center.x,
       edge.center.y,
@@ -244,14 +335,8 @@ export const boundaryPathToLinePoints = (bp: HatchBoundaryPath): THREE.Vector3[]
         }
         points.push(new THREE.Vector3(edge.end.x, edge.end.y, 0));
       } else if (edge.type === "arc") {
-        const startRad = (edge.startAngle * Math.PI) / 180;
-        const endRad = (edge.endAngle * Math.PI) / 180;
-        let sweep = endRad - startRad;
-        if (edge.ccw) {
-          if (sweep < 0) sweep += 2 * Math.PI;
-        } else {
-          if (sweep > 0) sweep -= 2 * Math.PI;
-        }
+        const [startRad, endRad] = hatchArcRadians(edge.startAngle, edge.endAngle, edge.ccw);
+        const sweep = hatchArcSweep(startRad, endRad, edge.ccw);
         const segments = Math.max(
           MIN_ARC_SEGMENTS,
           Math.floor((Math.abs(sweep) * CIRCLE_SEGMENTS) / (2 * Math.PI)),
@@ -323,14 +408,8 @@ export const boundaryPathToPoint2DArray = (bp: HatchBoundaryPath): Point2D[] => 
         }
         points.push({ x: edge.end.x, y: edge.end.y });
       } else if (edge.type === "arc") {
-        const startRad = (edge.startAngle * Math.PI) / 180;
-        const endRad = (edge.endAngle * Math.PI) / 180;
-        let sweep = endRad - startRad;
-        if (edge.ccw) {
-          if (sweep < 0) sweep += 2 * Math.PI;
-        } else {
-          if (sweep > 0) sweep -= 2 * Math.PI;
-        }
+        const [startRad, endRad] = hatchArcRadians(edge.startAngle, edge.endAngle, edge.ccw);
+        const sweep = hatchArcSweep(startRad, endRad, edge.ccw);
         const segments = Math.max(
           MIN_ARC_SEGMENTS,
           Math.floor((Math.abs(sweep) * CIRCLE_SEGMENTS) / (2 * Math.PI)),
@@ -358,9 +437,8 @@ export const boundaryPathToPoint2DArray = (bp: HatchBoundaryPath): Point2D[] => 
           Math.abs(endAngle - startAngle - 2 * Math.PI) < EPSILON ||
           Math.abs(endAngle - startAngle) < EPSILON;
         if (isFullEllipse) { startAngle = 0; endAngle = 2 * Math.PI; }
-        let sweepAngle = endAngle - startAngle;
-        if (edge.ccw) { if (sweepAngle < 0) sweepAngle += 2 * Math.PI; }
-        else { if (sweepAngle > 0) sweepAngle -= 2 * Math.PI; }
+        // Ellipse angles are already in radians
+        const sweepAngle = hatchArcSweep(startAngle, endAngle, edge.ccw);
         const segments = Math.max(
           MIN_ARC_SEGMENTS,
           Math.floor((Math.abs(sweepAngle) * CIRCLE_SEGMENTS) / (2 * Math.PI)),

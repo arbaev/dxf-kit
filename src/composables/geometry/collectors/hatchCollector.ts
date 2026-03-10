@@ -9,6 +9,7 @@ import {
   buildSolidHatchShapes,
   boundaryPathToLinePoints,
   boundaryPathToPoint2DArray,
+  filterPolygonsByStyle,
   generateHatchPattern,
   type Point2D,
 } from "../hatch";
@@ -36,7 +37,7 @@ export function collectHatch(p: CollectEntityParams): boolean {
   if (entity.solid) {
     // Build shapes with even-odd hole detection (handles DXF boundaries
     // where inner and outer arcs share the same winding direction).
-    const shapes = buildSolidHatchShapes(entity.boundaryPaths);
+    const shapes = buildSolidHatchShapes(entity.boundaryPaths, entity.style);
     if (shapes.length === 0) return false;
 
     const v = new THREE.Vector3();
@@ -62,9 +63,14 @@ export function collectHatch(p: CollectEntityParams): boolean {
     return true;
   } else {
     // Pattern hatch -- flat arrays, direct collector write
-    const polygons: Point2D[][] = entity.boundaryPaths
+    let polygons: Point2D[][] = entity.boundaryPaths
       .map((bp) => boundaryPathToPoint2DArray(bp))
       .filter((pts) => pts.length > 2);
+
+    // Apply hatch style filtering (style 1=outer, 2=ignore)
+    if (entity.style && entity.style > 0) {
+      polygons = filterPolygonsByStyle(polygons, entity.style);
+    }
 
     const hasEmbedded = entity.patternLines && entity.patternLines.length > 0;
     const patternLines = hasEmbedded
