@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2026-03-10 (dxf-vuer) / [1.0.0] - 2026-03-10 (dxf-render)
+## dxf-vuer [2.0.0] / dxf-render [1.0.0] - 2026-03-10
 
 ### Added
 
@@ -237,11 +237,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dual package exports**: `dxf-vuer` (full library) and `dxf-vuer/parser` (parser only), plus `dxf-vuer/style.css`
 - **Demo application** deployed at [dxf-vuer.netlify.app](https://dxf-vuer.netlify.app)
 
-[2.0.0]: https://github.com/arbaev/dxf-kit/releases/tag/v2.0.0
+[2.0.0]: https://github.com/arbaev/dxf-kit/releases/tag/dxf-vuer%402.0.0
+[1.0.0]: https://github.com/arbaev/dxf-kit/releases/tag/dxf-render%401.0.0
 [1.5.0]: https://github.com/arbaev/dxf-kit/releases/tag/v1.5.0
 [1.4.0]: https://github.com/arbaev/dxf-kit/releases/tag/v1.4.0
 [1.3.0]: https://github.com/arbaev/dxf-kit/releases/tag/v1.3.0
 [1.2.0]: https://github.com/arbaev/dxf-kit/releases/tag/v1.2.0
 [1.1.0]: https://github.com/arbaev/dxf-kit/releases/tag/v1.1.0
 [1.0.1]: https://github.com/arbaev/dxf-kit/releases/tag/v1.0.1
-[1.0.0]: https://github.com/arbaev/dxf-kit/releases/tag/v1.0.0
