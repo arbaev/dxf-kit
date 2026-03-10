@@ -6,6 +6,8 @@
 
 Framework-agnostic DXF parser and Three.js renderer. Use with React, Svelte, vanilla JS, or any framework.
 
+[Live Demo](https://dxf-vuer.netlify.app) — upload your DXF and see the rendering quality.
+
 For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer) package.
 
 ## Installation
