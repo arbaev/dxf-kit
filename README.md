@@ -5,7 +5,7 @@
 
 Parse and render AutoCAD DXF files in the browser. Custom parser, Three.js rendering, 21 entity types, vector text, hatch patterns.
 
-## [Core engine `dxf-render`](packages/dxf-render/) | [Vue 3 component `dxf-vuer`](packages/dxf-vuer/) | [Live Demo Viewer](https://dxf-vuer.netlify.app)
+#### [Core engine `dxf-render`](packages/dxf-render/) | [Vue 3 component `dxf-vuer`](packages/dxf-vuer/) | [Live Demo Viewer](https://dxf-vuer.netlify.app)
 
 ![screenshot](https://raw.githubusercontent.com/arbaev/dxf-kit/main/docs/screenshot.png)
 
