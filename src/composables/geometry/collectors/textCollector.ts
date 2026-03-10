@@ -135,9 +135,10 @@ export function collectTextOrMText(
       collector, layer, color: entityColor, font, lines, defaultHeight: height,
       posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
       attachmentPoint: entity.attachmentPoint,
-      // Skip word wrapping when width (code 41) is narrower than one character
-      // (width < text height) — wrapping would put every character on its own line
-      width: entity.width && entity.width >= height ? entity.width : undefined,
+      // Enable word wrap only when width is meaningful relative to text height.
+      // Very small positive widths (< 5% of height) appear in title block MTEXT
+      // where width is a scaling artifact, not an intentional column constraint.
+      width: entity.width && entity.width >= height * 0.05 ? entity.width : undefined,
       serifFont: colorCtx.serifFont,
       lineSpacingFactor: entity.lineSpacingFactor,
     });
