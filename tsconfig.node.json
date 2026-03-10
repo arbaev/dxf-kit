@@ -6,5 +6,12 @@
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true
   },
-  "include": ["vite.config.ts", "vite.config.demo.ts", "vitest.config.ts", "vite-plugins/**/*.ts"]
+  "include": [
+    "packages/dxf-render/vite.config.ts",
+    "packages/dxf-vuer/vite.config.ts",
+    "demo/vite.config.ts",
+    "vitest.workspace.ts",
+    "packages/dxf-render/vite-plugins/**/*.ts",
+    "vite-plugins/**/*.ts"
+  ]
 }

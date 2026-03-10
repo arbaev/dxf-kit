@@ -1,7 +1,7 @@
 # Netlify configuration for DXF Vuer
 
 [build]
-  command = "npm run build:demo"
+  command = "pnpm install && pnpm build && pnpm build:demo"
 
   publish = "dist-demo"
 

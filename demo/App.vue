@@ -157,10 +157,9 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick } from "vue";
-import FileUploader from "@/components/FileUploader.vue";
-import UnsupportedEntities from "@/components/UnsupportedEntities.vue";
-import DXFViewer from "@/components/DXFViewer.vue";
-import type { DxfData } from "@/types/dxf";
+import { FileUploader, UnsupportedEntities, DXFViewer } from "dxf-vuer";
+import "dxf-vuer/style.css";
+import type { DxfData } from "dxf-render";
 
 const isDark = ref(false);
 watch(isDark, (dark) => {

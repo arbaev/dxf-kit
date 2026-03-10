@@ -2,7 +2,6 @@
 
 [![npm](https://img.shields.io/npm/v/dxf-vuer)](https://www.npmjs.com/package/dxf-vuer)
 [![npm downloads](https://img.shields.io/npm/dm/dxf-vuer)](https://www.npmjs.com/package/dxf-vuer)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/dxf-vuer)](https://bundlephobia.com/package/dxf-vuer)
 [![license](https://img.shields.io/npm/l/dxf-vuer)](https://github.com/arbaev/dxf-vuer/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
@@ -12,6 +11,18 @@ Vue 3 component for viewing DXF files in the browser. Built-in DXF parser, Three
 
 ![dxf-vuer screenshot](https://raw.githubusercontent.com/arbaev/dxf-vuer/main/docs/screenshot.png)
 
+## Packages
+
+This monorepo contains two npm packages:
+
+| Package | Description | npm |
+|---------|-------------|-----|
+| **[dxf-render](packages/dxf-render/)** | Framework-agnostic DXF parser + Three.js renderer | [![npm](https://img.shields.io/npm/v/dxf-render)](https://www.npmjs.com/package/dxf-render) |
+| **[dxf-vuer](packages/dxf-vuer/)** | Vue 3 component wrapper | [![npm](https://img.shields.io/npm/v/dxf-vuer)](https://www.npmjs.com/package/dxf-vuer) |
+
+- **`dxf-render`** — use this if you need just the parser or renderer without Vue (React, Svelte, vanilla JS)
+- **`dxf-vuer`** — use this for Vue 3 projects; it re-exports everything from `dxf-render` for convenience
+
 ## Features
 
 - **21 DXF entity types** rendered: LINE, CIRCLE, ARC, ELLIPSE, SPLINE, POLYLINE, LWPOLYLINE, TEXT, MTEXT, DIMENSION, HATCH, INSERT, SOLID, 3DFACE, LEADER, MULTILEADER, MLINE, XLINE, RAY, ATTDEF, HELIX — plus ATTRIB within INSERT blocks
@@ -20,9 +31,10 @@ Vue 3 component for viewing DXF files in the browser. Built-in DXF parser, Three
 - **OCS support** — Arbitrary Axis Algorithm for correct rendering of mirrored/rotated entities
 - **Vector text rendering** — crisp text at any zoom via opentype.js triangulated glyphs; embedded Liberation Sans Regular font with lazy-loaded Liberation Serif; bold, italic, underline, stacked fractions, tab stops, and inline MTEXT formatting; custom font loading via `fontUrl` prop
 - **Built-in DXF parser** — no external parser dependencies, custom scanner with full type casting
-- **Parser-only entry point** — use `dxf-vuer/parser` in Node.js, React, or any JS/TS project (zero dependencies)
+- **Framework-agnostic core** — `dxf-render` works with React, Svelte, vanilla JS, or any framework
+- **Parser-only entry point** — use `dxf-render/parser` in Node.js or any JS/TS project (zero dependencies)
 - **TypeScript** — strict types, full `.d.ts` declarations
-- **Composables** — build custom viewers with `useDXFRenderer`, `useThreeScene`, `useCamera`, etc.
+- **Vue composables** — build custom viewers with `useDXFRenderer`, `useThreeScene`, `useCamera`, etc.
 - **CSS custom properties** — theme with `--dxf-vuer-*` variables, no global resets
 - **Dark theme** — `darkTheme` prop switches scene background, entity colors (ACI 7), and all overlays to dark mode; instant switching without re-render
 - **Drag-and-drop** — `allowDrop` prop enables dropping DXF files directly onto the viewer
@@ -35,19 +47,32 @@ Vue 3 component for viewing DXF files in the browser. Built-in DXF parser, Three
 - **Paper space filtering** — paper space entities (title blocks, borders) automatically excluded
 - **World coordinates** — optional cursor position display in drawing units
 - **Fullscreen mode** — built-in fullscreen button in the viewer toolbar
-- **Bundle sizes** — ~1000 KB main bundle (includes embedded font + opentype.js), ~49 KB parser-only chunk (zero dependencies), ~525 KB serif font chunk (lazy-loaded only when needed)
 
 ## Installation
 
+### Vue 3 projects
+
 ```bash
-npm install dxf-vuer three
-# or
-yarn add dxf-vuer three
+npm install dxf-vuer dxf-render three
 ```
 
-Peer dependencies: `vue >= 3.4`, `three >= 0.160`.
+Peer dependencies: `vue >= 3.4`, `three >= 0.160`, `dxf-render >= 1.0.0`.
 
-## Quick Start
+### Without Vue (React, Svelte, vanilla JS)
+
+```bash
+npm install dxf-render three
+```
+
+### Parser only (Node.js, any JS/TS)
+
+```bash
+npm install dxf-render
+```
+
+No `three` needed for parser-only usage.
+
+## Quick Start (Vue 3)
 
 ```vue
 <script setup>
@@ -93,6 +118,32 @@ async function loadFile(file) {
   <input type="file" accept=".dxf" @change="loadFile($event.target.files[0])" />
   <DXFViewer ref="viewer" show-reset-button style="width: 100%; height: 600px" />
 </template>
+```
+
+## Quick Start (Without Vue)
+
+```ts
+import { parseDxf, createThreeObjectsFromDXF, loadDefaultFont, useCamera, useOrbitControls } from 'dxf-render'
+import * as THREE from 'three'
+
+// Parse DXF
+const dxf = parseDxf(dxfText)
+
+// Load font for text rendering
+await loadDefaultFont()
+
+// Create Three.js objects
+const { group, materials } = await createThreeObjectsFromDXF(dxf)
+
+// Set up Three.js scene
+const scene = new THREE.Scene()
+scene.add(group)
+
+const renderer = new THREE.WebGLRenderer({ canvas: myCanvas })
+const camera = useCamera(renderer.domElement)
+useOrbitControls(camera, renderer.domElement)
+
+renderer.render(scene, camera)
 ```
 
 ## DXFViewer
@@ -150,8 +201,9 @@ async function loadFile(file) {
 Use the parser without Vue or Three.js — works in Node.js, React, or any JS environment:
 
 ```ts
-import { parseDxf } from 'dxf-vuer/parser'
-import type { DxfData, DxfLineEntity, isLineEntity } from 'dxf-vuer/parser'
+import { parseDxf } from 'dxf-render/parser'
+import type { DxfData, DxfLineEntity } from 'dxf-render/parser'
+import { isLineEntity } from 'dxf-render/parser'
 
 const dxf: DxfData = parseDxf(dxfText)
 
@@ -162,16 +214,20 @@ for (const entity of dxf.entities) {
 }
 ```
 
-The `dxf-vuer/parser` entry has zero dependencies.
+The `dxf-render/parser` entry has zero dependencies.
 
-## Composables
+## Vue Composables
 
 For building custom viewers:
 
 ```ts
-import { useDXFRenderer, useThreeScene, useCamera, useOrbitControls, useLayers } from 'dxf-vuer'
-import { createThreeObjectsFromDXF } from 'dxf-vuer'
-import { resolveEntityColor } from 'dxf-vuer'
+import { useDXFRenderer, useThreeScene, useLayers } from 'dxf-vuer'
+```
+
+Scene helpers (framework-agnostic):
+
+```ts
+import { createThreeObjectsFromDXF, useCamera, useOrbitControls, resolveEntityColor } from 'dxf-render'
 ```
 
 ## Supported DXF Entities
@@ -206,7 +262,31 @@ Override CSS custom properties to match your app's theme:
 
 ## Tech Stack
 
-Vue 3.5, TypeScript 5.9, Three.js 0.182, Vite 7, opentype.js 1.3.
+Vue 3.5, TypeScript 5.9, Three.js 0.182, Vite 7, opentype.js 1.3, pnpm workspaces.
+
+## Bundle Sizes
+
+| Package | File | Size | Note |
+|---------|------|------|------|
+| dxf-render | main bundle | ~960 KB | Includes font + opentype.js + inline worker |
+| dxf-render | parser chunk | ~50 KB | Zero dependencies |
+| dxf-render | serif font | ~525 KB | Lazy-loaded only when needed |
+| dxf-vuer | main bundle | ~33 KB | Thin Vue wrapper |
+| dxf-vuer | style.css | ~14 KB | Component styles |
+
+## Migration from v1.x
+
+dxf-vuer v2.0 splits the library into two packages. Most imports continue to work unchanged thanks to re-exports:
+
+```ts
+// Still works — dxf-vuer re-exports everything from dxf-render
+import { parseDxf, DXFViewer } from 'dxf-vuer'
+```
+
+**Breaking changes:**
+- New peer dependency: `dxf-render >= 1.0.0` (install alongside dxf-vuer)
+- Parser-only entry point moved: `dxf-vuer/parser` → `dxf-render/parser`
+- Package manager changed from yarn to pnpm (for contributors)
 
 ## Performance
 

@@ -1,0 +1,69 @@
+{
+  "name": "dxf-render",
+  "version": "1.0.0",
+  "description": "DXF parser and Three.js renderer — parse and render AutoCAD DXF files in the browser. Framework-agnostic.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Timur Arbaev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arbaev/dxf-vuer.git",
+    "directory": "packages/dxf-render"
+  },
+  "keywords": [
+    "dxf",
+    "dxf-parser",
+    "dxf-renderer",
+    "cad",
+    "autocad",
+    "threejs",
+    "three.js",
+    "webgl",
+    "engineering",
+    "drawing",
+    "technical-drawing",
+    "typescript"
+  ],
+  "main": "./dist/dxf-render-index.es.js",
+  "module": "./dist/dxf-render-index.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/dxf-render-index.es.js"
+    },
+    "./parser": {
+      "types": "./dist/parser-entry.d.ts",
+      "import": "./dist/dxf-render-parser.es.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && vite build",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "three": ">=0.160.0"
+  },
+  "peerDependenciesMeta": {
+    "three": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "opentype.js": "^1.3.4"
+  },
+  "devDependencies": {
+    "@types/opentype.js": "^1.3.9",
+    "@types/three": "^0.182.0",
+    "three": "^0.182.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.0.18"
+  }
+}

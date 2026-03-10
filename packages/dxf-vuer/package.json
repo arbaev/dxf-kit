@@ -1,0 +1,73 @@
+{
+  "name": "dxf-vuer",
+  "version": "2.0.0",
+  "description": "Vue 3 DXF file viewer — render AutoCAD DXF drawings in the browser with Three.js. Built-in parser, vector text rendering, TypeScript support.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Timur Arbaev",
+  "homepage": "https://dxf-vuer.netlify.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arbaev/dxf-vuer.git",
+    "directory": "packages/dxf-vuer"
+  },
+  "keywords": [
+    "vue",
+    "vue3",
+    "vuejs",
+    "dxf",
+    "dxf-viewer",
+    "dxf-parser",
+    "viewer",
+    "cad",
+    "cad-viewer",
+    "autocad",
+    "threejs",
+    "three.js",
+    "webgl",
+    "engineering",
+    "drawing",
+    "technical-drawing",
+    "blueprint",
+    "typescript"
+  ],
+  "main": "./dist/dxf-vuer-index.es.js",
+  "module": "./dist/dxf-vuer-index.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/dxf-vuer-index.es.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "scripts": {
+    "build": "vue-tsc -p tsconfig.build.json && vite build",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "dxf-render": "^1.0.0",
+    "three": ">=0.160.0",
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.182.0",
+    "@vitejs/plugin-vue": "^6.0.4",
+    "dxf-render": "workspace:*",
+    "three": "^0.182.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.0.18",
+    "vue": "^3.5.28",
+    "vue-tsc": "^3.2.4"
+  }
+}

@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-03-10 (dxf-vuer) / [1.0.0] - 2026-03-10 (dxf-render)
+
+### Added
+
+- **Monorepo architecture** — project split into two npm packages via pnpm workspaces:
+  - `dxf-render` (v1.0.0) — framework-agnostic DXF parser + Three.js renderer
+  - `dxf-vuer` (v2.0.0) — thin Vue 3 wrapper (components + composables)
+- **`dxf-render` package** — standalone package usable with React, Svelte, vanilla JS, or any framework; includes parser, renderer, scene helpers, and all utilities
+- **`parseDxfAsync()`** — new async parser API in dxf-render: runs `parseDxf()` in an inline Web Worker with automatic fallback to sync; `terminateParserWorker()` for cleanup
+- **`dxf-render/parser` entry point** — parser-only import with zero dependencies (replaces `dxf-vuer/parser`)
+
+### Changed
+
+- **Package structure** — monorepo with `packages/dxf-render/`, `packages/dxf-vuer/`, `demo/`
+- **File layout** — `src/composables/geometry/` → `packages/dxf-render/src/render/`; `src/composables/geometry/text.ts` → `render/text/mtextParser.ts`; camera/controls → `scene/`; parser/types/utils/constants/workers/assets unchanged in structure
+- **Package manager** — yarn → pnpm 9.15 workspaces
+- **Build** — sequential build: dxf-render first, then dxf-vuer (dxf-vuer depends on dxf-render)
+- **Bundle sizes** — dxf-render: ~960 KB main + ~50 KB parser + ~525 KB serif font; dxf-vuer: ~33 KB + ~14 KB CSS
+- **Backward compatibility** — `dxf-vuer` re-exports everything from `dxf-render` (`export * from "dxf-render"`); existing imports from `dxf-vuer` continue to work
+
+### Breaking
+
+- **New peer dependency** — `dxf-vuer` now requires `dxf-render >= 1.0.0` as a peer dependency
+- **Parser entry point moved** — `dxf-vuer/parser` → `dxf-render/parser`
+- **Worker logic extracted** — `useDXFRenderer` no longer manages Web Worker directly; uses `parseDxfAsync`/`terminateParserWorker` from dxf-render
+
 ## [1.5.0] - 2026-03-10
 
 ### Added
@@ -211,6 +237,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dual package exports**: `dxf-vuer` (full library) and `dxf-vuer/parser` (parser only), plus `dxf-vuer/style.css`
 - **Demo application** deployed at [dxf-vuer.netlify.app](https://dxf-vuer.netlify.app)
 
+[2.0.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v2.0.0
 [1.5.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.5.0
 [1.4.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.4.0
 [1.3.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.3.0

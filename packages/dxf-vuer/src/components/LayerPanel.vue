@@ -1,0 +1,283 @@
+<template>
+  <div class="layer-panel" :class="{ collapsed: !isExpanded }">
+    <div class="layer-panel-header" @click="isExpanded = !isExpanded">
+      <span class="layer-panel-title">Layers ({{ layers.length }})</span>
+      <button class="collapse-btn" :title="isExpanded ? 'Collapse' : 'Expand'">
+        {{ isExpanded ? '−' : '+' }}
+      </button>
+    </div>
+
+    <div v-if="isExpanded" class="layer-panel-body">
+      <div class="layer-panel-actions">
+        <button @click.stop="$emit('show-all')" class="action-btn">All</button>
+        <button @click.stop="$emit('hide-all')" class="action-btn">None</button>
+      </div>
+
+      <div class="layer-list">
+        <div
+          v-for="layer in layers"
+          :key="layer.name"
+          class="layer-item"
+          :class="{ hidden: !layer.visible, frozen: layer.frozen }"
+          @click="!layer.frozen && $emit('toggle-layer', layer.name)"
+        >
+          <!-- Frozen: snowflake icon -->
+          <svg
+            v-if="layer.frozen"
+            class="state-icon frozen-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="12" y1="2" x2="12" y2="22" />
+            <line x1="2" y1="12" x2="22" y2="12" />
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+            <line x1="19.07" y1="4.93" x2="4.93" y2="19.07" />
+            <!-- Crossbars -->
+            <line x1="12" y1="2" x2="9" y2="5" />
+            <line x1="12" y1="2" x2="15" y2="5" />
+            <line x1="12" y1="22" x2="9" y2="19" />
+            <line x1="12" y1="22" x2="15" y2="19" />
+          </svg>
+          <!-- Visible: eye open -->
+          <svg
+            v-else-if="layer.visible"
+            class="eye-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <!-- Hidden: eye off -->
+          <svg
+            v-else
+            class="eye-icon off"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+            <line x1="1" y1="1" x2="23" y2="23" />
+          </svg>
+
+          <!-- Locked indicator (shown when not frozen) -->
+          <svg
+            v-if="layer.locked && !layer.frozen"
+            class="state-icon lock-icon"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+
+          <span class="color-swatch" :style="{ backgroundColor: layer.color }"></span>
+          <span class="layer-name" :title="layer.name">{{ layer.name }}</span>
+          <span class="layer-count">{{ layer.entityCount }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from "vue";
+import type { LayerState } from "../composables/useLayers";
+
+interface Props {
+  layers: LayerState[];
+}
+
+defineProps<Props>();
+
+defineEmits<{
+  (e: "toggle-layer", layerName: string): void;
+  (e: "show-all"): void;
+  (e: "hide-all"): void;
+}>();
+
+const isExpanded = ref(true);
+</script>
+
+<style scoped>
+.layer-panel {
+  position: absolute;
+  bottom: var(--dxf-vuer-spacing-sm, 8px);
+  right: var(--dxf-vuer-spacing-sm, 8px);
+  z-index: 10;
+  background-color: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
+  border-radius: var(--dxf-vuer-border-radius, 4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-height: 50%;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  max-width: 260px;
+}
+
+.layer-panel.collapsed {
+  max-height: none;
+}
+
+.layer-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
+  flex-shrink: 0;
+}
+
+.collapsed .layer-panel-header {
+  border-bottom: none;
+}
+
+.layer-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dxf-vuer-text-color, #212121);
+}
+
+.collapse-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--dxf-vuer-text-secondary, #757575);
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.layer-panel-body {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.layer-panel-actions {
+  display: flex;
+  gap: 4px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
+  flex-shrink: 0;
+}
+
+.action-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  background: none;
+  border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--dxf-vuer-text-secondary, #757575);
+  transition: all 0.15s;
+}
+
+.action-btn:hover {
+  border-color: var(--dxf-vuer-primary-color, #1040b0);
+  color: var(--dxf-vuer-primary-color, #1040b0);
+}
+
+.layer-list {
+  overflow-y: auto;
+  max-height: 300px;
+  padding: 2px 0;
+}
+
+.layer-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  font-size: 12px;
+}
+
+.layer-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.layer-item.hidden {
+  opacity: 0.5;
+}
+
+.layer-item.frozen {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.eye-icon {
+  flex-shrink: 0;
+  color: var(--dxf-vuer-text-color, #212121);
+}
+
+.eye-icon.off {
+  color: var(--dxf-vuer-text-secondary, #757575);
+}
+
+.state-icon {
+  flex-shrink: 0;
+}
+
+.frozen-icon {
+  color: #5ba3d9;
+}
+
+.lock-icon {
+  color: var(--dxf-vuer-text-secondary, #757575);
+}
+
+.color-swatch {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.layer-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dxf-vuer-text-color, #212121);
+}
+
+.layer-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--dxf-vuer-text-secondary, #757575);
+}
+
+@media (max-width: 768px) {
+  .layer-panel {
+    min-width: 150px;
+    max-width: 200px;
+    max-height: 40%;
+  }
+
+  .layer-list {
+    max-height: 200px;
+  }
+}
+</style>

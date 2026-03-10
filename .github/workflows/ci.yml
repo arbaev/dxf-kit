@@ -17,20 +17,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: yarn
+          cache: pnpm
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
-      - name: Type check
-        run: yarn vue-tsc -p tsconfig.build.json --noEmit
-
-      - name: Build library
-        run: yarn build
+      - name: Build packages
+        run: pnpm build
 
       - name: Run tests
-        run: yarn test
+        run: pnpm test
