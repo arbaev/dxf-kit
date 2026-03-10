@@ -24,11 +24,12 @@ Vue 3 component for viewing DXF files in the browser. Built-in DXF parser, Three
 - **TypeScript** — strict types, full `.d.ts` declarations
 - **Composables** — build custom viewers with `useDXFRenderer`, `useThreeScene`, `useCamera`, etc.
 - **CSS custom properties** — theme with `--dxf-vuer-*` variables, no global resets
-- **Dark theme** — `darkTheme` prop switches scene background, entity colors (ACI 7), and all overlays to dark mode
+- **Dark theme** — `darkTheme` prop switches scene background, entity colors (ACI 7), and all overlays to dark mode; instant switching without re-render
 - **Drag-and-drop** — `allowDrop` prop enables dropping DXF files directly onto the viewer
 - **Export to PNG** — `exportToPNG()` method and optional toolbar button to save current view
 - **Loading by URL** — `url` prop to load DXF files from a remote URL
 - **Loading progress** — progress bar with percentage during rendering phase
+- **TAA anti-aliasing** — Temporal Anti-Aliasing: thin crisp lines during interaction, smooth text and edges after idle accumulation (32 frames, ~0.5s)
 - **Performance optimizations** — geometry merging (–78% draw calls), block template caching, async parsing in Web Worker, time-sliced rendering with progress bar
 - **Layer panel** — toggle layer visibility with color indicators; frozen/locked layer support
 - **Paper space filtering** — paper space entities (title blocks, borders) automatically excluded
@@ -214,6 +215,7 @@ Vue 3.5, TypeScript 5.9, Three.js 0.182, Vite 7, opentype.js 1.3.
 - **Web Worker parsing** — DXF parsing runs in a Web Worker to keep the UI responsive
 - **Time-sliced rendering** — entity processing yields to the main thread every ~16ms with a progress bar
 - **Vector text** — text rendered as triangulated mesh geometry, batched with other entities via GeometryCollector; no per-entity canvas/texture allocations
+- **TAA anti-aliasing** — hardware MSAA disabled for thin lines; 32 jittered frames accumulated when idle for smooth edges without line thickening
 
 ## Acknowledgements
 

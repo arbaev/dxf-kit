@@ -113,8 +113,8 @@
         <div class="feature-card">
           <h3>WebGL Rendering</h3>
           <p>
-            Three.js-powered rendering with pan, zoom, layer visibility, dark theme, drag-and-drop,
-            and PNG export.
+            Three.js-powered rendering with TAA anti-aliasing, pan, zoom, layer visibility,
+            instant dark theme switching, drag-and-drop, and PNG export.
           </p>
         </div>
         <div class="feature-card">

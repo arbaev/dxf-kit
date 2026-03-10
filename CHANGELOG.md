@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-03-10
+
+### Added
+
+- **TAA anti-aliasing** — Temporal Anti-Aliasing via Three.js `EffectComposer` + `TAARenderPass`: hardware MSAA disabled (thin lines), 32 jittered frames accumulated progressively when idle (~530ms at 60fps) for smooth text and edges without thickening lines
+- **Instant dark mode** — theme switching without full re-render; ACI 7 color resolved via sentinel value (`ACI7_COLOR`) deferred to material level; `MaterialCacheStore.switchTheme()` updates all theme-dependent materials in-place
+- **Overlay rendering** — separate overlay mesh buffer in `GeometryCollector` for text glyphs and dimension/leader arrows; rendered last in `flush()` so annotations always appear on top of drawing geometry
+- **Hatch style support** — `style` property (code 75) parsed: Normal (even-odd), Outer (level 0+1 only), Ignore (level 0 only); `filterPolygonsByStyle()` filters pattern polygons by nesting depth
+- **Leader arrow size from XDATA** — LEADER entities parse XDATA DSTYLE override for DIMASZ (arrow size); `arrowSize` field on `DxfLeaderEntity`
+
+### Fixed
+
+- **Hatch arc edges** — CW arc edges (ccw=false) angles inverted from CW convention to standard CCW via `hatchArcRadians()`; fixes boundary polygon connectivity (gap 171→0 units) and incorrect clipping in 7+ regions
+- **Hatch nearly-full-circle arcs** — arcs >350° from incorrect ccw flag now clamped to the short arc; prevents tiny boundary edges from becoming huge circles
+- **Hatch polygon centroid** — `polygonCentroid()` used instead of first vertex for even-odd nesting test; fixes incorrect hole detection when boundaries share vertices
+- **Dimension text angle** — `while` loop instead of `if` for angle normalization; fixes upside-down text on dimensions with angles >270°
+- **Leader arrow angle** — arrow direction computed from spline point at `arrowSize` distance, not from first two control points; fixes misaligned arrow/line junction
+- **MTEXT word wrap** — width/height ratio threshold (≥0.05) filters artifact micro-widths from DXF exporters while preserving intentional narrow columns
+
+### Changed
+
+- **Architecture**: monolithic `useDXFGeometry.ts` (2622 lines) replaced by modular collector system — 15 entity collector modules in `geometry/collectors/` with dispatch map; `createDXFScene.ts` (~400 lines) as slim orchestrator
+- **Color resolution** — `resolveEntityColor()` returns `ACI7_COLOR` sentinel instead of concrete hex for ACI 7/255; theme resolved at material creation time via `MaterialCacheStore.resolveColor()`
+- **Material cache** — three separate `Map` caches consolidated into `MaterialCacheStore` with `getLineMaterial()`, `getMeshMaterial()`, `getPointsMaterial()`, `switchTheme()`, `disposeAll()`
+- **Render context** — `EntityColorContext` replaced by `RenderContext` composing `ColorContext`, `LinetypeContext`, `TextContext`, `DimensionContext`
+- **Typed header** — `DxfHeader` typed interface (20 properties) replaces `Record<string, unknown>`
+- **Curve points** — `generateCirclePoints()`, `generateArcPoints()`, `generateEllipsePoints()` extracted to shared `curvePoints.ts`
+- **Rendering pipeline** — `useThreeScene` now manages `EffectComposer` lifecycle; `renderScene()` and `resizeComposer()` replace direct `renderer.render()` calls
+- **Bundle size**: main ~992 KB (was ~1000 KB), parser chunk ~49 KB (unchanged)
+- Test suite expanded from 818 to 841 cases across 36 files
+
 ## [1.4.0] - 2026-03-09
 
 ### Added
@@ -180,6 +211,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dual package exports**: `dxf-vuer` (full library) and `dxf-vuer/parser` (parser only), plus `dxf-vuer/style.css`
 - **Demo application** deployed at [dxf-vuer.netlify.app](https://dxf-vuer.netlify.app)
 
+[1.5.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.5.0
 [1.4.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.4.0
 [1.3.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.3.0
 [1.2.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.2.0
