@@ -129,9 +129,9 @@ export function collectDimensionEntity(
 
     if (dimData.textPos) {
       let dimAngleRad = dimAngle !== 0 ? degreesToRadians(dimAngle) : 0;
-      // Readability: flip text 180deg if it would be upside-down
-      if (dimAngleRad > Math.PI / 2) dimAngleRad -= Math.PI;
-      if (dimAngleRad < -Math.PI / 2) dimAngleRad += Math.PI;
+      // Readability: flip text to [-PI/2, PI/2] so it is never upside-down
+      while (dimAngleRad > Math.PI / 2) dimAngleRad -= Math.PI;
+      while (dimAngleRad < -Math.PI / 2) dimAngleRad += Math.PI;
       addDimensionTextToCollector({
         collector, layer, color: textColor, font,
         rawText: dimData.dimensionText, height: dimData.textHeight,
