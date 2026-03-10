@@ -258,6 +258,7 @@ export interface DxfLeaderEntity extends DxfEntityBase {
   styleName?: string;
   arrowHeadFlag?: number; // 0 = no arrow, 1 = with arrow
   pathType?: number; // 72: 0 = straight line, 1 = spline
+  arrowSize?: number; // DIMASZ override from XDATA DSTYLE
 }
 
 export interface MLeaderLine {

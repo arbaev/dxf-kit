@@ -158,14 +158,23 @@ export function collectLeaderEntity(
 
     // arrowHeadFlag: 0 = no arrow, 1 or undefined = with arrow (DXF default)
     if (entity.arrowHeadFlag !== 0 && rawPoints.length >= 2) {
-      // Arrow direction from spline tangent at tip (first two interpolated points)
-      const dx = points[0].x - points[1].x;
-      const dy = points[0].y - points[1].y;
+      // Arrow size: entity XDATA DSTYLE override > DIMSTYLE > header default
+      const arrowSize = entity.arrowSize || baseDv.arrowSize;
+      // Arrow direction: use the spline point near arrowSize distance from tip
+      // so the arrow base aligns with the curved leader line
+      let baseIdx = 1;
+      for (let i = 1; i < points.length; i++) {
+        baseIdx = i;
+        const d = (points[i].x - points[0].x) ** 2 + (points[i].y - points[0].y) ** 2;
+        if (d >= arrowSize * arrowSize) break;
+      }
+      const dx = points[0].x - points[baseIdx].x;
+      const dy = points[0].y - points[baseIdx].y;
       const angle = Math.atan2(dy, dx);
       let drawn = false;
       // Try custom arrow block from DIMLDRBLK
       if (leaderArrowBlockName && !isTickBlock(leaderArrowBlockName)) {
-        drawn = addBlockArrowToCollector(leaderArrowBlockName, points[0], angle, baseDv.arrowSize);
+        drawn = addBlockArrowToCollector(leaderArrowBlockName, points[0], angle, arrowSize);
       }
       if (!drawn) {
         // Leaders use ticks only if DIMLDRBLK explicitly specifies a tick block.
@@ -173,7 +182,7 @@ export function collectLeaderEntity(
         if (leaderArrowBlockName && isTickBlock(leaderArrowBlockName)) {
           addTickToCollector(points[0], angle);
         } else {
-          addArrowToCollector(points[1], points[0], baseDv.arrowSize);
+          addArrowToCollector(points[baseIdx], points[0], arrowSize);
         }
       }
     }

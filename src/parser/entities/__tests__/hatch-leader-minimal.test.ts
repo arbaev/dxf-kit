@@ -388,6 +388,57 @@ describe("parseLeader", () => {
     expect(entity.vertices[0]).toEqual({ x: 1, y: 2 });
     expect(entity.vertices[1]).toEqual({ x: 3, y: 4 });
   });
+
+  it("parses arrowSize from XDATA DSTYLE (DIMASZ override)", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "LEADER",
+      "3", "Standard",
+      "76", "2",
+      "10", "0.0",
+      "20", "0.0",
+      "10", "10.0",
+      "20", "10.0",
+      "1001", "ACAD",
+      "1000", "DSTYLE",
+      "1002", "{",
+      "1070", "41",     // DIMVAR code 41 = DIMASZ
+      "1040", "24.0",   // arrow size = 24
+      "1070", "371",    // DIMVAR code 371 = DIMLWD
+      "1070", "-1",     // integer value = -1
+      "1002", "}",
+      "0", "ENDSEC",
+      "0", "EOF",
+    );
+
+    const entity = parseLeader(scanner, group);
+
+    expect(entity.type).toBe("LEADER");
+    expect(entity.arrowSize).toBe(24);
+    expect(entity.vertices).toHaveLength(2);
+  });
+
+  it("does not set arrowSize when XDATA has no DIMASZ override", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "LEADER",
+      "76", "2",
+      "10", "0.0",
+      "20", "0.0",
+      "10", "5.0",
+      "20", "5.0",
+      "1001", "ACAD",
+      "1000", "DSTYLE",
+      "1002", "{",
+      "1070", "371",
+      "1070", "-1",
+      "1002", "}",
+      "0", "ENDSEC",
+      "0", "EOF",
+    );
+
+    const entity = parseLeader(scanner, group);
+
+    expect(entity.arrowSize).toBeUndefined();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
