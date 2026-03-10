@@ -5,9 +5,10 @@
   "type": "module",
   "license": "MIT",
   "author": "Timur Arbaev",
+  "homepage": "https://github.com/arbaev/dxf-kit/tree/main/packages/dxf-render",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/arbaev/dxf-vuer.git",
+    "url": "git+https://github.com/arbaev/dxf-kit.git",
     "directory": "packages/dxf-render"
   },
   "keywords": [

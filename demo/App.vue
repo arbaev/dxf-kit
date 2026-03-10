@@ -147,7 +147,7 @@
           >npm</a
         >
         &middot;
-        <a href="https://github.com/arbaev/dxf-vuer" target="_blank" rel="noopener noreferrer"
+        <a href="https://github.com/arbaev/dxf-kit" target="_blank" rel="noopener noreferrer"
           >GitHub</a
         >
       </footer>

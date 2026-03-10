@@ -237,11 +237,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dual package exports**: `dxf-vuer` (full library) and `dxf-vuer/parser` (parser only), plus `dxf-vuer/style.css`
 - **Demo application** deployed at [dxf-vuer.netlify.app](https://dxf-vuer.netlify.app)
 
-[2.0.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v2.0.0
-[1.5.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.5.0
-[1.4.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.4.0
-[1.3.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.3.0
-[1.2.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.2.0
-[1.1.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.1.0
-[1.0.1]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.0.1
-[1.0.0]: https://github.com/arbaev/dxf-vuer/releases/tag/v1.0.0
+[2.0.0]: https://github.com/arbaev/dxf-kit/releases/tag/v2.0.0
+[1.5.0]: https://github.com/arbaev/dxf-kit/releases/tag/v1.5.0
+[1.4.0]: https://github.com/arbaev/dxf-kit/releases/tag/v1.4.0
+[1.3.0]: https://github.com/arbaev/dxf-kit/releases/tag/v1.3.0
+[1.2.0]: https://github.com/arbaev/dxf-kit/releases/tag/v1.2.0
+[1.1.0]: https://github.com/arbaev/dxf-kit/releases/tag/v1.1.0
+[1.0.1]: https://github.com/arbaev/dxf-kit/releases/tag/v1.0.1
+[1.0.0]: https://github.com/arbaev/dxf-kit/releases/tag/v1.0.0

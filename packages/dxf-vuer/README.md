@@ -2,12 +2,12 @@
 
 [![npm](https://img.shields.io/npm/v/dxf-vuer)](https://www.npmjs.com/package/dxf-vuer)
 [![npm downloads](https://img.shields.io/npm/dm/dxf-vuer)](https://www.npmjs.com/package/dxf-vuer)
-[![license](https://img.shields.io/npm/l/dxf-vuer)](https://github.com/arbaev/dxf-vuer/blob/main/LICENSE)
+[![license](https://img.shields.io/npm/l/dxf-vuer)](https://github.com/arbaev/dxf-kit/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
 Vue 3 component for viewing DXF files in the browser. Thin wrapper around [dxf-render](https://www.npmjs.com/package/dxf-render).
 
-[Live Demo](https://dxf-vuer.netlify.app) | [GitHub](https://github.com/arbaev/dxf-vuer)
+[Live Demo](https://dxf-vuer.netlify.app) | [GitHub](https://github.com/arbaev/dxf-kit)
 
 ## Installation
 

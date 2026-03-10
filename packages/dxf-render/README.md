@@ -1,7 +1,7 @@
 # dxf-render
 
 [![npm](https://img.shields.io/npm/v/dxf-render)](https://www.npmjs.com/package/dxf-render)
-[![license](https://img.shields.io/npm/l/dxf-render)](https://github.com/arbaev/dxf-vuer/blob/main/LICENSE)
+[![license](https://img.shields.io/npm/l/dxf-render)](https://github.com/arbaev/dxf-kit/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
 Framework-agnostic DXF parser and Three.js renderer. Use with React, Svelte, vanilla JS, or any framework.
