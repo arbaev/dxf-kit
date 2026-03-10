@@ -91,6 +91,17 @@ export const boundaryPathToShapePath = (bp: HatchBoundaryPath): THREE.ShapePath 
   return addBoundaryPathToShapePath(shapePath, bp) ? shapePath : null;
 };
 
+/** Compute centroid (average of all vertices) of a polygon */
+const polygonCentroid = (pts: Point2D[]): Point2D => {
+  let x = 0, y = 0;
+  for (const p of pts) {
+    x += p.x;
+    y += p.y;
+  }
+  const n = pts.length;
+  return { x: x / n, y: y / n };
+};
+
 /**
  * Build THREE.Shape array from HATCH boundary paths with even-odd hole detection.
  * Handles the common DXF case where inner boundaries have the same winding direction
@@ -119,7 +130,11 @@ export const buildSolidHatchShapes = (boundaryPaths: HatchBoundaryPath[]): THREE
   const isHoleFlag: boolean[] = [];
 
   for (let i = 0; i < entries.length; i++) {
-    const testPt = entries[i].pts[0];
+    // Use centroid as test point instead of first vertex.
+    // Adjacent hatch boundaries share vertices, and pointInPolygon2D
+    // gives undefined results when the test point lies exactly on a vertex
+    // of another polygon. The centroid avoids this boundary issue.
+    const testPt = polygonCentroid(entries[i].pts);
     let nestLevel = 0;
 
     for (let j = 0; j < i; j++) {

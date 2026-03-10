@@ -575,3 +575,70 @@ describe("boundaryPathToPoint2DArray", () => {
     expect(pts).toHaveLength(0);
   });
 });
+
+// ── Adjacent boundaries with shared vertices (section marker) ────────
+describe("buildSolidHatchShapes - adjacent boundaries with shared vertices", () => {
+  // Section marker: triangle with inscribed circle.
+  // 3 non-overlapping boundary paths tile the area outside the circle.
+  // Boundaries share vertices at circle intersection points — the centroid-based
+  // test point must be used to avoid pointInPolygon2D giving wrong results
+  // at shared vertex positions.
+  const circleCenter = { x: 1898.485, y: 7385.076 };
+
+  const path1: HatchBoundaryPath = {
+    polylineVertices: [
+      { x: 1891.060, y: 7392.500 },
+      { x: 1883.636, y: 7385.076 },
+      { x: 1891.060, y: 7377.651, bulge: -0.199 },
+      { x: 1887.985, y: 7385.076, bulge: -0.199 },
+      { x: 1891.060, y: 7392.500 },
+    ],
+  };
+  const path2: HatchBoundaryPath = {
+    polylineVertices: [
+      { x: 1898.485, y: 7399.925 },
+      { x: 1891.060, y: 7392.500, bulge: -0.199 },
+      { x: 1898.485, y: 7395.576 },
+      { x: 1898.485, y: 7399.925 },
+    ],
+  };
+  const path3: HatchBoundaryPath = {
+    polylineVertices: [
+      { x: 1891.060, y: 7377.651 },
+      { x: 1898.485, y: 7370.226 },
+      { x: 1898.485, y: 7374.576, bulge: -0.199 },
+      { x: 1891.060, y: 7377.651 },
+    ],
+  };
+
+  it("produces 3 independent shapes (no false hole detection)", () => {
+    const shapes = buildSolidHatchShapes([path1, path2, path3]);
+    expect(shapes.length).toBe(3);
+    for (const shape of shapes) {
+      expect(shape.extractPoints(12).holes.length).toBe(0);
+    }
+  });
+
+  it("all seed points are covered and circle interior is not filled", () => {
+    const shapes = buildSolidHatchShapes([path1, path2, path3]);
+    const polygons = shapes.map(s =>
+      s.getPoints(12).map(p => ({ x: p.x, y: p.y })),
+    );
+
+    // DXF seed points — each should be inside exactly one shape
+    const seeds = [
+      { x: 1886.939, y: 7385.272 },
+      { x: 1897.289, y: 7396.976 },
+      { x: 1897.667, y: 7373.080 },
+    ];
+    for (const seed of seeds) {
+      const count = polygons.filter(p => pointInPolygon2D(seed.x, seed.y, p)).length;
+      expect(count).toBe(1);
+    }
+
+    // Circle center must not be inside any shape
+    expect(
+      polygons.some(p => pointInPolygon2D(circleCenter.x, circleCenter.y, p)),
+    ).toBe(false);
+  });
+});
