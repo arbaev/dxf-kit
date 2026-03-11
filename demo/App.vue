@@ -57,6 +57,21 @@
         <code class="hero-install">npm install dxf-vuer dxf-render three</code>
       </section>
 
+      <div class="sample-buttons">
+        <span class="sample-label">Examples:</span>
+        <button
+          v-for="sample in samples"
+          :key="sample.file"
+          class="sample-btn"
+          :class="{ active: currentFileName === sample.label }"
+          :disabled="isLoadingSample"
+          @click="loadSample(sample)"
+        >
+          {{ sample.label }}
+          <span v-if="sample.hint" class="sample-hint">{{ sample.hint }}</span>
+        </button>
+      </div>
+
       <div v-if="error" class="error-message">
         <svg
           width="20"
@@ -181,19 +196,39 @@ const unsupportedEntities = ref<string[]>([]);
 const error = ref<string | null>(null);
 const currentFileName = ref<string>("");
 const dxfViewerRef = ref<InstanceType<typeof DXFViewer> | null>(null);
+const isLoadingSample = ref(false);
 
-onMounted(async () => {
-  await nextTick();
+const samples = [
+  { file: "/entities.dxf", label: "Basic Entities" },
+  { file: "/samples/linetypes.dxf", label: "Linetypes" },
+  { file: "/samples/electric.dxf", label: "Electric Schematic" },
+  { file: "/samples/hatch-patterns.dxf", label: "Hatch Patterns" },
+  { file: "/samples/floorplan.dxf", label: "Floor Plan" },
+  { file: "/samples/house-plan.dxf", label: "House Plan", hint: "17 MB" },
+];
+
+async function loadSample(sample: { file: string; label: string }) {
+  if (isLoadingSample.value) return;
+  isLoadingSample.value = true;
+  error.value = null;
+  unsupportedEntities.value = [];
   try {
-    const response = await fetch("/entities.dxf");
+    const response = await fetch(sample.file);
     const text = await response.text();
-    currentFileName.value = "entities.dxf";
+    currentFileName.value = sample.label;
     if (dxfViewerRef.value) {
       dxfViewerRef.value.loadDXFFromText(text);
     }
   } catch {
-    // Sample file not available — ignore
+    error.value = `Failed to load ${sample.label}`;
+  } finally {
+    isLoadingSample.value = false;
   }
+}
+
+onMounted(async () => {
+  await nextTick();
+  loadSample(samples[0]);
 });
 
 const handleFileSelected = async (file: File) => {
@@ -384,6 +419,53 @@ const resetView = () => {
   text-decoration: underline;
 }
 
+.sample-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.sample-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.sample-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: white;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.sample-btn:hover:not(:disabled):not(.active) {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.sample-btn.active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+.sample-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sample-hint {
+  font-size: 0.6875rem;
+  opacity: 0.6;
+  margin-left: 4px;
+}
+
 .error-message {
   display: flex;
   align-items: center;
@@ -450,6 +532,22 @@ const resetView = () => {
 .app.dark .feature-card {
   background: #1e1e1e;
   border-color: #333;
+}
+
+.app.dark .sample-btn {
+  background: #1e1e1e;
+  border-color: #444;
+}
+
+.app.dark .sample-btn:hover:not(:disabled) {
+  border-color: #6b8fd4;
+  color: #6b8fd4;
+}
+
+.app.dark .sample-btn.active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
 }
 
 .app.dark .viewer-container {
