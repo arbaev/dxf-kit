@@ -9,7 +9,7 @@ Framework-agnostic DXF parser and Three.js renderer. Use with React, Svelte, van
 
 [Live Demo](https://dxf-vuer.netlify.app) — upload your DXF and see the rendering quality.
 
-Try it now: [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz_small.svg)](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vanilla-ts?file=src/main.ts&title=dxf-render+Vanilla+TS) [![React](https://developer.stackblitz.com/img/open_in_stackblitz_small.svg)](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/react?file=src/DxfViewer.tsx&title=dxf-render+React)
+Try it now on StackBlitz: [Vanilla TS](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vanilla-ts?file=src/main.ts&title=dxf-render+Vanilla+TS) | [React](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/react?file=src/DxfViewer.tsx&title=dxf-render+React) | [Vue](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vue?file=src/App.vue&title=dxf-vuer+Vue+3)
 
 For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer) package.
 
@@ -62,8 +62,12 @@ scene.add(group);
 const frustumSize = 100;
 const aspect = myCanvas.clientWidth / myCanvas.clientHeight;
 const camera = new THREE.OrthographicCamera(
-  (frustumSize * aspect) / -2, (frustumSize * aspect) / 2,
-  frustumSize / 2, frustumSize / -2, 0.1, 1000,
+  (frustumSize * aspect) / -2,
+  (frustumSize * aspect) / 2,
+  frustumSize / 2,
+  frustumSize / -2,
+  0.1,
+  1000,
 );
 
 const renderer = new THREE.WebGLRenderer({ canvas: myCanvas });
@@ -135,8 +139,12 @@ export function DxfViewer({ dxfText }: { dxfText: string }) {
     scene.background = new THREE.Color(0xffffff);
 
     const camera = new THREE.OrthographicCamera(
-      (frustumSize * aspect) / -2, (frustumSize * aspect) / 2,
-      frustumSize / 2, frustumSize / -2, 0.1, 1000,
+      (frustumSize * aspect) / -2,
+      (frustumSize * aspect) / 2,
+      frustumSize / 2,
+      frustumSize / -2,
+      0.1,
+      1000,
     );
 
     const { fitCameraToBox } = useCamera();
@@ -157,7 +165,10 @@ export function DxfViewer({ dxfText }: { dxfText: string }) {
       renderer.render(scene, camera);
     })();
 
-    return () => { disposed = true; renderer.dispose(); };
+    return () => {
+      disposed = true;
+      renderer.dispose();
+    };
   }, [dxfText]);
 
   return <canvas ref={canvasRef} style={{ width: "100%", height: "500px" }} />;
@@ -273,26 +284,26 @@ Full TypeScript types exported: `DxfData`, `DxfEntity`, `DxfLayer`, `DxfHeader`,
 
 ## Comparison
 
-| Feature | dxf-render | dxf-viewer | dxf-parser | three-dxf |
-|---------|-----------|------------|------------|-----------|
-| DXF parsing | ✅ | ✅ | ✅ | ✅ |
-| Three.js rendering | ✅ | ✅ | ❌ | ✅ |
-| Entity types | 21 rendered | ~15 | ~15 parsed | ~8 |
-| Linetype patterns | ✅ DASHED, CENTER, DOT... | ❌ all solid | — | ❌ |
-| All dimension types | ✅ 7 types | linear only | — | ❌ |
-| LEADER / MULTILEADER | ✅ | ❌ | — | ❌ |
-| HATCH patterns | ✅ 25 built-in | ✅ | — | ❌ |
-| OCS (Arbitrary Axis) | ✅ full | Z-flip only | — | ❌ |
-| Vector text (opentype.js) | ✅ | ✅ | — | ❌ |
-| Geometry merging | ✅ | ✅ | — | ❌ |
-| Dark theme | ✅ instant switch | bg only | — | ❌ |
-| TypeScript | ✅ native | .d.ts | ✅ | ❌ |
-| Tests | 841 tests | 0 | ✅ | 0 |
-| Web Worker parsing | ✅ | ✅ | ❌ | ❌ |
-| Parser-only entry | ✅ zero deps | ❌ | ✅ | ❌ |
-| Framework | agnostic | agnostic | — | agnostic |
-| Bundle size | ~960KB | ~1.2MB | ~50KB | ~30KB |
-| Last updated | 2026 | 2024 | 2023 | 2019 |
+| Feature                   | dxf-render                | dxf-viewer   | dxf-parser | three-dxf |
+| ------------------------- | ------------------------- | ------------ | ---------- | --------- |
+| DXF parsing               | ✅                        | ✅           | ✅         | ✅        |
+| Three.js rendering        | ✅                        | ✅           | ❌         | ✅        |
+| Entity types              | 21 rendered               | ~15          | ~15 parsed | ~8        |
+| Linetype patterns         | ✅ DASHED, CENTER, DOT... | ❌ all solid | —          | ❌        |
+| All dimension types       | ✅ 7 types                | linear only  | —          | ❌        |
+| LEADER / MULTILEADER      | ✅                        | ❌           | —          | ❌        |
+| HATCH patterns            | ✅ 25 built-in            | ✅           | —          | ❌        |
+| OCS (Arbitrary Axis)      | ✅ full                   | Z-flip only  | —          | ❌        |
+| Vector text (opentype.js) | ✅                        | ✅           | —          | ❌        |
+| Geometry merging          | ✅                        | ✅           | —          | ❌        |
+| Dark theme                | ✅ instant switch         | bg only      | —          | ❌        |
+| TypeScript                | ✅ native                 | .d.ts        | ✅         | ❌        |
+| Tests                     | 841 tests                 | 0            | ✅         | 0         |
+| Web Worker parsing        | ✅                        | ✅           | ❌         | ❌        |
+| Parser-only entry         | ✅ zero deps              | ❌           | ✅         | ❌        |
+| Framework                 | agnostic                  | agnostic     | —          | agnostic  |
+| Bundle size               | ~960KB                    | ~1.2MB       | ~50KB      | ~30KB     |
+| Last updated              | 2026                      | 2024         | 2023       | 2019      |
 
 ## Bundle sizes
 
