@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { DXFViewer, FileUploader, parseDxf } from "dxf-vuer";
+import { DXFViewer, parseDxf } from "dxf-vuer";
 import type { DxfData } from "dxf-vuer";
 import "dxf-vuer/style.css";
 
 const dxfData = ref<DxfData | null>(null);
 const fileName = ref("");
 
-async function handleFile(file: File) {
+async function handleFile(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
   fileName.value = file.name;
   const text = await file.text();
   dxfData.value = parseDxf(text);
@@ -17,7 +19,10 @@ async function handleFile(file: File) {
 <template>
   <div style="font-family: system-ui, sans-serif">
     <div style="padding: 16px; display: flex; gap: 12px; align-items: center">
-      <FileUploader @file-selected="handleFile" />
+      <label style="padding: 8px 16px; background: #fff; border: 1px solid #ccc; border-radius: 6px; cursor: pointer; font-size: 14px">
+        Open DXF file
+        <input type="file" accept=".dxf" hidden @change="handleFile" />
+      </label>
       <span v-if="fileName" style="font-size: 14px; color: #666">{{ fileName }}</span>
     </div>
 
