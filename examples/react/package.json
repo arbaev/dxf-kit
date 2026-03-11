@@ -1,0 +1,23 @@
+{
+  "name": "dxf-render-react-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build"
+  },
+  "dependencies": {
+    "dxf-render": "^1.0.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/three": "^0.182.0",
+    "@vitejs/plugin-react": "^4.5.2",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  }
+}

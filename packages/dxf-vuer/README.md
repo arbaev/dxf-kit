@@ -8,7 +8,7 @@
 
 Vue 3 component for viewing DXF files in the browser. Thin wrapper around [dxf-render](https://www.npmjs.com/package/dxf-render).
 
-[Live Demo](https://dxf-vuer.netlify.app) | [GitHub](https://github.com/arbaev/dxf-kit)
+[Live Demo](https://dxf-vuer.netlify.app) | [GitHub](https://github.com/arbaev/dxf-kit) | [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz_small.svg)](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vue?file=src/App.vue&title=dxf-vuer+Vue+3)
 
 ## Installation
 
