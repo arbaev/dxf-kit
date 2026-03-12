@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { NURBSCurve } from "three/examples/jsm/curves/NURBSCurve.js";
+import { NURBSCurve } from "three/addons/curves/NURBSCurve.js";
 import type { DxfVertex, DxfSplineEntity } from "@/types/dxf";
 import { isSplineEntity } from "@/types/dxf";
 import type { CollectEntityParams } from "../blockTemplateCache";

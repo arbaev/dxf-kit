@@ -1,8 +1,8 @@
 import { ref } from "vue";
 import * as THREE from "three";
-import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
-import { TAARenderPass } from "three/examples/jsm/postprocessing/TAARenderPass.js";
-import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { TAARenderPass } from "three/addons/postprocessing/TAARenderPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {
   useOrbitControls,
   CAMERA_NEAR_PLANE,

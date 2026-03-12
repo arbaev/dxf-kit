@@ -16,7 +16,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          three: ["three", "three/examples/jsm/curves/NURBSCurve.js"],
+          three: ["three", "three/addons/curves/NURBSCurve.js"],
         },
       },
     },
