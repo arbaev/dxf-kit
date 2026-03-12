@@ -171,7 +171,7 @@ function parseTable(
 
 function parseLayers(scanner: DxfScanner): Record<string, ILayer> {
   const layers: Record<string, ILayer> = {};
-  let layer = {} as ILayer;
+  let layer = { visible: true, frozen: false, locked: false } as ILayer;
   let layerName: string | undefined;
 
   let curr = scanner.next();
@@ -205,7 +205,7 @@ function parseLayers(scanner: DxfScanner): Record<string, ILayer> {
       case 0:
         if (curr.value === "LAYER") {
           layers[layerName!] = layer;
-          layer = {} as ILayer;
+          layer = { visible: true, frozen: false, locked: false } as ILayer;
           layerName = undefined;
         }
         curr = scanner.next();
