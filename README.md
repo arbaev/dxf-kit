@@ -79,6 +79,7 @@ async function loadFile(file) {
 ## Features
 
 - **21 DXF entity types** — LINE, CIRCLE, ARC, ELLIPSE, SPLINE, POLYLINE, LWPOLYLINE, TEXT, MTEXT, DIMENSION, HATCH, INSERT, SOLID, 3DFACE, LEADER, MULTILEADER, MLINE, XLINE, RAY, ATTDEF, HELIX, plus ATTRIB within blocks
+- **Variable-width polylines** — per-vertex `startWidth`/`endWidth` tapering, constant-width, arrows, donuts rendered as mesh geometry with miter joins
 - **Linetype rendering** — DASHED, HIDDEN, CENTER, PHANTOM, DOT, DASHDOT with LTSCALE support
 - **Hatch patterns** — 25 built-in AutoCAD patterns with multi-boundary clipping
 - **Vector text** — crisp at any zoom; Liberation Sans/Serif fonts; bold, italic, underline, MTEXT formatting

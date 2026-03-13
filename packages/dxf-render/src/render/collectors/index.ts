@@ -43,7 +43,7 @@ export function collectEntity(p: CollectEntityParams): boolean {
 }
 
 // Re-export helpers needed by other modules
-export { computePolylinePoints } from "./polylineCollector";
+export { computePolylinePoints, resolveSegmentWidths, hasAnyWidth } from "./polylineCollector";
 export { computeSplinePoints } from "./splineCollector";
 export { computePointDisplaySize } from "./pointCollector";
 

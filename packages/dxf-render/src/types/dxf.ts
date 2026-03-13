@@ -44,6 +44,8 @@ export interface DxfArcEntity extends DxfEntityBase {
 }
 
 export interface DxfPolylineVertex extends DxfVertex {
+  startWidth?: number;  // Per-vertex start width (DXF code 40)
+  endWidth?: number;    // Per-vertex end width (DXF code 41)
   bulge?: number;
   vertexFlags?: number;
   faceA?: number;

@@ -16,6 +16,7 @@ For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer)
 ## Why dxf-render?
 
 - **Most entities** — 21 rendered types including all dimension variants, LEADER, MULTILEADER, MLINE
+- **Variable-width polylines** — per-vertex tapering, arrows, donuts rendered as mesh with miter joins
 - **Accurate rendering** — linetype patterns, OCS transforms, hatch patterns, proper color resolution
 - **Two entry points** — full renderer or parser-only (zero deps, works in Node.js)
 - **Battle-tested** — 841 tests covering parser, renderer, and utilities
@@ -282,6 +283,8 @@ Full TypeScript types exported: `DxfData`, `DxfEntity`, `DxfLayer`, `DxfHeader`,
 
 21 rendered entity types: LINE, CIRCLE, ARC, ELLIPSE, POINT, POLYLINE, LWPOLYLINE, SPLINE, TEXT, MTEXT, DIMENSION, INSERT, SOLID, 3DFACE, HATCH, LEADER, MULTILEADER, MLINE, XLINE, RAY, ATTDEF, plus ATTRIB within INSERT blocks and HELIX via SPLINE.
 
+POLYLINE/LWPOLYLINE support includes per-vertex variable width (tapering), constant-width segments, arrows, donuts, and bulge arcs — all rendered as triangle-strip mesh geometry with proper miter joins at corners.
+
 ## Comparison
 
 | Feature                   | dxf-render                | dxf-viewer   | dxf-parser | three-dxf |
@@ -289,6 +292,7 @@ Full TypeScript types exported: `DxfData`, `DxfEntity`, `DxfLayer`, `DxfHeader`,
 | DXF parsing               | ✅                        | ✅           | ✅         | ✅        |
 | Three.js rendering        | ✅                        | ✅           | ❌         | ✅        |
 | Entity types              | 21 rendered               | ~15          | ~15 parsed | ~8        |
+| Variable-width polylines  | ✅ tapering, arrows, donuts| ❌           | —          | ❌        |
 | Linetype patterns         | ✅ DASHED, CENTER, DOT... | ❌ all solid | —          | ❌        |
 | All dimension types       | ✅ 7 types                | linear only  | —          | ❌        |
 | LEADER / MULTILEADER      | ✅                        | ❌           | —          | ❌        |
@@ -298,7 +302,7 @@ Full TypeScript types exported: `DxfData`, `DxfEntity`, `DxfLayer`, `DxfHeader`,
 | Geometry merging          | ✅                        | ✅           | —          | ❌        |
 | Dark theme                | ✅ instant switch         | bg only      | —          | ❌        |
 | TypeScript                | ✅ native                 | .d.ts        | ✅         | ❌        |
-| Tests                     | 841 tests                 | 0            | ✅         | 0         |
+| Tests                     | 854 tests                 | 0            | ✅         | 0         |
 | Web Worker parsing        | ✅                        | ✅           | ❌         | ❌        |
 | Parser-only entry         | ✅ zero deps              | ❌           | ✅         | ❌        |
 | Framework                 | agnostic                  | agnostic     | —          | agnostic  |

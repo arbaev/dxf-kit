@@ -144,8 +144,9 @@
           <h3>21 Entity Types</h3>
           <p>
             Lines, arcs, splines, multilines, construction lines, hatches with 25 AutoCAD patterns,
-            architectural dimensions, block inserts with attributes, leader/multileader. Linetypes,
-            OCS transforms, and paper space filtering.
+            architectural dimensions, block inserts with attributes, leader/multileader.
+            Variable-width polylines with per-vertex tapering, arrows, and donuts.
+            Linetypes, OCS transforms, and paper space filtering.
           </p>
         </div>
         <div class="feature-card">
@@ -260,7 +261,7 @@ const examples = [
 
 const samples = [
   { file: "/entities.dxf", label: "Basic Entities" },
-  { file: "/samples/linetypes.dxf", label: "Linetypes" },
+  { file: "/samples/linetypes.dxf", label: "Line Types & Widths" },
   { file: "/samples/electric.dxf", label: "Electric Schematic" },
   { file: "/samples/hatch-patterns.dxf", label: "Hatch Patterns" },
   { file: "/samples/floorplan.dxf", label: "Floor Plan" },

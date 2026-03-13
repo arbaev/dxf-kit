@@ -4,6 +4,8 @@ import * as helpers from "../parseHelpers";
 import type { IPoint, IEntityBase } from "../parseHelpers";
 
 interface IVertexEntity extends IEntityBase, IPoint {
+  startWidth?: number;
+  endWidth?: number;
   bulge?: number;
   vertexFlags?: number;
   faceA?: number;
@@ -125,8 +127,10 @@ function parseVertex(scanner: DxfScanner, curr: IGroup): IVertexEntity {
         entity.z = curr.value as number;
         break;
       case 40:
+        if (curr.value !== 0) entity.startWidth = curr.value as number;
         break;
       case 41:
+        if (curr.value !== 0) entity.endWidth = curr.value as number;
         break;
       case 42:
         if (curr.value !== 0) entity.bulge = curr.value as number;

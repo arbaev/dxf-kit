@@ -122,6 +122,58 @@ describe("parsePolyline", () => {
     expect(entity.vertices[1].z).toBe(2);
   });
 
+  // -- Vertex with startWidth and endWidth ------------------------------------
+
+  it("parses vertex with startWidth and endWidth (codes 40/41)", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "POLYLINE",
+      "8", "Layer1",
+      "0", "VERTEX",
+      "10", "0.0",
+      "20", "0.0",
+      "40", "2.5",
+      "41", "1.0",
+      "0", "VERTEX",
+      "10", "10.0",
+      "20", "5.0",
+      "40", "1.0",
+      "41", "0.5",
+      "0", "SEQEND",
+      "0", "EOF",
+    );
+
+    const entity = parsePolyline(scanner, group) as IPolylineEntity;
+
+    expect(entity.vertices).toHaveLength(2);
+    expect(entity.vertices[0].startWidth).toBe(2.5);
+    expect(entity.vertices[0].endWidth).toBe(1.0);
+    expect(entity.vertices[1].startWidth).toBe(1.0);
+    expect(entity.vertices[1].endWidth).toBe(0.5);
+  });
+
+  it("parses vertex with only startWidth (code 40)", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "POLYLINE",
+      "8", "Layer1",
+      "0", "VERTEX",
+      "10", "0.0",
+      "20", "0.0",
+      "40", "3.0",
+      "0", "VERTEX",
+      "10", "10.0",
+      "20", "5.0",
+      "0", "SEQEND",
+      "0", "EOF",
+    );
+
+    const entity = parsePolyline(scanner, group) as IPolylineEntity;
+
+    expect(entity.vertices[0].startWidth).toBe(3.0);
+    expect(entity.vertices[0].endWidth).toBeUndefined();
+    expect(entity.vertices[1].startWidth).toBeUndefined();
+    expect(entity.vertices[1].endWidth).toBeUndefined();
+  });
+
   // -- Polyline with thickness ------------------------------------------------
 
   it("parses polyline with thickness (code 39)", () => {
