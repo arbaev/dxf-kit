@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.2.0
+
+### Features
+
+- **Touch support**: `touch-action: none` on `.dxf-viewer` container for correct mobile touch handling.
+- **GIS origin offset**: uses `originOffset` from dxf-render instead of `group.position` shift for correct large-coordinate handling.
+
+### Refactored
+
+- Import `useControls` instead of deprecated `useOrbitControls`.
+
+### Dependencies
+
+- Requires `dxf-render` ≥ 1.2.0 (new `originOffset` return value, `useControls`).
+
 ## 2.1.0
 
 ### Features

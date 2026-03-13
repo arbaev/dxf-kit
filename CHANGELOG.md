@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## dxf-render [1.2.0] / dxf-vuer [2.2.0] - 2026-03-13
+
+### Added
+
+- **Variable-width polylines** — POLYLINE/LWPOLYLINE per-vertex `startWidth`/`endWidth` tapering with triangle-strip mesh geometry and miter joins
+- **GIS origin translation** — `$EXTMIN/$EXTMAX` center subtracted from coordinates before Float32Array to prevent precision loss at large GIS coordinates; `originOffset` returned from `createThreeObjectsFromDXF()`
+- **Touch support** — `MapControls` for native one-finger pan on mobile; `touch-action: none` on viewer container
+- **Example: leaflet-dxf** — overlay DXF on OpenStreetMap with geo-referencing (parser-only, DXF → GeoJSON)
+- **Example: dxf-to-pdf** — export DXF to PDF via Three.js offscreen rendering + jsPDF
+- **Demo: "Line Types & Widths" showcase** — combined linetypes and polyline width examples with annotations
+- **Demo: Examples section** with StackBlitz links for all 5 examples
+
+### Changed
+
+- `useOrbitControls` renamed to `useControls` (old name kept as deprecated alias)
+- dxf-vuer uses `originOffset` instead of `group.position` shift
+- 874 test cases across 37 files (was 854 across 36)
+
 ## dxf-render [1.0.3] / dxf-vuer [2.0.2] - 2026-03-11
 
 ### Added
