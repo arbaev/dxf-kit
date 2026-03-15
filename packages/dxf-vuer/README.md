@@ -44,11 +44,41 @@ async function loadFile(file) {
 
 | Component | Description |
 |-----------|-------------|
-| `DXFViewer` | Main viewer: Three.js scene, layer panel, toolbar, drag-and-drop, dark theme |
+| `DXFViewer` | Main viewer: Three.js scene, layer panel, toolbar, error display, drag-and-drop, dark theme |
 | `FileUploader` | File input button. Emits `file-selected` with `File` |
 | `LayerPanel` | Collapsible layer visibility panel with color indicators |
 | `UnsupportedEntities` | Collapsible list of unsupported entity types |
 | `DXFStatistics` | File statistics (entities, layers, blocks, AutoCAD version) |
+
+## DXFViewer Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `dxfData` | `DxfData \| null` | `null` | Parsed DXF data object |
+| `fileName` | `string` | `""` | File name displayed in the viewer |
+| `url` | `string` | `""` | URL to fetch and display a DXF file |
+| `showResetButton` | `boolean` | `false` | Show fit-to-view button |
+| `showFullscreenButton` | `boolean` | `true` | Show fullscreen toggle button |
+| `showExportButton` | `boolean` | `false` | Show export-to-PNG button |
+| `showFileName` | `boolean` | `true` | Show file name overlay |
+| `showCoordinates` | `boolean` | `false` | Show cursor world coordinates on hover |
+| `showZoomLevel` | `boolean` | `false` | Show zoom percentage (100% = fit-to-view) |
+| `showDebugInfo` | `boolean` | `false` | Show debug overlay (FPS, draw calls, lines, triangles) |
+| `allowDrop` | `boolean` | `false` | Enable drag-and-drop file loading |
+| `darkTheme` | `boolean` | `false` | Dark theme for viewer and scene |
+| `autoFit` | `boolean` | `true` | Auto-fit camera to drawing on load |
+| `fontUrl` | `string` | `""` | Custom font URL for text rendering |
+
+## DXFViewer Events
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `dxf-loaded` | `boolean` | Emitted after load attempt (true = success) |
+| `dxf-data` | `DxfData \| null` | Parsed DXF data or null on error |
+| `error` | `string` | Error message on parse/render/fetch failure |
+| `unsupported-entities` | `string[]` | List of unsupported entity types found |
+| `reset-view` | — | Emitted when view is reset to fit |
+| `file-dropped` | `string` | File name when a file is dropped |
 
 ## Composables
 

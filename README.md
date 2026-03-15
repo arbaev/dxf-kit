@@ -48,7 +48,7 @@ const dxf = parseDxf(dxfText);
 [![npm](https://img.shields.io/npm/v/dxf-vuer)](https://www.npmjs.com/package/dxf-vuer)
 [![npm downloads](https://img.shields.io/npm/dm/dxf-vuer)](https://www.npmjs.com/package/dxf-vuer)
 
-Thin Vue 3 wrapper around `dxf-render`. Drop-in `<DXFViewer>` component with layer panel, dark theme, drag-and-drop, export to PNG.
+Thin Vue 3 wrapper around `dxf-render`. Drop-in `<DXFViewer>` component with layer panel, dark theme, drag-and-drop, export to PNG, zoom level, error display, debug overlay.
 
 ```bash
 npm install dxf-vuer dxf-render three
@@ -85,6 +85,9 @@ async function loadFile(file) {
 - **Vector text** — crisp at any zoom; Liberation Sans/Serif fonts; bold, italic, underline, MTEXT formatting
 - **Dark theme** — instant switching
 - **Layer panel** — toggle visibility with color indicators
+- **Error display** — parse/render/fetch errors shown in the viewer
+- **Debug overlay** — FPS, draw calls, lines, triangles
+- **Zoom level** — percentage display relative to fit-to-view
 - **TAA anti-aliasing** — smooth edges after idle accumulation
 - **TypeScript** — strict types, full `.d.ts` declarations
 
