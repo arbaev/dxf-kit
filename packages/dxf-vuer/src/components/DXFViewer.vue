@@ -22,8 +22,8 @@
           <path
             d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
           />
-          <line x1="12" y1="9" x2="12" y2="13" />
-          <line x1="12" y1="17" x2="12.01" y2="17" />
+          <line x1="12" y1="9" x2="12" y2="14" />
+          <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
         </svg>
         <div class="message-title">WebGL Not Supported</div>
         <div class="message-text">Update your browser or enable hardware acceleration</div>
@@ -158,6 +158,27 @@
       </div>
     </div>
 
+    <div v-else-if="errorMessage" class="message-overlay error-overlay">
+      <div class="message-content error">
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+          />
+          <line x1="12" y1="9" x2="12" y2="14" />
+          <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
+        </svg>
+        <div class="message-title">Error</div>
+        <div class="message-text">{{ errorMessage }}</div>
+      </div>
+    </div>
+
     <div v-else-if="!hasDXFData" class="message-overlay">
       <div class="message-content placeholder">
         <svg
@@ -200,6 +221,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick, toRaw } fro
 import * as THREE from "three";
 import { useDXFRenderer } from "../composables/useDXFRenderer";
 import { useLayers } from "../composables/useLayers";
+import { useLoadError } from "../composables/useLoadError";
 import type { DxfData, DxfLayer } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
 
@@ -266,6 +288,7 @@ const {
 } = useDXFRenderer();
 
 const loadingPhase = ref<"" | "fetching" | "parsing" | "rendering">("");
+const { errorMessage, setError, clearError } = useLoadError();
 
 // Cursor world coordinates
 const cursorX = ref(0);
@@ -396,7 +419,16 @@ const handleHideAllLayers = () => {
   applyLayerVisibility(visibleLayerNames.value);
 };
 
+const handleLoadError = (error: unknown, fallbackMsg: string) => {
+  clearLayers();
+  const msg = setError(error, fallbackMsg);
+  emit("error", msg);
+  emit("dxf-loaded", false);
+  emit("dxf-data", null);
+};
+
 const loadDXFFromText = async (dxfText: string) => {
+  clearError();
   isLoading.value = true;
   try {
     loadingPhase.value = "parsing";
@@ -406,7 +438,6 @@ const loadDXFFromText = async (dxfText: string) => {
 
     loadingPhase.value = "rendering";
     const unsupportedEntities = await displayDXF(dxf, props.darkTheme, props.fontUrl);
-
     initLayersFromDXF(dxf, props.darkTheme);
     applyLayerVisibility(visibleLayerNames.value);
     emit("dxf-loaded", true);
@@ -416,11 +447,7 @@ const loadDXFFromText = async (dxfText: string) => {
       emit("unsupported-entities", unsupportedEntities);
     }
   } catch (error) {
-    clearLayers();
-    const errorMsg = error instanceof Error ? error.message : "Unknown error loading DXF";
-    emit("error", errorMsg);
-    emit("dxf-loaded", false);
-    emit("dxf-data", null);
+    handleLoadError(error, "Unknown error loading DXF");
   } finally {
     loadingPhase.value = "";
     isLoading.value = false;
@@ -428,6 +455,7 @@ const loadDXFFromText = async (dxfText: string) => {
 };
 
 const loadDXFFromData = async (dxfData: DxfData) => {
+  clearError();
   isLoading.value = true;
   loadingPhase.value = "rendering";
   try {
@@ -441,11 +469,7 @@ const loadDXFFromData = async (dxfData: DxfData) => {
       emit("unsupported-entities", unsupportedEntities);
     }
   } catch (error) {
-    clearLayers();
-    const errorMsg = error instanceof Error ? error.message : "Unknown error displaying DXF";
-    emit("error", errorMsg);
-    emit("dxf-loaded", false);
-    emit("dxf-data", null);
+    handleLoadError(error, "Unknown error displaying DXF");
   } finally {
     loadingPhase.value = "";
     isLoading.value = false;
@@ -453,6 +477,7 @@ const loadDXFFromData = async (dxfData: DxfData) => {
 };
 
 const loadDXFFromUrl = async (url: string) => {
+  clearError();
   isLoading.value = true;
   loadingPhase.value = "fetching";
   try {
@@ -463,9 +488,7 @@ const loadDXFFromUrl = async (url: string) => {
   } catch (error) {
     // loadDXFFromText has its own error handling;
     // this catch handles fetch errors only
-    const msg = error instanceof Error ? error.message : "Failed to fetch DXF";
-    emit("error", msg);
-    emit("dxf-loaded", false);
+    handleLoadError(error, "Failed to fetch DXF");
   } finally {
     loadingPhase.value = "";
     isLoading.value = false;
@@ -698,6 +721,13 @@ defineExpose({
   background-color: rgba(250, 250, 250, 0.85);
 }
 
+.error-overlay {
+  z-index: 20;
+  background-color: rgba(250, 250, 250, 0.95);
+}
+
+
+
 .spinner {
   width: 40px;
   height: 40px;
@@ -741,6 +771,12 @@ defineExpose({
 .dark-theme .loading-overlay {
   background-color: rgba(26, 26, 26, 0.85);
 }
+
+.dark-theme .error-overlay {
+  background-color: rgba(26, 26, 26, 0.95);
+}
+
+
 
 .dark-theme .file-name-overlay {
   background-color: rgba(30, 30, 30, 0.95);
