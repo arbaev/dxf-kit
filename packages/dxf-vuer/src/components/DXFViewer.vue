@@ -128,12 +128,17 @@
       @hide-all="handleHideAllLayers"
     />
 
-    <div v-if="showCoordinates && isCursorVisible && hasDXFData" class="coordinates-overlay">
-      <div class="coord-row">
-        <span class="coord-label">X:</span><span class="coord-value">{{ cursorX.toFixed(2) }}</span>
-      </div>
-      <div class="coord-row">
-        <span class="coord-label">Y:</span><span class="coord-value">{{ cursorY.toFixed(2) }}</span>
+    <div v-if="(showCoordinates || showZoomLevel) && hasDXFData" class="coordinates-overlay">
+      <template v-if="showCoordinates && isCursorVisible">
+        <div class="coord-row">
+          <span class="coord-label">X:</span><span class="coord-value">{{ cursorX.toFixed(2) }}</span>
+        </div>
+        <div class="coord-row">
+          <span class="coord-label">Y:</span><span class="coord-value">{{ cursorY.toFixed(2) }}</span>
+        </div>
+      </template>
+      <div v-if="showZoomLevel" class="coord-row">
+        <span class="coord-value zoom-value">{{ zoomPercent }}%</span>
       </div>
     </div>
 
@@ -233,6 +238,7 @@ interface Props {
   showFullscreenButton?: boolean;
   autoFit?: boolean;
   showCoordinates?: boolean;
+  showZoomLevel?: boolean;
   showFileName?: boolean;
   showExportButton?: boolean;
   allowDrop?: boolean;
@@ -248,6 +254,7 @@ const props = withDefaults(defineProps<Props>(), {
   showFullscreenButton: true,
   autoFit: true,
   showCoordinates: false,
+  showZoomLevel: false,
   showFileName: true,
   showExportButton: false,
   allowDrop: false,
@@ -272,6 +279,7 @@ const isFullscreen = ref(false);
 const {
   isLoading,
   displayProgress,
+  zoomPercent,
   webGLSupported,
   error: rendererError,
   initThreeJS,
@@ -674,6 +682,11 @@ defineExpose({
   width: 7em;
   text-align: right;
   flex-shrink: 0;
+}
+
+.zoom-value {
+  width: auto;
+  color: var(--dxf-vuer-text-secondary, #757575);
 }
 
 .message-overlay {

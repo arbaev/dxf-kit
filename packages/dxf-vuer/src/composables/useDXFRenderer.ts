@@ -21,17 +21,20 @@ interface RendererState {
   currentMaterials: MaterialCacheStore | null;
   originOffset: THREE.Vector3;
   abortController: AbortController | null;
+  baseZoom: number;
 }
 
 export function useDXFRenderer() {
   const isLoading = ref(false);
   const displayProgress = ref(0);
+  const zoomPercent = ref(100);
 
   const state: RendererState = {
     currentDXFGroup: null,
     currentMaterials: null,
     originOffset: new THREE.Vector3(),
     abortController: null,
+    baseZoom: 1,
   };
 
   const {
@@ -54,6 +57,10 @@ export function useDXFRenderer() {
   const { fitCameraToBox, handleResize: handleCameraResize, resetResizing } = useCamera();
 
   const render = () => {
+    const camera = getCamera();
+    if (camera && state.baseZoom > 0) {
+      zoomPercent.value = Math.round((camera.zoom / state.baseZoom) * 100);
+    }
     renderScene();
   };
 
@@ -158,6 +165,8 @@ export function useDXFRenderer() {
 
       setOrbitTarget(0, 0, 0);
       fitCameraToBox(box, camera);
+      state.baseZoom = camera.zoom;
+      zoomPercent.value = 100;
       saveOrbitState();
     }
 
@@ -224,6 +233,7 @@ export function useDXFRenderer() {
   return {
     isLoading,
     displayProgress,
+    zoomPercent,
     webGLSupported,
     error,
 
