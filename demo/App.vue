@@ -266,7 +266,7 @@ const resetView = () => {
 }
 
 .top-actions {
-  position: fixed;
+  position: absolute;
   top: var(--spacing-md);
   right: var(--spacing-md);
   z-index: 100;
