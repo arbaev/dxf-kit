@@ -142,6 +142,13 @@
       </div>
     </div>
 
+    <div v-if="showDebugInfo && hasDXFData" class="debug-overlay">
+      <span>{{ debugInfo.fps }} FPS</span>
+      <span>{{ debugInfo.drawCalls }} draws</span>
+      <span>{{ formatK(debugInfo.lines) }} lines</span>
+      <span>{{ formatK(debugInfo.triangles) }} tris</span>
+    </div>
+
     <div v-if="isLoading" class="message-overlay loading-overlay">
       <div class="message-content">
         <div class="spinner"></div>
@@ -239,6 +246,7 @@ interface Props {
   autoFit?: boolean;
   showCoordinates?: boolean;
   showZoomLevel?: boolean;
+  showDebugInfo?: boolean;
   showFileName?: boolean;
   showExportButton?: boolean;
   allowDrop?: boolean;
@@ -255,6 +263,7 @@ const props = withDefaults(defineProps<Props>(), {
   autoFit: true,
   showCoordinates: false,
   showZoomLevel: false,
+  showDebugInfo: false,
   showFileName: true,
   showExportButton: false,
   allowDrop: false,
@@ -280,6 +289,7 @@ const {
   isLoading,
   displayProgress,
   zoomPercent,
+  debugInfo,
   webGLSupported,
   error: rendererError,
   initThreeJS,
@@ -297,6 +307,12 @@ const {
 
 const loadingPhase = ref<"" | "fetching" | "parsing" | "rendering">("");
 const { errorMessage, setError, clearError } = useLoadError();
+
+const formatK = (n: number): string => {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+  return String(n);
+};
 
 // Cursor world coordinates
 const cursorX = ref(0);
@@ -687,6 +703,23 @@ defineExpose({
 .zoom-value {
   width: auto;
   color: var(--dxf-vuer-text-secondary, #757575);
+}
+
+.debug-overlay {
+  position: absolute;
+  bottom: var(--dxf-vuer-spacing-sm, 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  gap: var(--dxf-vuer-spacing-sm, 8px);
+  padding: 4px var(--dxf-vuer-spacing-sm, 8px);
+  background-color: rgba(0, 0, 0, 0.7);
+  color: #ccc;
+  border-radius: var(--dxf-vuer-border-radius, 4px);
+  font-size: 11px;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  pointer-events: none;
 }
 
 .message-overlay {

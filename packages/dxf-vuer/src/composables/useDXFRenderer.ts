@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { ref, reactive } from "vue";
 import * as THREE from "three";
 import type { Group } from "three";
 import {
@@ -22,12 +22,21 @@ interface RendererState {
   originOffset: THREE.Vector3;
   abortController: AbortController | null;
   baseZoom: number;
+  frameCount: number;
+  lastFpsTime: number;
+  fpsIdleTimer: ReturnType<typeof setTimeout> | null;
 }
 
 export function useDXFRenderer() {
   const isLoading = ref(false);
   const displayProgress = ref(0);
   const zoomPercent = ref(100);
+  const debugInfo = reactive({
+    fps: 0,
+    drawCalls: 0,
+    triangles: 0,
+    lines: 0,
+  });
 
   const state: RendererState = {
     currentDXFGroup: null,
@@ -35,6 +44,9 @@ export function useDXFRenderer() {
     originOffset: new THREE.Vector3(),
     abortController: null,
     baseZoom: 1,
+    frameCount: 0,
+    lastFpsTime: 0,
+    fpsIdleTimer: null,
   };
 
   const {
@@ -62,6 +74,42 @@ export function useDXFRenderer() {
       zoomPercent.value = Math.round((camera.zoom / state.baseZoom) * 100);
     }
     renderScene();
+
+    // Count stats from the DXF scene graph directly
+    // (renderer.info includes post-processing passes overhead)
+    let drawCalls = 0;
+    let triangles = 0;
+    let lines = 0;
+    if (state.currentDXFGroup) {
+      state.currentDXFGroup.traverse((obj: THREE.Object3D) => {
+        if (!obj.visible) return;
+        const renderable = obj as THREE.Mesh;
+        if (!renderable.geometry) return;
+        drawCalls++;
+        const pos = renderable.geometry.getAttribute("position");
+        if (!pos) return;
+        if (renderable.isMesh) {
+          const idx = renderable.geometry.index;
+          triangles += idx ? idx.count / 3 : pos.count / 3;
+        } else if ((renderable as unknown as THREE.LineSegments).isLineSegments) {
+          lines += pos.count / 2;
+        }
+      });
+    }
+    debugInfo.drawCalls = drawCalls;
+    debugInfo.triangles = triangles;
+    debugInfo.lines = lines;
+    state.frameCount++;
+    const now = performance.now();
+    const elapsed = now - state.lastFpsTime;
+    if (elapsed >= 500) {
+      debugInfo.fps = Math.round((state.frameCount * 1000) / elapsed);
+      state.frameCount = 0;
+      state.lastFpsTime = now;
+    }
+    // Reset FPS to 0 after 1s of idle (no render() calls)
+    if (state.fpsIdleTimer) clearTimeout(state.fpsIdleTimer);
+    state.fpsIdleTimer = setTimeout(() => { debugInfo.fps = 0; }, 1000);
   };
 
   const initThreeJS = (container: HTMLDivElement, options: ThreeJSOptions = {}) => {
@@ -227,6 +275,10 @@ export function useDXFRenderer() {
     state.currentMaterials = null;
     state.originOffset = new THREE.Vector3();
     state.abortController = null;
+    if (state.fpsIdleTimer) {
+      clearTimeout(state.fpsIdleTimer);
+      state.fpsIdleTimer = null;
+    }
     resetResizing();
   };
 
@@ -234,6 +286,7 @@ export function useDXFRenderer() {
     isLoading,
     displayProgress,
     zoomPercent,
+    debugInfo,
     webGLSupported,
     error,
 

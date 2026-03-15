@@ -119,6 +119,7 @@
           :show-reset-button="!!dxfData"
           :show-coordinates="true"
           :show-zoom-level="true"
+          :show-debug-info="true"
           :show-export-button="true"
           :allow-drop="true"
           :dark-theme="isDark"
