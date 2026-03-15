@@ -1,6 +1,6 @@
 <template>
   <section class="examples">
-    <h2>Examples</h2>
+    <h2>Interactive Examples</h2>
     <p class="examples-subtitle">
       Try interactive examples on StackBlitz — no installation required.
     </p>
@@ -97,7 +97,7 @@ const examples = [
   padding: var(--spacing-md) var(--spacing-lg);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  background: white;
+  background: var(--card-bg, white);
   text-decoration: none;
   color: inherit;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
@@ -124,7 +124,7 @@ const examples = [
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: #f0f4ff;
+  background: var(--accent-bg, #f0f4ff);
   color: var(--primary-color);
 }
 
@@ -148,19 +148,4 @@ const examples = [
   }
 }
 
-:global(.app.dark) .example-card {
-  background: #1e1e1e;
-  border-color: #333;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-}
-
-:global(.app.dark) .example-card:hover {
-  border-color: #6b8fd4;
-  box-shadow: 0 3px 12px rgba(107, 143, 212, 0.2);
-}
-
-:global(.app.dark) .example-icon {
-  background: #1a2744;
-  color: #6b8fd4;
-}
 </style>

@@ -72,13 +72,8 @@ const whatsNew = [
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--primary-color);
-  background: #f0f4ff;
+  background: var(--accent-bg, #f0f4ff);
   padding: 2px 8px;
   border-radius: 4px;
-}
-
-:global(.app.dark) .whats-new-version {
-  background: #1a2744;
-  color: #6b8fd4;
 }
 </style>

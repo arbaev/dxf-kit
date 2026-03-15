@@ -57,7 +57,7 @@ const features = [
   padding: var(--spacing-lg);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  background: white;
+  background: var(--card-bg, white);
 }
 
 .feature-card h3 {
@@ -81,7 +81,7 @@ const features = [
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: #f0f4ff;
+  background: var(--accent-bg, #f0f4ff);
   color: var(--primary-color);
   margin-bottom: var(--spacing-sm);
 }
@@ -90,15 +90,5 @@ const features = [
   .features {
     grid-template-columns: 1fr;
   }
-}
-
-:global(.app.dark) .feature-card {
-  background: #1e1e1e;
-  border-color: #333;
-}
-
-:global(.app.dark) .feature-icon {
-  background: #1a2744;
-  color: #6b8fd4;
 }
 </style>
