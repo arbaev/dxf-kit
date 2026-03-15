@@ -189,46 +189,9 @@
         />
       </div>
 
-      <section class="features">
-        <div v-for="feature in features" :key="feature.title" class="feature-card">
-          <div class="feature-icon" v-html="feature.icon" />
-          <h3>{{ feature.title }}</h3>
-          <p v-html="feature.body" />
-        </div>
-      </section>
-
-      <section class="whats-new">
-        <h2>What's New</h2>
-        <div class="whats-new-list">
-          <div v-for="item in whatsNew" :key="item.text" class="whats-new-item">
-            <span class="whats-new-version">{{ item.version }}</span>
-            <span class="whats-new-text">{{ item.text }}</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="examples">
-        <h2>Examples</h2>
-        <p class="examples-subtitle">
-          Try interactive examples on StackBlitz — no installation required.
-        </p>
-        <div class="examples-grid">
-          <a
-            v-for="example in examples"
-            :key="example.title"
-            :href="example.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="example-card"
-          >
-            <span class="example-icon" v-html="example.icon" />
-            <div>
-              <h3>{{ example.title }}</h3>
-              <p>{{ example.description }}</p>
-            </div>
-          </a>
-        </div>
-      </section>
+      <FeaturesSection />
+      <WhatsNewSection />
+      <ExamplesSection />
 
       <footer class="app-footer">
         MIT License &middot;
@@ -253,6 +216,9 @@ import { ref, watch, onMounted, nextTick } from "vue";
 import { FileUploader, UnsupportedEntities, DXFViewer } from "dxf-vuer";
 import "dxf-vuer/style.css";
 import type { DxfData } from "dxf-render";
+import FeaturesSection from "./components/FeaturesSection.vue";
+import WhatsNewSection from "./components/WhatsNewSection.vue";
+import ExamplesSection from "./components/ExamplesSection.vue";
 
 const isDark = ref(window.matchMedia("(prefers-color-scheme: dark)").matches);
 const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
@@ -289,101 +255,6 @@ const currentFileName = ref<string>("");
 const dxfViewerRef = ref<InstanceType<typeof DXFViewer> | null>(null);
 const isLoadingSample = ref(false);
 const loadingSampleFile = ref<string | null>(null);
-
-const features = [
-  {
-    title: "Built-in Parser",
-    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
-    body: "Custom DXF parser with zero external dependencies. 21 entity types including dimensions, hatches, splines, multilines, construction lines, and block attributes. Async parsing in a Web Worker keeps the UI responsive.",
-  },
-  {
-    title: "Vector Text",
-    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>',
-    body: "Crisp text at any zoom level via opentype.js triangulated glyphs. Sans and serif fonts, bold and italic, stacked fractions, MTEXT formatting. Custom font loading supported.",
-  },
-  {
-    title: "WebGL Rendering",
-    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
-    body: "Three.js-powered rendering with TAA anti-aliasing, pan, zoom, layer visibility, instant dark theme switching, drag-and-drop, and PNG export.",
-  },
-  {
-    title: "High Performance",
-    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
-    body: "Geometry merging cuts draw calls by 78%. Block template caching, time-sliced rendering with progress bar. Text batched as geometry with all other entities.",
-  },
-  {
-    title: "21 Entity Types",
-    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
-    body: "Lines, arcs, splines, multilines, construction lines, hatches with 25 AutoCAD patterns, architectural dimensions, block inserts with attributes, leader/multileader. Variable-width polylines with per-vertex tapering, arrows, and donuts. Linetypes, OCS transforms, and paper space filtering.",
-  },
-  {
-    title: "Framework Flexible",
-    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
-    body: 'Vue 3 component via dxf-vuer, or use <a href="https://www.npmjs.com/package/dxf-render" target="_blank" rel="noopener noreferrer">dxf-render</a> standalone with React, Svelte, or vanilla JS. Parser-only mode for Node.js. Full TypeScript support.',
-  },
-];
-
-const whatsNew = [
-  {
-    version: "1.2.0",
-    text: "Variable-width polylines with per-vertex tapering, arrows, and donuts",
-  },
-  {
-    version: "1.2.0",
-    text: "GIS origin translation — large UTM/state plane coordinates without precision loss",
-  },
-  { version: "1.2.0", text: "Touch support — native one-finger pan on mobile devices" },
-  { version: "1.1.0", text: "Theme-adaptive ACI 250-251 colors — dark grays invert in dark mode" },
-  {
-    version: "1.5.0",
-    text: "TAA anti-aliasing — 32-frame temporal accumulation for crisp text and edges",
-  },
-  { version: "1.5.0", text: "Instant dark mode — theme switching without full re-render" },
-  { version: "1.4.0", text: "MLINE, XLINE, RAY entities — multilines and construction lines" },
-  {
-    version: "1.4.0",
-    text: "25 built-in hatch patterns with solid fill optimization (86× faster)",
-  },
-];
-
-const STACKBLITZ_BASE = "https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples";
-
-const examples = [
-  {
-    title: "Vanilla TypeScript",
-    description:
-      "Minimal setup with dxf-render and Three.js — parse, render, and display a DXF file.",
-    url: `${STACKBLITZ_BASE}/vanilla-ts?file=src/main.ts&title=dxf-render+Vanilla+TS`,
-    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>',
-  },
-  {
-    title: "React",
-    description: "DXF viewer as a React component with useEffect, useRef, and Three.js rendering.",
-    url: `${STACKBLITZ_BASE}/react?file=src/DxfViewer.tsx&title=dxf-render+React`,
-    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="2"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/></svg>',
-  },
-  {
-    title: "Vue 3",
-    description:
-      "Drop-in DXF viewer using the dxf-vuer component — dark theme, layers, and export.",
-    url: `${STACKBLITZ_BASE}/vue?file=src/App.vue&title=dxf-vuer+Vue+3`,
-    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3l10 19L22 3"/><path d="M6.5 3L12 14.5 17.5 3"/></svg>',
-  },
-  {
-    title: "Leaflet + DXF",
-    description:
-      "Overlay DXF on OpenStreetMap with geo-referencing — parser-only, no Three.js. Includes Florence city center sample.",
-    url: `${STACKBLITZ_BASE}/leaflet-dxf?file=src/main.ts&title=dxf-render+Leaflet`,
-    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>',
-  },
-  {
-    title: "DXF to PDF",
-    description:
-      "Export DXF drawings to PDF — offscreen Three.js rendering with page size and orientation options.",
-    url: `${STACKBLITZ_BASE}/dxf-to-pdf?file=src/main.ts&title=dxf-render+PDF+Export`,
-    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
-  },
-];
 
 const samples = [
   { file: "/entities.dxf", label: "Basic Entities", size: "191 KB" },
@@ -681,161 +552,6 @@ const resetView = () => {
   background: var(--border-color);
 }
 
-.features {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-md);
-  max-width: var(--content-max-width);
-  margin: var(--spacing-lg) auto 0;
-  padding: 0;
-}
-
-.feature-card {
-  padding: var(--spacing-lg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  background: white;
-}
-
-.feature-card h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: var(--spacing-sm);
-  color: var(--text-color);
-}
-
-.feature-card p {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  margin: 0;
-}
-
-.feature-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background: #f0f4ff;
-  color: var(--primary-color);
-  margin-bottom: var(--spacing-sm);
-}
-
-.whats-new {
-  max-width: var(--content-max-width);
-  margin: var(--spacing-lg) auto 0;
-  text-align: center;
-}
-
-.whats-new h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-color);
-  margin-bottom: var(--spacing-md);
-}
-
-.whats-new-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  text-align: left;
-}
-
-.whats-new-item {
-  display: flex;
-  align-items: baseline;
-  gap: var(--spacing-sm);
-  padding: 6px 0;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-.whats-new-version {
-  flex-shrink: 0;
-  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--primary-color);
-  background: #f0f4ff;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.examples {
-  max-width: var(--content-max-width);
-  margin: var(--spacing-lg) auto 0;
-  text-align: center;
-}
-
-.examples h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-color);
-  margin-bottom: var(--spacing-sm);
-}
-
-.examples-subtitle {
-  color: var(--text-secondary);
-  margin-bottom: var(--spacing-md);
-}
-
-.examples-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-md);
-  text-align: left;
-}
-
-.example-card {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-lg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  background: white;
-  text-decoration: none;
-  color: inherit;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-}
-
-.example-card:hover {
-  border-color: var(--primary-color);
-  box-shadow: 0 3px 12px rgba(74, 144, 217, 0.15);
-}
-
-.example-icon {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background: #f0f4ff;
-  color: var(--primary-color);
-}
-
-.example-card h3 {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--text-color);
-  margin-bottom: 2px;
-}
-
-.example-card p {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin: 0;
-}
-
 .app-footer {
   text-align: center;
   padding: var(--spacing-lg);
@@ -982,20 +698,23 @@ const resetView = () => {
     height: 50vh;
   }
 
-  .features {
-    grid-template-columns: 1fr;
-  }
+}
 
-  .examples-grid {
-    grid-template-columns: 1fr;
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
 /* Focus visible */
 .theme-toggle:focus-visible,
 .copy-btn:focus-visible,
-.sample-btn:focus-visible,
-.example-card:focus-visible {
+.sample-btn:focus-visible {
   outline: 2px solid var(--primary-color);
   outline-offset: 2px;
 }
@@ -1028,11 +747,6 @@ const resetView = () => {
   color: #6b8fd4;
 }
 
-.app.dark .feature-card {
-  background: #1e1e1e;
-  border-color: #333;
-}
-
 .app.dark .sample-btn {
   background: #1e1e1e;
   border-color: #444;
@@ -1057,32 +771,6 @@ const resetView = () => {
   background-color: #3a1c1e;
   color: #f5a0a5;
   border-color: #5c2b2e;
-}
-
-.app.dark .whats-new-version {
-  background: #1a2744;
-  color: #6b8fd4;
-}
-
-.app.dark .feature-icon {
-  background: #1a2744;
-  color: #6b8fd4;
-}
-
-.app.dark .example-card {
-  background: #1e1e1e;
-  border-color: #333;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-}
-
-.app.dark .example-card:hover {
-  border-color: #6b8fd4;
-  box-shadow: 0 3px 12px rgba(107, 143, 212, 0.2);
-}
-
-.app.dark .example-icon {
-  background: #1a2744;
-  color: #6b8fd4;
 }
 
 .app.dark .app-footer a {
