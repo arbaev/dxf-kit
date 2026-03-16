@@ -6,6 +6,7 @@ export { default as LayerPanel } from "./components/LayerPanel.vue";
 export { default as FileUploader } from "./components/FileUploader.vue";
 export { default as UnsupportedEntities } from "./components/UnsupportedEntities.vue";
 export { default as DXFStatistics } from "./components/DXFStatistics.vue";
+export { default as ViewerToolbar } from "./components/ViewerToolbar.vue";
 
 // Vue composables
 export { useDXFRenderer } from "./composables/useDXFRenderer";
