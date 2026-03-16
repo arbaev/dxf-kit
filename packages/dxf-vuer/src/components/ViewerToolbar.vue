@@ -83,6 +83,7 @@
         <path d="M20 16h-4v4" />
       </svg>
     </button>
+    <slot name="extra" />
   </div>
 </template>
 

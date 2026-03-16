@@ -41,16 +41,25 @@
           {{ fileName }}
         </div>
 
-        <ViewerToolbar
+        <slot
           v-if="toolbarPosition === pos"
-          :show-export-button="showExportButton"
-          :show-reset-button="showResetButton"
-          :show-fullscreen-button="showFullscreenButton"
-          :is-fullscreen="isFullscreen"
-          @export="exportToPNG"
-          @reset-view="handleResetView"
-          @toggle-fullscreen="toggleFullscreen"
-        />
+          name="toolbar"
+          v-bind="{ resetView: handleResetView, exportToPNG, toggleFullscreen, isFullscreen }"
+        >
+          <ViewerToolbar
+            :show-export-button="showExportButton"
+            :show-reset-button="showResetButton"
+            :show-fullscreen-button="showFullscreenButton"
+            :is-fullscreen="isFullscreen"
+            @export="exportToPNG"
+            @reset-view="handleResetView"
+            @toggle-fullscreen="toggleFullscreen"
+          >
+            <template v-if="$slots['toolbar-extra']" #extra>
+              <slot name="toolbar-extra" />
+            </template>
+          </ViewerToolbar>
+        </slot>
 
         <div v-if="coordinatesPosition === pos && (showCoordinates || showZoomLevel)" class="coordinates-overlay">
           <template v-if="showCoordinates && isCursorVisible">
@@ -80,66 +89,78 @@
           @show-all="handleShowAllLayers"
           @hide-all="handleHideAllLayers"
         />
+
+        <slot
+          v-if="overlayPosition === pos && $slots.overlay"
+          name="overlay"
+          v-bind="{ zoomPercent, cursorX, cursorY }"
+        />
       </div>
     </div>
 
     <div v-if="isLoading" class="message-overlay loading-overlay">
-      <div class="message-content">
-        <div class="spinner"></div>
-        <div class="message-text">
-          {{
-            loadingPhase === "fetching"
-              ? "Loading DXF..."
-              : loadingPhase === "parsing"
-                ? "Parsing DXF..."
-                : "Rendering..."
-          }}
+      <slot name="loading" :phase="loadingPhase" :progress="displayProgress">
+        <div class="message-content">
+          <div class="spinner"></div>
+          <div class="message-text">
+            {{
+              loadingPhase === "fetching"
+                ? "Loading DXF..."
+                : loadingPhase === "parsing"
+                  ? "Parsing DXF..."
+                  : "Rendering..."
+            }}
+          </div>
+          <div v-if="loadingPhase === 'rendering'" class="progress-container">
+            <div class="progress-bar" :style="{ width: displayProgress * 100 + '%' }"></div>
+          </div>
+          <div v-if="loadingPhase === 'rendering'" class="progress-text">
+            {{ Math.round(displayProgress * 100) }}%
+          </div>
         </div>
-        <div v-if="loadingPhase === 'rendering'" class="progress-container">
-          <div class="progress-bar" :style="{ width: displayProgress * 100 + '%' }"></div>
-        </div>
-        <div v-if="loadingPhase === 'rendering'" class="progress-text">
-          {{ Math.round(displayProgress * 100) }}%
-        </div>
-      </div>
+      </slot>
     </div>
 
     <div v-else-if="errorMessage" class="message-overlay error-overlay">
-      <div class="message-content error">
-        <svg
-          width="48"
-          height="48"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path
-            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-          />
-          <line x1="12" y1="9" x2="12" y2="14" />
-          <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
-        </svg>
-        <div class="message-title">Error</div>
-        <div class="message-text">{{ errorMessage }}</div>
-      </div>
+      <slot name="error" :message="errorMessage" :retry="retry">
+        <div class="message-content error">
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            />
+            <line x1="12" y1="9" x2="12" y2="14" />
+            <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
+          </svg>
+          <div class="message-title">Error</div>
+          <div class="message-text">{{ errorMessage }}</div>
+        </div>
+      </slot>
     </div>
 
     <div v-else-if="!hasDXFData" class="message-overlay">
-      <div class="message-content placeholder">
-        <svg
-          width="64"
-          height="64"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1"
-        >
-          <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-          <polyline points="13 2 13 9 20 9" />
-        </svg>
-        <div class="message-text">Select a DXF file to view</div>
-      </div>
+      <slot name="empty-state">
+        <div class="message-content placeholder">
+          <svg
+            width="64"
+            height="64"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+          >
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+            <polyline points="13 2 13 9 20 9" />
+          </svg>
+          <div class="message-text">Select a DXF file to view</div>
+        </div>
+      </slot>
     </div>
 
     <div v-if="isDragOver" class="message-overlay drop-overlay">
@@ -198,6 +219,7 @@ interface Props {
   coordinatesPosition?: OverlayPosition;
   debugPosition?: OverlayPosition;
   layerPanelPosition?: OverlayPosition;
+  overlayPosition?: OverlayPosition;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -220,6 +242,7 @@ const props = withDefaults(defineProps<Props>(), {
   coordinatesPosition: "bottom-left",
   debugPosition: "bottom-center",
   layerPanelPosition: "bottom-right",
+  overlayPosition: "top-center",
 });
 
 interface Emits {
@@ -367,6 +390,14 @@ const exportToPNG = () => {
   link.download = (props.fileName || "dxf-export").replace(/\.dxf$/i, "") + ".png";
   link.href = renderer.domElement.toDataURL("image/png");
   link.click();
+};
+
+const retry = () => {
+  if (props.url) {
+    loadDXFFromUrl(props.url);
+  } else if (props.dxfData && hasDXFData.value) {
+    loadDXFFromData(props.dxfData);
+  }
 };
 
 const initLayersFromDXF = (dxf: DxfData, darkTheme?: boolean) => {
