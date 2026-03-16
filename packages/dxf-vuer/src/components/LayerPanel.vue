@@ -116,19 +116,16 @@ const isExpanded = ref(true);
 
 <style scoped>
 .layer-panel {
-  position: absolute;
-  bottom: var(--dxf-vuer-spacing-sm, 8px);
-  right: var(--dxf-vuer-spacing-sm, 8px);
-  z-index: 10;
   background-color: rgba(255, 255, 255, 0.95);
   border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
   border-radius: var(--dxf-vuer-border-radius, 4px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  max-height: 50%;
+  max-height: 50vh;
   display: flex;
   flex-direction: column;
   min-width: 180px;
   max-width: 260px;
+  pointer-events: auto;
 }
 
 .layer-panel.collapsed {

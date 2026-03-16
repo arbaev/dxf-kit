@@ -110,12 +110,9 @@ defineEmits<{
 
 <style scoped>
 .viewer-toolbar {
-  position: absolute;
-  top: var(--dxf-vuer-spacing-sm, 8px);
-  right: var(--dxf-vuer-spacing-sm, 8px);
-  z-index: 10;
   display: flex;
   gap: 4px;
+  pointer-events: auto;
 }
 
 .toolbar-button {

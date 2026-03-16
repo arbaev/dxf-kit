@@ -30,48 +30,57 @@
       </div>
     </div>
 
-    <div v-if="showFileName && fileName && hasDXFData" class="file-name-overlay">
-      {{ fileName }}
-    </div>
-
-    <ViewerToolbar
-      v-if="hasDXFData"
-      :show-export-button="showExportButton"
-      :show-reset-button="showResetButton"
-      :show-fullscreen-button="showFullscreenButton"
-      :is-fullscreen="isFullscreen"
-      @export="exportToPNG"
-      @reset-view="handleResetView"
-      @toggle-fullscreen="toggleFullscreen"
-    />
-
-    <LayerPanel
-      v-if="hasDXFData && layerList.length > 0"
-      :layers="layerList"
-      @toggle-layer="handleToggleLayer"
-      @show-all="handleShowAllLayers"
-      @hide-all="handleHideAllLayers"
-    />
-
-    <div v-if="(showCoordinates || showZoomLevel) && hasDXFData" class="coordinates-overlay">
-      <template v-if="showCoordinates && isCursorVisible">
-        <div class="coord-row">
-          <span class="coord-label">X:</span><span class="coord-value">{{ cursorX.toFixed(2) }}</span>
+    <div v-if="hasDXFData" class="overlay-grid">
+      <div
+        v-for="pos in overlayPositions"
+        :key="pos"
+        class="overlay-cell"
+        :class="`cell-${pos}`"
+      >
+        <div v-if="fileNamePosition === pos && showFileName && fileName" class="file-name-overlay">
+          {{ fileName }}
         </div>
-        <div class="coord-row">
-          <span class="coord-label">Y:</span><span class="coord-value">{{ cursorY.toFixed(2) }}</span>
+
+        <ViewerToolbar
+          v-if="toolbarPosition === pos"
+          :show-export-button="showExportButton"
+          :show-reset-button="showResetButton"
+          :show-fullscreen-button="showFullscreenButton"
+          :is-fullscreen="isFullscreen"
+          @export="exportToPNG"
+          @reset-view="handleResetView"
+          @toggle-fullscreen="toggleFullscreen"
+        />
+
+        <div v-if="coordinatesPosition === pos && (showCoordinates || showZoomLevel)" class="coordinates-overlay">
+          <template v-if="showCoordinates && isCursorVisible">
+            <div class="coord-row">
+              <span class="coord-label">X:</span><span class="coord-value">{{ cursorX.toFixed(2) }}</span>
+            </div>
+            <div class="coord-row">
+              <span class="coord-label">Y:</span><span class="coord-value">{{ cursorY.toFixed(2) }}</span>
+            </div>
+          </template>
+          <div v-if="showZoomLevel" class="coord-row">
+            <span class="coord-value zoom-value">{{ zoomPercent }}%</span>
+          </div>
         </div>
-      </template>
-      <div v-if="showZoomLevel" class="coord-row">
-        <span class="coord-value zoom-value">{{ zoomPercent }}%</span>
+
+        <div v-if="debugPosition === pos && showDebugInfo" class="debug-overlay">
+          <span>{{ debugInfo.fps }} FPS</span>
+          <span>{{ debugInfo.drawCalls }} draws</span>
+          <span>{{ formatK(debugInfo.lines) }} lines</span>
+          <span>{{ formatK(debugInfo.triangles) }} tris</span>
+        </div>
+
+        <LayerPanel
+          v-if="layerPanelPosition === pos && layerList.length > 0"
+          :layers="layerList"
+          @toggle-layer="handleToggleLayer"
+          @show-all="handleShowAllLayers"
+          @hide-all="handleHideAllLayers"
+        />
       </div>
-    </div>
-
-    <div v-if="showDebugInfo && hasDXFData" class="debug-overlay">
-      <span>{{ debugInfo.fps }} FPS</span>
-      <span>{{ debugInfo.drawCalls }} draws</span>
-      <span>{{ formatK(debugInfo.lines) }} lines</span>
-      <span>{{ formatK(debugInfo.triangles) }} tris</span>
     </div>
 
     <div v-if="isLoading" class="message-overlay loading-overlay">
@@ -160,8 +169,14 @@ import { useDXFRenderer } from "../composables/useDXFRenderer";
 import { useLayers } from "../composables/useLayers";
 import { useLoadError } from "../composables/useLoadError";
 import type { DxfData, DxfLayer } from "dxf-render";
+import type { OverlayPosition } from "../types";
 import LayerPanel from "./LayerPanel.vue";
 import ViewerToolbar from "./ViewerToolbar.vue";
+
+const overlayPositions: OverlayPosition[] = [
+  "top-left", "top-center", "top-right",
+  "bottom-left", "bottom-center", "bottom-right",
+];
 
 interface Props {
   dxfData?: DxfData | null;
@@ -178,6 +193,11 @@ interface Props {
   allowDrop?: boolean;
   darkTheme?: boolean;
   fontUrl?: string;
+  fileNamePosition?: OverlayPosition;
+  toolbarPosition?: OverlayPosition;
+  coordinatesPosition?: OverlayPosition;
+  debugPosition?: OverlayPosition;
+  layerPanelPosition?: OverlayPosition;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -195,6 +215,11 @@ const props = withDefaults(defineProps<Props>(), {
   allowDrop: false,
   darkTheme: false,
   fontUrl: "",
+  fileNamePosition: "top-left",
+  toolbarPosition: "top-right",
+  coordinatesPosition: "bottom-left",
+  debugPosition: "bottom-center",
+  layerPanelPosition: "bottom-right",
 });
 
 interface Emits {
@@ -538,18 +563,44 @@ defineExpose({
   touch-action: none;
 }
 
-.file-name-overlay {
+/* Overlay grid: 9-cell layout for positioning overlay elements */
+.overlay-grid {
   position: absolute;
-  top: var(--dxf-vuer-spacing-sm, 8px);
-  left: var(--dxf-vuer-spacing-sm, 8px);
+  inset: 0;
   z-index: 10;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "top-left     top-center     top-right"
+    "bottom-left  bottom-center  bottom-right";
+  padding: var(--dxf-vuer-spacing-sm, 8px);
+  gap: var(--dxf-vuer-spacing-sm, 8px);
+  pointer-events: none;
+}
+
+.overlay-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.cell-top-left { grid-area: top-left; align-items: flex-start; }
+.cell-top-center { grid-area: top-center; align-items: center; }
+.cell-top-right { grid-area: top-right; align-items: flex-end; }
+.cell-bottom-left { grid-area: bottom-left; align-items: flex-start; justify-content: flex-end; }
+.cell-bottom-center { grid-area: bottom-center; align-items: center; justify-content: flex-end; }
+.cell-bottom-right { grid-area: bottom-right; align-items: flex-end; justify-content: flex-end; }
+
+.file-name-overlay {
   padding: var(--dxf-vuer-spacing-sm, 8px) var(--dxf-vuer-spacing-md, 16px);
   background-color: rgba(255, 255, 255, 0.95);
   border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
   border-radius: var(--dxf-vuer-border-radius, 4px);
   font-size: 14px;
   color: var(--dxf-vuer-text-color, #212121);
-  max-width: calc(100% - var(--dxf-vuer-spacing-lg, 24px) * 2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -560,10 +611,6 @@ defineExpose({
 }
 
 .coordinates-overlay {
-  position: absolute;
-  bottom: var(--dxf-vuer-spacing-sm, 8px);
-  left: var(--dxf-vuer-spacing-sm, 8px);
-  z-index: 10;
   display: flex;
   flex-direction: column;
   padding: 4px var(--dxf-vuer-spacing-sm, 8px);
@@ -573,7 +620,6 @@ defineExpose({
   border-radius: var(--dxf-vuer-border-radius, 4px);
   font-size: 12px;
   font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-  pointer-events: none;
   white-space: nowrap;
 }
 
@@ -600,11 +646,6 @@ defineExpose({
 }
 
 .debug-overlay {
-  position: absolute;
-  bottom: var(--dxf-vuer-spacing-sm, 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
   display: flex;
   gap: var(--dxf-vuer-spacing-sm, 8px);
   padding: 4px var(--dxf-vuer-spacing-sm, 8px);
@@ -613,7 +654,6 @@ defineExpose({
   border-radius: var(--dxf-vuer-border-radius, 4px);
   font-size: 11px;
   font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-  pointer-events: none;
 }
 
 .message-overlay {
@@ -838,11 +878,8 @@ defineExpose({
 
 @media (max-width: 768px) {
   .file-name-overlay {
-    top: var(--dxf-vuer-spacing-sm, 8px);
-    left: var(--dxf-vuer-spacing-sm, 8px);
     padding: 6px var(--dxf-vuer-spacing-sm, 8px);
     font-size: 12px;
-    max-width: calc(100% - 80px);
   }
 
   .message-title {
