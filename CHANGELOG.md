@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## dxf-vuer [2.3.0] - 2026-03-16
+
+### Added
+
+- **Error overlay** — parse/render/fetch errors displayed visually inside the viewer
+- **`showZoomLevel` prop** — zoom percentage display relative to fit-to-view
+- **`showDebugInfo` prop** — debug overlay with FPS, draw calls, lines, triangles
+- **ViewerToolbar component** — extracted toolbar into standalone component with `#extra` slot for custom buttons
+- **Overlay positioning** — 6-cell CSS Grid for flexible overlay placement; new position props: `fileNamePosition`, `toolbarPosition`, `coordinatesPosition`, `debugPosition`, `layerPanelPosition`, `overlayPosition`
+- **Slots** — 6 named slots (`#toolbar`, `#toolbar-extra`, `#loading`, `#error`, `#empty-state`, `#overlay`) with scoped data for full UI customization
+- **`OverlayPosition` type** — exported for TypeScript consumers
+
+### Fixed
+
+- Warning icon exclamation mark dot not rendering (SVG `<line>` → `<circle>`)
+
+### Changed
+
+- Extract `useLoadError` composable for error state management
+- 878 test cases across 38 files (was 874 across 37)
+
 ## dxf-render [1.2.0] / dxf-vuer [2.2.0] - 2026-03-13
 
 ### Added

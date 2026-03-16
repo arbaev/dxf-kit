@@ -44,7 +44,8 @@ async function loadFile(file) {
 
 | Component | Description |
 |-----------|-------------|
-| `DXFViewer` | Main viewer: Three.js scene, layer panel, toolbar, error display, drag-and-drop, dark theme |
+| `DXFViewer` | Main viewer: Three.js scene, layer panel, toolbar, error display, drag-and-drop, dark theme, slots |
+| `ViewerToolbar` | Toolbar with export, fit-to-view, fullscreen buttons. Has `#extra` slot for custom buttons |
 | `FileUploader` | File input button. Emits `file-selected` with `File` |
 | `LayerPanel` | Collapsible layer visibility panel with color indicators |
 | `UnsupportedEntities` | Collapsible list of unsupported entity types |
@@ -68,6 +69,42 @@ async function loadFile(file) {
 | `darkTheme` | `boolean` | `false` | Dark theme for viewer and scene |
 | `autoFit` | `boolean` | `true` | Auto-fit camera to drawing on load |
 | `fontUrl` | `string` | `""` | Custom font URL for text rendering |
+| `fileNamePosition` | `OverlayPosition` | `"top-left"` | Position of file name overlay |
+| `toolbarPosition` | `OverlayPosition` | `"top-right"` | Position of toolbar |
+| `coordinatesPosition` | `OverlayPosition` | `"bottom-left"` | Position of coordinates overlay |
+| `debugPosition` | `OverlayPosition` | `"bottom-center"` | Position of debug overlay |
+| `layerPanelPosition` | `OverlayPosition` | `"bottom-right"` | Position of layer panel |
+| `overlayPosition` | `OverlayPosition` | `"top-center"` | Position of `#overlay` slot content |
+
+`OverlayPosition` = `"top-left"` | `"top-center"` | `"top-right"` | `"bottom-left"` | `"bottom-center"` | `"bottom-right"`
+
+## DXFViewer Slots
+
+| Slot | Scoped data | Description |
+|------|-------------|-------------|
+| `#toolbar` | `{ resetView, exportToPNG, toggleFullscreen, isFullscreen }` | Replace entire toolbar |
+| `#toolbar-extra` | — | Add buttons to the existing toolbar |
+| `#loading` | `{ phase, progress }` | Replace loading screen |
+| `#error` | `{ message, retry }` | Replace error screen |
+| `#empty-state` | — | Replace "Select a DXF file" placeholder |
+| `#overlay` | `{ zoomPercent, cursorX, cursorY }` | Custom overlay (positioned via `overlayPosition` prop) |
+
+```vue
+<!-- Add a custom button to the toolbar -->
+<DXFViewer :dxf-data="dxfData">
+  <template #toolbar-extra>
+    <button class="toolbar-button" @click="print">Print</button>
+  </template>
+</DXFViewer>
+
+<!-- Custom error screen with retry -->
+<DXFViewer :dxf-data="dxfData">
+  <template #error="{ message, retry }">
+    <p>{{ message }}</p>
+    <button @click="retry">Try again</button>
+  </template>
+</DXFViewer>
+```
 
 ## DXFViewer Events
 

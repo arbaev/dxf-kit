@@ -85,7 +85,9 @@ async function loadFile(file) {
 - **Vector text** — crisp at any zoom; Liberation Sans/Serif fonts; bold, italic, underline, MTEXT formatting
 - **Dark theme** — instant switching
 - **Layer panel** — toggle visibility with color indicators
-- **Error display** — parse/render/fetch errors shown in the viewer
+- **Overlay positioning** — 6-cell grid system for positioning UI overlays (toolbar, coordinates, layers, etc.)
+- **Customizable UI** — 6 named slots (`#toolbar`, `#toolbar-extra`, `#loading`, `#error`, `#empty-state`, `#overlay`) with scoped data
+- **Error display** — parse/render/fetch errors shown in the viewer with retry support
 - **Debug overlay** — FPS, draw calls, lines, triangles
 - **Zoom level** — percentage display relative to fit-to-view
 - **TAA anti-aliasing** — smooth edges after idle accumulation

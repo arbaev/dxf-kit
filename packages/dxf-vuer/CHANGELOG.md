@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.3.0
+
+### Features
+
+- **Error overlay**: parse/render/fetch errors displayed visually inside the viewer.
+- **`showZoomLevel` prop**: display zoom percentage relative to fit-to-view.
+- **`showDebugInfo` prop**: debug overlay with FPS, draw calls, lines, triangles.
+- **ViewerToolbar component**: extracted toolbar buttons (Export PNG, Fit to View, Fullscreen) into a standalone `ViewerToolbar` component with `#extra` slot for custom buttons.
+- **Overlay positioning**: 6-cell CSS Grid (2 rows x 3 columns) for flexible positioning of all overlay elements. New props: `fileNamePosition`, `toolbarPosition`, `coordinatesPosition`, `debugPosition`, `layerPanelPosition`, `overlayPosition` with `OverlayPosition` type.
+- **Slots**: 6 named slots for UI customization:
+  - `#toolbar` — replace entire toolbar (scoped: `resetView`, `exportToPNG`, `toggleFullscreen`, `isFullscreen`)
+  - `#toolbar-extra` — add buttons to the existing toolbar
+  - `#loading` — replace loading screen (scoped: `phase`, `progress`)
+  - `#error` — replace error screen (scoped: `message`, `retry`)
+  - `#empty-state` — replace placeholder
+  - `#overlay` — custom overlay with positioning (scoped: `zoomPercent`, `cursorX`, `cursorY`)
+- **`retry()` function**: exposed via `#error` slot for retrying failed loads.
+- **`OverlayPosition` type**: exported from `dxf-vuer` for TypeScript consumers.
+
+### Bug Fixes
+
+- Warning icon exclamation mark dot not rendering (SVG `<line>` → `<circle>`).
+
+### Refactored
+
+- Extract `useLoadError` composable, consolidate error handling via `handleLoadError`.
+
 ## 2.2.0
 
 ### Features
