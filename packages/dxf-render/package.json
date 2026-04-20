@@ -1,21 +1,32 @@
 {
   "name": "dxf-render",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "DXF parser and Three.js renderer — parse and render AutoCAD DXF files in the browser. Framework-agnostic.",
   "type": "module",
   "license": "MIT",
   "author": "Timur Arbaev",
-  "homepage": "https://github.com/arbaev/dxf-kit/tree/main/packages/dxf-render",
+  "homepage": "https://dxf-vuer.netlify.app",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/arbaev/dxf-kit.git",
     "directory": "packages/dxf-render"
   },
+  "bugs": {
+    "url": "https://github.com/arbaev/dxf-kit/issues"
+  },
   "keywords": [
     "dxf",
     "dxf-parser",
     "dxf-renderer",
+    "dxf-viewer",
+    "dxf-three",
+    "dxf-js",
+    "render-dxf",
+    "parser",
+    "viewer",
+    "blueprint",
     "cad",
+    "cad-viewer",
     "autocad",
     "threejs",
     "three.js",
@@ -25,8 +36,6 @@
     "technical-drawing",
     "typescript",
     "browser-cad",
-    "dxf-renderer",
-    "cad-viewer",
     "2d-cad"
   ],
   "main": "./dist/dxf-render-index.es.js",
