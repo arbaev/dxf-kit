@@ -41,6 +41,9 @@
   "main": "./dist/dxf-render-index.es.js",
   "module": "./dist/dxf-render-index.es.js",
   "types": "./dist/index.d.ts",
+  "browser": {
+    "fs": false
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
