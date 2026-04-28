@@ -486,6 +486,29 @@ const loadDXFFromData = async (dxfData: DxfData) => {
   }
 };
 
+const decodeBuffer = (buffer: ArrayBuffer): string => {
+  const view = new Uint8Array(buffer);
+  // UTF-16 LE BOM (DXF files saved by AutoCAD with non-ASCII content)
+  if (view.length >= 2 && view[0] === 0xff && view[1] === 0xfe) {
+    return new TextDecoder("utf-16le").decode(buffer);
+  }
+  // UTF-16 BE BOM
+  if (view.length >= 2 && view[0] === 0xfe && view[1] === 0xff) {
+    return new TextDecoder("utf-16be").decode(buffer);
+  }
+  // UTF-8 (with or without BOM — TextDecoder strips it automatically)
+  return new TextDecoder("utf-8").decode(buffer);
+};
+
+const loadDXFFromBuffer = async (buffer: ArrayBuffer) => {
+  await loadDXFFromText(decodeBuffer(buffer));
+};
+
+const loadDXFFromBlob = async (blob: Blob) => {
+  const buffer = await blob.arrayBuffer();
+  await loadDXFFromBuffer(buffer);
+};
+
 const loadDXFFromUrl = async (url: string) => {
   clearError();
   isLoading.value = true;
@@ -579,6 +602,8 @@ defineExpose({
   loadDXFFromText,
   loadDXFFromData,
   loadDXFFromUrl,
+  loadDXFFromBuffer,
+  loadDXFFromBlob,
   resize,
   resetView,
   exportToPNG,
