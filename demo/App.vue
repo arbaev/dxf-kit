@@ -124,18 +124,44 @@
 
       <UnsupportedEntities v-if="unsupportedEntities.length > 0" :entities="unsupportedEntities" />
 
+      <div class="display-options">
+        <div class="display-options-group">
+          <span class="display-options-label">Overlays:</span>
+          <label><input type="checkbox" v-model="showFileName" />File name</label>
+          <label><input type="checkbox" v-model="showCoordinates" />Coordinates</label>
+          <label><input type="checkbox" v-model="showZoomLevel" />Zoom %</label>
+          <label><input type="checkbox" v-model="showDebugInfo" />Debug info</label>
+        </div>
+        <div class="display-options-group">
+          <span class="display-options-label">Toolbar:</span>
+          <label><input type="checkbox" v-model="showResetButton" />Reset view</label>
+          <label><input type="checkbox" v-model="showFullscreenButton" />Fullscreen</label>
+          <label><input type="checkbox" v-model="showExportButton" />Export PNG</label>
+        </div>
+        <div class="display-options-group">
+          <span class="display-options-label">Behavior:</span>
+          <label><input type="checkbox" v-model="showLayerPanel" />Layers panel</label>
+          <label><input type="checkbox" v-model="allowDrop" />Drag-and-drop</label>
+          <label><input type="checkbox" v-model="autoFit" />Auto-fit</label>
+        </div>
+      </div>
+
       <div id="viewer" class="viewer-container">
         <DXFViewer
           :key="aaMode"
           ref="dxfViewerRef"
           :dxf-data="dxfData"
           :file-name="currentFileName"
-          :show-reset-button="!!dxfData"
-          :show-coordinates="true"
-          :show-zoom-level="true"
-          :show-debug-info="true"
-          :show-export-button="true"
-          :allow-drop="true"
+          :show-reset-button="showResetButton"
+          :show-fullscreen-button="showFullscreenButton"
+          :show-export-button="showExportButton"
+          :show-file-name="showFileName"
+          :show-coordinates="showCoordinates"
+          :show-zoom-level="showZoomLevel"
+          :show-debug-info="showDebugInfo"
+          :show-layer-panel="showLayerPanel"
+          :allow-drop="allowDrop"
+          :auto-fit="autoFit"
           :dark-theme="isDark"
           :antialiasing="aaMode"
           @dxf-data="handleDXFData"
@@ -194,6 +220,18 @@ const dxfViewerRef = ref<InstanceType<typeof DXFViewer> | null>(null);
 const isLoadingSample = ref(false);
 const loadingSampleFile = ref<string | null>(null);
 const aaMode = ref<AntialiasingMode>("msaa");
+
+// Display option toggles (mirror DXFViewer prop defaults the demo overrides)
+const showFileName = ref(true);
+const showCoordinates = ref(true);
+const showZoomLevel = ref(true);
+const showDebugInfo = ref(true);
+const showResetButton = ref(true);
+const showFullscreenButton = ref(true);
+const showExportButton = ref(true);
+const showLayerPanel = ref(true);
+const allowDrop = ref(true);
+const autoFit = ref(true);
 
 const aaDescriptions: Record<AntialiasingMode, string> = {
   msaa: "Hardware multisampling: crisp geometric edges with no blur and almost free runtime cost. Best default for CAD lines and text.",
@@ -525,6 +563,59 @@ const resetView = () => {
   color: var(--text-color);
 }
 
+.display-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 18px;
+  margin: 0 auto var(--spacing-sm);
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  max-width: 820px;
+  font-size: 0.8125rem;
+}
+
+.display-options-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.display-options-group + .display-options-group {
+  border-left: 1px solid var(--border-color);
+  padding-left: 18px;
+}
+
+.display-options-label {
+  color: var(--text-color);
+  font-weight: 600;
+}
+
+.display-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-color);
+  cursor: pointer;
+  user-select: none;
+}
+
+.display-options input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--primary-color);
+}
+
+.app.dark .display-options {
+  border-color: #444;
+}
+
+.app.dark .display-options-group + .display-options-group {
+  border-left-color: #444;
+}
+
 .controls-hint {
   text-align: center;
   font-size: 0.8125rem;
@@ -568,6 +659,24 @@ const resetView = () => {
 
   .aa-hint {
     text-align: center;
+  }
+
+  .display-options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .display-options-group + .display-options-group {
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    padding-left: 0;
+    padding-top: 8px;
+    width: 100%;
+  }
+
+  .app.dark .display-options-group + .display-options-group {
+    border-top-color: #444;
   }
 }
 
