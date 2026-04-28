@@ -29,6 +29,26 @@ const whatsNew: WhatsNewItem[] = [
     text: "Configurable antialiasing — MSAA (default), SMAA, FXAA, TAA, SSAA, or none — pick the right tradeoff for your drawing",
   },
   {
+    pkg: "dxf-vuer",
+    version: "2.4.0",
+    text: "Layers panel filter — text search by name, auto-shown for drawings with more than 5 layers",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "2.4.0",
+    text: "loadDXFFromBuffer / loadDXFFromBlob — load drawings from storage SDKs, IndexedDB, or fetch().blob() with UTF-8 / UTF-16 BOM auto-detection",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "2.4.0",
+    text: "Respects prefers-reduced-motion — TAA accumulation loop is skipped for users who opted into reduced motion",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "2.4.0",
+    text: "showLayerPanel prop — programmatically hide the layers panel",
+  },
+  {
     pkg: "dxf-render",
     version: "1.2.0",
     text: "Variable-width polylines with per-vertex tapering, arrows, and donuts",

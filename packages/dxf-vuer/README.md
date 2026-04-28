@@ -136,6 +136,42 @@ async function loadFile(file) {
 | `reset-view` | — | Emitted when view is reset to fit |
 | `file-dropped` | `string` | File name when a file is dropped |
 
+## DXFViewer Methods (via `ref`)
+
+| Method | Description |
+|--------|-------------|
+| `loadDXFFromText(text: string)` | Load from a DXF string |
+| `loadDXFFromData(data: DxfData)` | Load already-parsed DXF data |
+| `loadDXFFromUrl(url: string)` | Fetch and load from a URL |
+| `loadDXFFromBuffer(buffer: ArrayBuffer)` | Load from an ArrayBuffer (auto-decodes UTF-8 / UTF-16 LE/BE by BOM) |
+| `loadDXFFromBlob(blob: Blob)` | Load from a Blob (storage SDKs, drag-and-drop, fetch().blob()) |
+| `resize()` | Trigger viewer resize |
+| `resetView()` | Fit camera to drawing |
+| `exportToPNG()` | Trigger PNG download |
+| `getRenderer()` | Access the underlying Three.js `WebGLRenderer` |
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import { DXFViewer } from 'dxf-vuer'
+
+const viewer = ref(null)
+
+async function loadFromStorage() {
+  const blob = await fetch('https://storage.example.com/file.dxf').then(r => r.blob())
+  viewer.value.loadDXFFromBlob(blob)
+}
+</script>
+
+<template>
+  <DXFViewer ref="viewer" />
+</template>
+```
+
+## Accessibility
+
+- **`prefers-reduced-motion`** — when the user has enabled "reduce motion" in their OS, the TAA antialiasing mode renders a single frame without the 32-frame jitter accumulation animation. Other AA modes are unaffected.
+
 ## Composables
 
 | Composable | Description |

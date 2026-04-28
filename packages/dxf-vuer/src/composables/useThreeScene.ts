@@ -282,15 +282,23 @@ export function useThreeScene() {
     accumulationFrameId = requestAnimationFrame(accumulateFrame);
   };
 
+  const prefersReducedMotion = (): boolean => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  };
+
   const renderScene = () => {
     if (!renderer || !scene || !camera) return;
 
     if (taaPass && composer) {
-      // TAA: render one frame immediately, then start accumulation loop
       stopAccumulation();
       taaPass.accumulateIndex = -1;
       composer.render();
-      accumulationFrameId = requestAnimationFrame(accumulateFrame);
+      // Skip jittered accumulation loop when user prefers reduced motion —
+      // the slowly-resolving frames read as animation
+      if (!prefersReducedMotion()) {
+        accumulationFrameId = requestAnimationFrame(accumulateFrame);
+      }
       return;
     }
 
