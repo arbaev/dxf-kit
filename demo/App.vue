@@ -102,6 +102,28 @@
         <p class="aa-hint">{{ aaDescription }}</p>
       </div>
 
+      <div class="overlays-card">
+        <p class="overlays-hint">
+          Overlays — click an empty cell to position, click the active (blue) cell to hide
+        </p>
+        <div class="overlay-rows">
+          <div v-for="row in overlayRows" :key="row.label" class="overlay-row">
+            <span class="overlay-label" :class="{ off: !row.isVisible() }">{{ row.label }}</span>
+            <div class="layout-mini-grid" role="radiogroup" :aria-label="`${row.label} position`">
+              <button
+                v-for="pos in overlayPositions"
+                :key="pos"
+                class="layout-cell"
+                :class="{ active: row.isVisible() && row.getPosition() === pos }"
+                :aria-label="pos"
+                :title="row.isVisible() && row.getPosition() === pos ? `${pos} (click to hide)` : pos"
+                @click="onCellClick(row, pos)"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <p class="controls-hint">
         {{ isTouchDevice ? "Pinch to zoom · Drag to pan" : "Scroll to zoom · Drag to pan" }}
       </p>
@@ -124,28 +146,6 @@
 
       <UnsupportedEntities v-if="unsupportedEntities.length > 0" :entities="unsupportedEntities" />
 
-      <div class="display-options">
-        <div class="display-options-group">
-          <span class="display-options-label">Overlays:</span>
-          <label><input type="checkbox" v-model="showFileName" />File name</label>
-          <label><input type="checkbox" v-model="showCoordinates" />Coordinates</label>
-          <label><input type="checkbox" v-model="showZoomLevel" />Zoom %</label>
-          <label><input type="checkbox" v-model="showDebugInfo" />Debug info</label>
-        </div>
-        <div class="display-options-group">
-          <span class="display-options-label">Toolbar:</span>
-          <label><input type="checkbox" v-model="showResetButton" />Reset view</label>
-          <label><input type="checkbox" v-model="showFullscreenButton" />Fullscreen</label>
-          <label><input type="checkbox" v-model="showExportButton" />Export PNG</label>
-        </div>
-        <div class="display-options-group">
-          <span class="display-options-label">Behavior:</span>
-          <label><input type="checkbox" v-model="showLayerPanel" />Layers panel</label>
-          <label><input type="checkbox" v-model="allowDrop" />Drag-and-drop</label>
-          <label><input type="checkbox" v-model="autoFit" />Auto-fit</label>
-        </div>
-      </div>
-
       <div id="viewer" class="viewer-container">
         <DXFViewer
           :key="aaMode"
@@ -160,8 +160,13 @@
           :show-zoom-level="showZoomLevel"
           :show-debug-info="showDebugInfo"
           :show-layer-panel="showLayerPanel"
-          :allow-drop="allowDrop"
-          :auto-fit="autoFit"
+          :allow-drop="true"
+          :auto-fit="true"
+          :file-name-position="fileNamePosition"
+          :toolbar-position="toolbarPosition"
+          :coordinates-position="coordinatesPosition"
+          :debug-position="debugPosition"
+          :layer-panel-position="layerPanelPosition"
           :dark-theme="isDark"
           :antialiasing="aaMode"
           @dxf-data="handleDXFData"
@@ -198,7 +203,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { FileUploader, UnsupportedEntities, DXFViewer } from "dxf-vuer";
-import type { AntialiasingMode } from "dxf-vuer";
+import type { AntialiasingMode, OverlayPosition } from "dxf-vuer";
 import "dxf-vuer/style.css";
 import type { DxfData } from "dxf-render";
 import HeroSection from "./components/HeroSection.vue";
@@ -230,8 +235,85 @@ const showResetButton = ref(true);
 const showFullscreenButton = ref(true);
 const showExportButton = ref(true);
 const showLayerPanel = ref(true);
-const allowDrop = ref(true);
-const autoFit = ref(true);
+
+// Overlay positions
+const overlayPositions: OverlayPosition[] = [
+  "top-left",
+  "top-center",
+  "top-right",
+  "bottom-left",
+  "bottom-center",
+  "bottom-right",
+];
+
+const fileNamePosition = ref<OverlayPosition>("top-left");
+const toolbarPosition = ref<OverlayPosition>("top-right");
+const coordinatesPosition = ref<OverlayPosition>("bottom-left");
+const debugPosition = ref<OverlayPosition>("bottom-center");
+const layerPanelPosition = ref<OverlayPosition>("bottom-right");
+
+interface OverlayRow {
+  label: string;
+  getPosition: () => OverlayPosition;
+  setPosition: (p: OverlayPosition) => void;
+  isVisible: () => boolean;
+  setVisible: (v: boolean) => void;
+}
+
+const overlayRows: OverlayRow[] = [
+  {
+    label: "File name",
+    getPosition: () => fileNamePosition.value,
+    setPosition: (p) => (fileNamePosition.value = p),
+    isVisible: () => showFileName.value,
+    setVisible: (v) => (showFileName.value = v),
+  },
+  {
+    label: "Coordinates + Zoom",
+    getPosition: () => coordinatesPosition.value,
+    setPosition: (p) => (coordinatesPosition.value = p),
+    isVisible: () => showCoordinates.value || showZoomLevel.value,
+    setVisible: (v) => {
+      showCoordinates.value = v;
+      showZoomLevel.value = v;
+    },
+  },
+  {
+    label: "Toolbar",
+    getPosition: () => toolbarPosition.value,
+    setPosition: (p) => (toolbarPosition.value = p),
+    isVisible: () =>
+      showResetButton.value || showFullscreenButton.value || showExportButton.value,
+    setVisible: (v) => {
+      showResetButton.value = v;
+      showFullscreenButton.value = v;
+      showExportButton.value = v;
+    },
+  },
+  {
+    label: "Debug info",
+    getPosition: () => debugPosition.value,
+    setPosition: (p) => (debugPosition.value = p),
+    isVisible: () => showDebugInfo.value,
+    setVisible: (v) => (showDebugInfo.value = v),
+  },
+  {
+    label: "Layers panel",
+    getPosition: () => layerPanelPosition.value,
+    setPosition: (p) => (layerPanelPosition.value = p),
+    isVisible: () => showLayerPanel.value,
+    setVisible: (v) => (showLayerPanel.value = v),
+  },
+];
+
+const onCellClick = (row: OverlayRow, pos: OverlayPosition) => {
+  if (row.isVisible() && row.getPosition() === pos) {
+    row.setVisible(false);
+  } else {
+    row.setPosition(pos);
+    row.setVisible(true);
+  }
+};
 
 const aaDescriptions: Record<AntialiasingMode, string> = {
   msaa: "Hardware multisampling: crisp geometric edges with no blur and almost free runtime cost. Best default for CAD lines and text.",
@@ -563,57 +645,83 @@ const resetView = () => {
   color: var(--text-color);
 }
 
-.display-options {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 8px 18px;
+.overlays-card {
+  max-width: 820px;
   margin: 0 auto var(--spacing-sm);
-  padding: 10px 16px;
+  padding: 8px 16px 10px;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  max-width: 820px;
   font-size: 0.8125rem;
 }
 
-.display-options-group {
+.overlays-hint {
+  margin: 0 0 8px;
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.overlay-rows {
   display: flex;
-  align-items: center;
-  gap: 12px;
   flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 22px;
 }
 
-.display-options-group + .display-options-group {
-  border-left: 1px solid var(--border-color);
-  padding-left: 18px;
-}
-
-.display-options-label {
-  color: var(--text-color);
-  font-weight: 600;
-}
-
-.display-options label {
-  display: inline-flex;
+.overlay-row {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 4px;
+}
+
+.overlay-label {
   color: var(--text-color);
-  cursor: pointer;
-  user-select: none;
+  font-weight: 600;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
-.display-options input[type="checkbox"] {
-  cursor: pointer;
-  accent-color: var(--primary-color);
+.overlay-label.off {
+  opacity: 0.55;
 }
 
-.app.dark .display-options {
+.layout-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 14px);
+  grid-template-rows: repeat(2, 14px);
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.layout-cell {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+}
+
+.layout-cell:hover {
+  border-color: var(--primary-color);
+}
+
+.layout-cell.active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.app.dark .overlays-card,
+.app.dark .overlays-header {
   border-color: #444;
 }
 
-.app.dark .display-options-group + .display-options-group {
-  border-left-color: #444;
+.app.dark .layout-cell {
+  border-color: #555;
 }
 
 .controls-hint {
@@ -661,23 +769,6 @@ const resetView = () => {
     text-align: center;
   }
 
-  .display-options {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .display-options-group + .display-options-group {
-    border-left: none;
-    border-top: 1px solid var(--border-color);
-    padding-left: 0;
-    padding-top: 8px;
-    width: 100%;
-  }
-
-  .app.dark .display-options-group + .display-options-group {
-    border-top-color: #444;
-  }
 }
 
 /* Reduced motion */
