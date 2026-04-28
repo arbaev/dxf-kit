@@ -13,9 +13,27 @@
         <button @click.stop="$emit('hide-all')" class="action-btn">None</button>
       </div>
 
+      <div v-if="layers.length > 5" class="layer-filter-wrapper">
+        <input
+          v-model="filter"
+          type="text"
+          class="layer-filter"
+          placeholder="Filter layers…"
+          aria-label="Filter layers by name"
+          @click.stop
+        />
+        <button
+          v-if="filter"
+          class="layer-filter-clear"
+          aria-label="Clear filter"
+          @click.stop="filter = ''"
+        >×</button>
+      </div>
+
       <div class="layer-list">
+        <div v-if="filteredLayers.length === 0" class="layer-empty">No layers match "{{ filter }}"</div>
         <div
-          v-for="layer in layers"
+          v-for="layer in filteredLayers"
           :key="layer.name"
           class="layer-item"
           :class="{ hidden: !layer.visible, frozen: layer.frozen }"
@@ -96,14 +114,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import type { LayerState } from "../composables/useLayers";
 
 interface Props {
   layers: LayerState[];
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 defineEmits<{
   (e: "toggle-layer", layerName: string): void;
@@ -112,6 +130,13 @@ defineEmits<{
 }>();
 
 const isExpanded = ref(true);
+const filter = ref("");
+
+const filteredLayers = computed(() => {
+  const q = filter.value.trim().toLowerCase();
+  if (!q) return props.layers;
+  return props.layers.filter((l) => l.name.toLowerCase().includes(q));
+});
 </script>
 
 <style scoped>
@@ -192,6 +217,61 @@ const isExpanded = ref(true);
 .action-btn:hover {
   border-color: var(--dxf-vuer-primary-color, #1040b0);
   color: var(--dxf-vuer-primary-color, #1040b0);
+}
+
+.layer-filter-wrapper {
+  position: relative;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
+  flex-shrink: 0;
+}
+
+.layer-filter {
+  width: 100%;
+  padding: 3px 22px 3px 6px;
+  font-size: 11px;
+  border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
+  border-radius: 3px;
+  background: white;
+  color: var(--dxf-vuer-text-color, #212121);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.layer-filter:focus {
+  border-color: var(--dxf-vuer-primary-color, #1040b0);
+}
+
+.layer-filter::placeholder {
+  color: var(--dxf-vuer-text-secondary, #757575);
+}
+
+.layer-filter-clear {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--dxf-vuer-text-secondary, #757575);
+}
+
+.layer-filter-clear:hover {
+  color: var(--dxf-vuer-text-color, #212121);
+}
+
+.layer-empty {
+  padding: 8px 10px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--dxf-vuer-text-secondary, #757575);
+  text-align: center;
 }
 
 .layer-list {
