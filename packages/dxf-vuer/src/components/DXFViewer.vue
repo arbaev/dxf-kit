@@ -190,7 +190,8 @@ import { useDXFRenderer } from "../composables/useDXFRenderer";
 import { useLayers } from "../composables/useLayers";
 import { useLoadError } from "../composables/useLoadError";
 import type { DxfData, DxfLayer } from "dxf-render";
-import type { OverlayPosition, AntialiasingMode } from "../types";
+import type { OverlayPosition } from "../types";
+import type { AntialiasingMode } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
 import ViewerToolbar from "./ViewerToolbar.vue";
 

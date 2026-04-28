@@ -1,20 +1,17 @@
 import { ref } from "vue";
 import * as THREE from "three";
-import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { TAARenderPass } from "three/addons/postprocessing/TAARenderPass.js";
-import { SSAARenderPass } from "three/addons/postprocessing/SSAARenderPass.js";
-import { SMAAPass } from "three/addons/postprocessing/SMAAPass.js";
-import { FXAAPass } from "three/addons/postprocessing/FXAAPass.js";
-import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {
   useControls,
   CAMERA_NEAR_PLANE,
   CAMERA_FAR_PLANE,
   CAMERA_INITIAL_Z_POSITION,
   SCENE_BG_COLOR,
+  createRenderer,
+  createComposer,
+  isReducedMotionPreferred,
+  type AntialiasingMode,
+  type AntialiasingPipeline,
 } from "dxf-render";
-import type { AntialiasingMode } from "../types";
 
 export interface ThreeJSOptions {
   enableControls?: boolean;
@@ -44,9 +41,8 @@ export function useThreeScene() {
   let scene: THREE.Scene | null = null;
   let camera: THREE.OrthographicCamera | null = null;
   let renderer: THREE.WebGLRenderer | null = null;
-  let composer: EffectComposer | null = null;
-  // accumulateIndex exists at runtime but is missing from @types/three
-  let taaPass: (TAARenderPass & { accumulateIndex: number }) | null = null;
+  let composer: AntialiasingPipeline["composer"] = null;
+  let taaPass: AntialiasingPipeline["taaPass"] = null;
   let accumulationFrameId: number | null = null;
 
   const {
@@ -122,50 +118,6 @@ export function useThreeScene() {
     }
   };
 
-  const createComposer = (
-    aaMode: AntialiasingMode,
-    sceneRef: THREE.Scene,
-    cameraRef: THREE.OrthographicCamera,
-    rendererRef: THREE.WebGLRenderer,
-  ): EffectComposer | null => {
-    // MSAA uses native WebGL antialiasing; "none" skips post-processing entirely
-    if (aaMode === "msaa" || aaMode === "none") return null;
-
-    const newComposer = new EffectComposer(rendererRef);
-
-    if (aaMode === "taa") {
-      // TAA accumulates jittered frames when idle for smooth AA
-      const pass = new TAARenderPass(sceneRef, cameraRef) as TAARenderPass & {
-        accumulateIndex: number;
-      };
-      pass.accumulate = true;
-      newComposer.addPass(pass);
-      taaPass = pass;
-    } else if (aaMode === "ssaa") {
-      newComposer.addPass(new SSAARenderPass(sceneRef, cameraRef));
-    } else if (aaMode === "smaa") {
-      newComposer.addPass(new RenderPass(sceneRef, cameraRef));
-      const smaaPass = new SMAAPass();
-      const size = new THREE.Vector2();
-      rendererRef.getSize(size);
-      const pixelRatio = rendererRef.getPixelRatio();
-      smaaPass.setSize(size.x * pixelRatio, size.y * pixelRatio);
-      newComposer.addPass(smaaPass);
-    } else if (aaMode === "fxaa") {
-      newComposer.addPass(new RenderPass(sceneRef, cameraRef));
-      const fxaaPass = new FXAAPass();
-      const size = new THREE.Vector2();
-      rendererRef.getSize(size);
-      const pixelRatio = rendererRef.getPixelRatio();
-      fxaaPass.setSize(size.x * pixelRatio, size.y * pixelRatio);
-      newComposer.addPass(fxaaPass);
-    }
-
-    // OutputPass converts from linear to sRGB color space for correct color display
-    newComposer.addPass(new OutputPass());
-    return newComposer;
-  };
-
   const initThreeJS = (container: HTMLDivElement, options: ThreeJSOptions = {}) => {
     const { enableControls = false, aaMode = "msaa" } = options;
 
@@ -198,13 +150,7 @@ export function useThreeScene() {
     camera.zoom = 1;
 
     try {
-      renderer = new THREE.WebGLRenderer({
-        // Native MSAA is configured at construction time and cannot be toggled later
-        antialias: aaMode === "msaa",
-        alpha: true,
-        preserveDrawingBuffer: true,
-      });
-      renderer.sortObjects = false;
+      renderer = createRenderer({ aaMode });
       renderer.setSize(containerWidth, containerHeight);
     } catch (err) {
       const errorMessage =
@@ -214,7 +160,9 @@ export function useThreeScene() {
       return;
     }
 
-    composer = createComposer(aaMode, scene, camera, renderer);
+    const pipeline = createComposer({ aaMode, scene, camera, renderer });
+    composer = pipeline.composer;
+    taaPass = pipeline.taaPass;
 
     container.appendChild(renderer.domElement);
 
@@ -282,11 +230,6 @@ export function useThreeScene() {
     accumulationFrameId = requestAnimationFrame(accumulateFrame);
   };
 
-  const prefersReducedMotion = (): boolean => {
-    if (typeof window === "undefined" || !window.matchMedia) return false;
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  };
-
   const renderScene = () => {
     if (!renderer || !scene || !camera) return;
 
@@ -296,7 +239,7 @@ export function useThreeScene() {
       composer.render();
       // Skip jittered accumulation loop when user prefers reduced motion —
       // the slowly-resolving frames read as animation
-      if (!prefersReducedMotion()) {
+      if (!isReducedMotionPreferred()) {
         accumulationFrameId = requestAnimationFrame(accumulateFrame);
       }
       return;

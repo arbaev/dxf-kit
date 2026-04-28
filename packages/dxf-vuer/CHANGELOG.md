@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.4.0
+
+### Features
+
+- **`antialiasing` prop**: choose the AA mode at init time — `msaa` (default, hardware), `smaa`, `fxaa`, `taa`, `ssaa`, or `none`. Default changed from TAA to MSAA for crisper thin lines and text in CAD drawings. Init-time only — recreate the component via `:key` to switch at runtime. Powered by the new `createRenderer` / `createComposer` factories in `dxf-render` 1.3.0; `AntialiasingMode` is now imported from `dxf-render` (still re-exported from `dxf-vuer` for backward compatibility).
+- **`showLayerPanel` prop**: hide the layers panel programmatically (default `true`). Position is still controlled by the existing `layerPanelPosition`.
+- **Layers panel filter**: text input for searching layers by name. Auto-shown when the drawing has more than 5 layers.
+- **`loadDXFFromBuffer` and `loadDXFFromBlob` methods**: load drawings from `ArrayBuffer` or `Blob` for integrations with IndexedDB, S3, Supabase Storage and other binary sources. Auto-detects encoding (UTF-8, UTF-16 LE/BE) by BOM.
+- **`prefers-reduced-motion` support**: when the user has enabled "reduce motion" in the OS, the TAA mode renders a single frame and skips the 32-frame jittered accumulation loop. Other AA modes are unaffected.
+
+### Documentation
+
+- npm search SEO: added keywords (`dxf-renderer`, `dxf-three`, `render-dxf`, `parser`), added the `bugs` field.
+
+### Dependencies
+
+- Requires `dxf-render` ≥ 1.3.0 (new AA pipeline factories).
+
 ## 2.3.0
 
 ### Features

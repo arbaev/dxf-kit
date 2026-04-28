@@ -5,5 +5,3 @@ export type OverlayPosition =
   | "bottom-left"
   | "bottom-center"
   | "bottom-right";
-
-export type AntialiasingMode = "none" | "msaa" | "smaa" | "fxaa" | "taa" | "ssaa";
