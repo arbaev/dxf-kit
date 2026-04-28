@@ -65,6 +65,7 @@ async function loadFile(file) {
 | `showCoordinates` | `boolean` | `false` | Show cursor world coordinates on hover |
 | `showZoomLevel` | `boolean` | `false` | Show zoom percentage (100% = fit-to-view) |
 | `showDebugInfo` | `boolean` | `false` | Show debug overlay (FPS, draw calls, lines, triangles) |
+| `showLayerPanel` | `boolean` | `true` | Show the layers panel (auto-hidden when the drawing has no layers) |
 | `allowDrop` | `boolean` | `false` | Enable drag-and-drop file loading |
 | `darkTheme` | `boolean` | `false` | Dark theme for viewer and scene |
 | `autoFit` | `boolean` | `true` | Auto-fit camera to drawing on load |

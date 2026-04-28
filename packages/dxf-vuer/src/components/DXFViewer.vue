@@ -83,7 +83,7 @@
         </div>
 
         <LayerPanel
-          v-if="layerPanelPosition === pos && layerList.length > 0"
+          v-if="showLayerPanel && layerPanelPosition === pos && layerList.length > 0"
           :layers="layerList"
           @toggle-layer="handleToggleLayer"
           @show-all="handleShowAllLayers"
@@ -211,6 +211,7 @@ interface Props {
   showDebugInfo?: boolean;
   showFileName?: boolean;
   showExportButton?: boolean;
+  showLayerPanel?: boolean;
   allowDrop?: boolean;
   darkTheme?: boolean;
   fontUrl?: string;
@@ -235,6 +236,7 @@ const props = withDefaults(defineProps<Props>(), {
   showDebugInfo: false,
   showFileName: true,
   showExportButton: false,
+  showLayerPanel: true,
   allowDrop: false,
   darkTheme: false,
   fontUrl: "",
