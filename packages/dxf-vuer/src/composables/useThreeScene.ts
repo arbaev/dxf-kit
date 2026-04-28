@@ -1,18 +1,21 @@
 import { ref } from "vue";
 import * as THREE from "three";
-import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-import { TAARenderPass } from "three/addons/postprocessing/TAARenderPass.js";
-import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import {
   useControls,
   CAMERA_NEAR_PLANE,
   CAMERA_FAR_PLANE,
   CAMERA_INITIAL_Z_POSITION,
   SCENE_BG_COLOR,
+  createRenderer,
+  createComposer,
+  isReducedMotionPreferred,
+  type AntialiasingMode,
+  type AntialiasingPipeline,
 } from "dxf-render";
 
 export interface ThreeJSOptions {
   enableControls?: boolean;
+  aaMode?: AntialiasingMode;
 }
 
 interface MaterialWithTextures extends THREE.Material {
@@ -38,9 +41,8 @@ export function useThreeScene() {
   let scene: THREE.Scene | null = null;
   let camera: THREE.OrthographicCamera | null = null;
   let renderer: THREE.WebGLRenderer | null = null;
-  let composer: EffectComposer | null = null;
-  // accumulateIndex exists at runtime but is missing from @types/three
-  let taaPass: (TAARenderPass & { accumulateIndex: number }) | null = null;
+  let composer: AntialiasingPipeline["composer"] = null;
+  let taaPass: AntialiasingPipeline["taaPass"] = null;
   let accumulationFrameId: number | null = null;
 
   const {
@@ -117,7 +119,7 @@ export function useThreeScene() {
   };
 
   const initThreeJS = (container: HTMLDivElement, options: ThreeJSOptions = {}) => {
-    const { enableControls = false } = options;
+    const { enableControls = false, aaMode = "msaa" } = options;
 
     error.value = null;
 
@@ -148,12 +150,7 @@ export function useThreeScene() {
     camera.zoom = 1;
 
     try {
-      renderer = new THREE.WebGLRenderer({
-        antialias: false,
-        alpha: true,
-        preserveDrawingBuffer: true,
-      });
-      renderer.sortObjects = false;
+      renderer = createRenderer({ aaMode });
       renderer.setSize(containerWidth, containerHeight);
     } catch (err) {
       const errorMessage =
@@ -163,13 +160,9 @@ export function useThreeScene() {
       return;
     }
 
-    // TAA post-processing: accumulates jittered frames when idle for smooth AA
-    composer = new EffectComposer(renderer);
-    taaPass = new TAARenderPass(scene, camera) as TAARenderPass & { accumulateIndex: number };
-    taaPass.accumulate = true;
-    composer.addPass(taaPass);
-    // OutputPass converts from linear to sRGB color space for correct color display
-    composer.addPass(new OutputPass());
+    const pipeline = createComposer({ aaMode, scene, camera, renderer });
+    composer = pipeline.composer;
+    taaPass = pipeline.taaPass;
 
     container.appendChild(renderer.domElement);
 
@@ -202,8 +195,8 @@ export function useThreeScene() {
     if (composer) {
       composer.dispose();
       composer = null;
-      taaPass = null;
     }
+    taaPass = null;
 
     if (renderer) {
       renderer.dispose();
@@ -237,13 +230,28 @@ export function useThreeScene() {
     accumulationFrameId = requestAnimationFrame(accumulateFrame);
   };
 
-  // Render one frame immediately, then start TAA accumulation loop
   const renderScene = () => {
-    if (!composer || !taaPass) return;
-    stopAccumulation();
-    taaPass.accumulateIndex = -1;
-    composer.render();
-    accumulationFrameId = requestAnimationFrame(accumulateFrame);
+    if (!renderer || !scene || !camera) return;
+
+    if (taaPass && composer) {
+      stopAccumulation();
+      taaPass.accumulateIndex = -1;
+      composer.render();
+      // Skip jittered accumulation loop when user prefers reduced motion —
+      // the slowly-resolving frames read as animation
+      if (!isReducedMotionPreferred()) {
+        accumulationFrameId = requestAnimationFrame(accumulateFrame);
+      }
+      return;
+    }
+
+    if (composer) {
+      composer.render();
+      return;
+    }
+
+    // MSAA / none: direct render
+    renderer.render(scene, camera);
   };
 
   const resizeComposer = (width: number, height: number) => {

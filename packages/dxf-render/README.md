@@ -261,6 +261,46 @@ export function DxfViewer({ dxfText }: { dxfText: string }) {
 
 - `useCamera(domElement)` — orthographic camera with `fitCameraToBox()`
 - `useControls(camera, domElement)` — pan/zoom controls (no rotation), mobile touch support
+- `createRenderer({ aaMode })` — `WebGLRenderer` with the right `antialias` flag for the selected AA mode
+- `createComposer({ aaMode, scene, camera, renderer })` — builds the post-processing pipeline (`EffectComposer` + AA pass + `OutputPass`); returns `{ composer: null }` for `msaa`/`none` (use `renderer.render()` directly)
+- `isReducedMotionPreferred()` — `true` when the user has enabled "reduce motion" in their OS
+
+### Antialiasing
+
+Six modes available via `AntialiasingMode = "msaa" | "smaa" | "fxaa" | "taa" | "ssaa" | "none"`:
+
+| Mode | Use case |
+|------|----------|
+| `msaa` | Hardware multisampling (default). Crisp geometric edges, almost free runtime cost. Best for CAD with thin lines and text |
+| `smaa` | Edge-detection post-processing. Cheap and works while panning. Note: may fade pixels at corners of 1px lines (line-art limitation) |
+| `fxaa` | Cheapest fullscreen AA — single shader pass. Smooths edges but tends to blur thin lines and small text |
+| `taa` | Temporal AA: 32 jittered frames accumulated when the camera stops. Smooth on static views; first frame after movement looks aliased. Skipped when `prefers-reduced-motion: reduce` |
+| `ssaa` | Super-sampling: renders at higher resolution and downscales. Reference quality; expensive |
+| `none` | No antialiasing. Maximum performance and pixel sharpness |
+
+```ts
+import * as THREE from "three";
+import { createRenderer, createComposer, isReducedMotionPreferred } from "dxf-render";
+
+const scene = new THREE.Scene();
+const camera = new THREE.OrthographicCamera(/* ... */);
+const renderer = createRenderer({ aaMode: "msaa" });
+const { composer, taaPass } = createComposer({ aaMode: "msaa", scene, camera, renderer });
+
+function render() {
+  if (taaPass && composer) {
+    taaPass.accumulateIndex = -1;
+    composer.render();
+    if (!isReducedMotionPreferred()) {
+      // schedule next jittered frame via requestAnimationFrame...
+    }
+  } else if (composer) {
+    composer.render();
+  } else {
+    renderer.render(scene, camera);
+  }
+}
+```
 
 ### Fonts
 

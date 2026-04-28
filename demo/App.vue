@@ -89,6 +89,41 @@
         </div>
       </div>
 
+      <div class="aa-selector">
+        <span class="aa-label">Antialiasing:</span>
+        <select v-model="aaMode" class="aa-select">
+          <option value="none">None</option>
+          <option value="msaa">MSAA (hardware, default)</option>
+          <option value="smaa">SMAA</option>
+          <option value="fxaa">FXAA</option>
+          <option value="taa">TAA (jittered, idle-only)</option>
+          <option value="ssaa">SSAA (high quality, slow)</option>
+        </select>
+        <p class="aa-hint">{{ aaDescription }}</p>
+      </div>
+
+      <div class="overlays-card">
+        <p class="overlays-hint">
+          Overlays — click an empty cell to position, click the active (blue) cell to hide
+        </p>
+        <div class="overlay-rows">
+          <div v-for="row in overlayRows" :key="row.label" class="overlay-row">
+            <span class="overlay-label" :class="{ off: !row.isVisible() }">{{ row.label }}</span>
+            <div class="layout-mini-grid" role="radiogroup" :aria-label="`${row.label} position`">
+              <button
+                v-for="pos in overlayPositions"
+                :key="pos"
+                class="layout-cell"
+                :class="{ active: row.isVisible() && row.getPosition() === pos }"
+                :aria-label="pos"
+                :title="row.isVisible() && row.getPosition() === pos ? `${pos} (click to hide)` : pos"
+                @click="onCellClick(row, pos)"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <p class="controls-hint">
         {{ isTouchDevice ? "Pinch to zoom · Drag to pan" : "Scroll to zoom · Drag to pan" }}
       </p>
@@ -113,16 +148,27 @@
 
       <div id="viewer" class="viewer-container">
         <DXFViewer
+          :key="aaMode"
           ref="dxfViewerRef"
           :dxf-data="dxfData"
           :file-name="currentFileName"
-          :show-reset-button="!!dxfData"
-          :show-coordinates="true"
-          :show-zoom-level="true"
-          :show-debug-info="true"
-          :show-export-button="true"
+          :show-reset-button="showResetButton"
+          :show-fullscreen-button="showFullscreenButton"
+          :show-export-button="showExportButton"
+          :show-file-name="showFileName"
+          :show-coordinates="showCoordinates"
+          :show-zoom-level="showZoomLevel"
+          :show-debug-info="showDebugInfo"
+          :show-layer-panel="showLayerPanel"
           :allow-drop="true"
+          :auto-fit="true"
+          :file-name-position="fileNamePosition"
+          :toolbar-position="toolbarPosition"
+          :coordinates-position="coordinatesPosition"
+          :debug-position="debugPosition"
+          :layer-panel-position="layerPanelPosition"
           :dark-theme="isDark"
+          :antialiasing="aaMode"
           @dxf-data="handleDXFData"
           @unsupported-entities="handleUnsupportedEntities"
           @error="handleError"
@@ -132,6 +178,7 @@
         />
       </div>
 
+      <StatsSection />
       <FeaturesSection />
       <WhatsNewSection />
       <ExamplesSection />
@@ -155,11 +202,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { FileUploader, UnsupportedEntities, DXFViewer } from "dxf-vuer";
+import type { AntialiasingMode, OverlayPosition } from "dxf-vuer";
 import "dxf-vuer/style.css";
 import type { DxfData } from "dxf-render";
 import HeroSection from "./components/HeroSection.vue";
+import StatsSection from "./components/StatsSection.vue";
 import FeaturesSection from "./components/FeaturesSection.vue";
 import WhatsNewSection from "./components/WhatsNewSection.vue";
 import ExamplesSection from "./components/ExamplesSection.vue";
@@ -177,6 +226,107 @@ const currentFileName = ref<string>("");
 const dxfViewerRef = ref<InstanceType<typeof DXFViewer> | null>(null);
 const isLoadingSample = ref(false);
 const loadingSampleFile = ref<string | null>(null);
+const aaMode = ref<AntialiasingMode>("msaa");
+
+// Display option toggles (mirror DXFViewer prop defaults the demo overrides)
+const showFileName = ref(true);
+const showCoordinates = ref(true);
+const showZoomLevel = ref(true);
+const showDebugInfo = ref(true);
+const showResetButton = ref(true);
+const showFullscreenButton = ref(true);
+const showExportButton = ref(true);
+const showLayerPanel = ref(true);
+
+// Overlay positions
+const overlayPositions: OverlayPosition[] = [
+  "top-left",
+  "top-center",
+  "top-right",
+  "bottom-left",
+  "bottom-center",
+  "bottom-right",
+];
+
+const fileNamePosition = ref<OverlayPosition>("top-left");
+const toolbarPosition = ref<OverlayPosition>("top-right");
+const coordinatesPosition = ref<OverlayPosition>("bottom-left");
+const debugPosition = ref<OverlayPosition>("bottom-center");
+const layerPanelPosition = ref<OverlayPosition>("bottom-right");
+
+interface OverlayRow {
+  label: string;
+  getPosition: () => OverlayPosition;
+  setPosition: (p: OverlayPosition) => void;
+  isVisible: () => boolean;
+  setVisible: (v: boolean) => void;
+}
+
+const overlayRows: OverlayRow[] = [
+  {
+    label: "File name",
+    getPosition: () => fileNamePosition.value,
+    setPosition: (p) => (fileNamePosition.value = p),
+    isVisible: () => showFileName.value,
+    setVisible: (v) => (showFileName.value = v),
+  },
+  {
+    label: "Coordinates + Zoom",
+    getPosition: () => coordinatesPosition.value,
+    setPosition: (p) => (coordinatesPosition.value = p),
+    isVisible: () => showCoordinates.value || showZoomLevel.value,
+    setVisible: (v) => {
+      showCoordinates.value = v;
+      showZoomLevel.value = v;
+    },
+  },
+  {
+    label: "Toolbar",
+    getPosition: () => toolbarPosition.value,
+    setPosition: (p) => (toolbarPosition.value = p),
+    isVisible: () =>
+      showResetButton.value || showFullscreenButton.value || showExportButton.value,
+    setVisible: (v) => {
+      showResetButton.value = v;
+      showFullscreenButton.value = v;
+      showExportButton.value = v;
+    },
+  },
+  {
+    label: "Debug info",
+    getPosition: () => debugPosition.value,
+    setPosition: (p) => (debugPosition.value = p),
+    isVisible: () => showDebugInfo.value,
+    setVisible: (v) => (showDebugInfo.value = v),
+  },
+  {
+    label: "Layers panel",
+    getPosition: () => layerPanelPosition.value,
+    setPosition: (p) => (layerPanelPosition.value = p),
+    isVisible: () => showLayerPanel.value,
+    setVisible: (v) => (showLayerPanel.value = v),
+  },
+];
+
+const onCellClick = (row: OverlayRow, pos: OverlayPosition) => {
+  if (row.isVisible() && row.getPosition() === pos) {
+    row.setVisible(false);
+  } else {
+    row.setPosition(pos);
+    row.setVisible(true);
+  }
+};
+
+const aaDescriptions: Record<AntialiasingMode, string> = {
+  msaa: "Hardware multisampling: crisp geometric edges with no blur and almost free runtime cost. Best default for CAD lines and text.",
+  smaa: "Edge-detection post-processing AA. Smooths jagged lines without softening text noticeably; cheap and works while panning.",
+  fxaa: "Cheapest fullscreen AA — single shader pass. Smooths edges but tends to blur thin lines and small text.",
+  taa: "Temporal AA: accumulates 32 jittered frames after the camera stops. Very smooth on static views, but the first frame after movement looks aliased.",
+  ssaa: "Super-sampling: renders at higher resolution and downscales. Reference-quality image; expensive — not for interactive use on big drawings.",
+  none: "No antialiasing — raw rasterization. Maximum performance and pixel sharpness, with visible staircase aliasing on diagonal lines.",
+};
+
+const aaDescription = computed(() => aaDescriptions[aaMode.value]);
 
 const samples = [
   { file: "/entities.dxf", label: "Basic Entities", size: "191 KB" },
@@ -445,6 +595,137 @@ const resetView = () => {
   color: #ffcdd2;
 }
 
+.aa-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0 auto var(--spacing-sm);
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  max-width: 820px;
+}
+
+.aa-hint {
+  font-size: 0.75rem;
+  color: var(--text-color);
+  margin: 0;
+  line-height: 1.4;
+  flex: 1;
+  text-align: left;
+}
+
+.app.dark .aa-selector {
+  border-color: #444;
+}
+
+.aa-label {
+  color: var(--text-color);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.aa-select {
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: white;
+  color: var(--text-color);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.aa-select:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 1px;
+}
+
+.app.dark .aa-select {
+  background: #1e1e1e;
+  border-color: #444;
+  color: var(--text-color);
+}
+
+.overlays-card {
+  max-width: 820px;
+  margin: 0 auto var(--spacing-sm);
+  padding: 8px 16px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  font-size: 0.8125rem;
+}
+
+.overlays-hint {
+  margin: 0 0 8px;
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.overlay-rows {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 22px;
+}
+
+.overlay-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.overlay-label {
+  color: var(--text-color);
+  font-weight: 600;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.overlay-label.off {
+  opacity: 0.55;
+}
+
+.layout-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 14px);
+  grid-template-rows: repeat(2, 14px);
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.layout-cell {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+}
+
+.layout-cell:hover {
+  border-color: var(--primary-color);
+}
+
+.layout-cell.active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.app.dark .overlays-card,
+.app.dark .overlays-header {
+  border-color: #444;
+}
+
+.app.dark .layout-cell {
+  border-color: #555;
+}
+
 .controls-hint {
   text-align: center;
   font-size: 0.8125rem;
@@ -479,6 +760,17 @@ const resetView = () => {
   .viewer-container {
     height: 50vh;
   }
+
+  .aa-selector {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .aa-hint {
+    text-align: center;
+  }
+
 }
 
 /* Reduced motion */

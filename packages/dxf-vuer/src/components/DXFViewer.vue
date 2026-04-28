@@ -83,7 +83,7 @@
         </div>
 
         <LayerPanel
-          v-if="layerPanelPosition === pos && layerList.length > 0"
+          v-if="showLayerPanel && layerPanelPosition === pos && layerList.length > 0"
           :layers="layerList"
           @toggle-layer="handleToggleLayer"
           @show-all="handleShowAllLayers"
@@ -191,6 +191,7 @@ import { useLayers } from "../composables/useLayers";
 import { useLoadError } from "../composables/useLoadError";
 import type { DxfData, DxfLayer } from "dxf-render";
 import type { OverlayPosition } from "../types";
+import type { AntialiasingMode } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
 import ViewerToolbar from "./ViewerToolbar.vue";
 
@@ -211,9 +212,11 @@ interface Props {
   showDebugInfo?: boolean;
   showFileName?: boolean;
   showExportButton?: boolean;
+  showLayerPanel?: boolean;
   allowDrop?: boolean;
   darkTheme?: boolean;
   fontUrl?: string;
+  antialiasing?: AntialiasingMode;
   fileNamePosition?: OverlayPosition;
   toolbarPosition?: OverlayPosition;
   coordinatesPosition?: OverlayPosition;
@@ -234,9 +237,11 @@ const props = withDefaults(defineProps<Props>(), {
   showDebugInfo: false,
   showFileName: true,
   showExportButton: false,
+  showLayerPanel: true,
   allowDrop: false,
   darkTheme: false,
   fontUrl: "",
+  antialiasing: "msaa",
   fileNamePosition: "top-left",
   toolbarPosition: "top-right",
   coordinatesPosition: "bottom-left",
@@ -482,6 +487,29 @@ const loadDXFFromData = async (dxfData: DxfData) => {
   }
 };
 
+const decodeBuffer = (buffer: ArrayBuffer): string => {
+  const view = new Uint8Array(buffer);
+  // UTF-16 LE BOM (DXF files saved by AutoCAD with non-ASCII content)
+  if (view.length >= 2 && view[0] === 0xff && view[1] === 0xfe) {
+    return new TextDecoder("utf-16le").decode(buffer);
+  }
+  // UTF-16 BE BOM
+  if (view.length >= 2 && view[0] === 0xfe && view[1] === 0xff) {
+    return new TextDecoder("utf-16be").decode(buffer);
+  }
+  // UTF-8 (with or without BOM — TextDecoder strips it automatically)
+  return new TextDecoder("utf-8").decode(buffer);
+};
+
+const loadDXFFromBuffer = async (buffer: ArrayBuffer) => {
+  await loadDXFFromText(decodeBuffer(buffer));
+};
+
+const loadDXFFromBlob = async (blob: Blob) => {
+  const buffer = await blob.arrayBuffer();
+  await loadDXFFromBuffer(buffer);
+};
+
 const loadDXFFromUrl = async (url: string) => {
   clearError();
   isLoading.value = true;
@@ -545,7 +573,7 @@ onMounted(() => {
   document.addEventListener("fullscreenchange", onFullscreenChange);
   nextTick(() => {
     if (dxfContainer.value) {
-      initThreeJS(dxfContainer.value, { enableControls: true });
+      initThreeJS(dxfContainer.value, { enableControls: true, aaMode: props.antialiasing });
 
       if (props.url) {
         loadDXFFromUrl(props.url);
@@ -575,6 +603,8 @@ defineExpose({
   loadDXFFromText,
   loadDXFFromData,
   loadDXFFromUrl,
+  loadDXFFromBuffer,
+  loadDXFFromBlob,
   resize,
   resetView,
   exportToPNG,

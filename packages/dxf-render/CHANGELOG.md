@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.3.0
+
+### Features
+
+- **Configurable antialiasing pipeline**: new `scene/antialiasing.ts` module with framework-agnostic factories — `createRenderer({ aaMode })`, `createComposer({ aaMode, scene, camera, renderer })`, and `isReducedMotionPreferred()`. Six modes: `msaa` (default, hardware), `smaa`, `fxaa`, `taa`, `ssaa`, `none`. New exported type `AntialiasingMode`. Lets React / Svelte / vanilla users use the same AA palette that powers `dxf-vuer`'s `<DXFViewer>`.
+
+### Documentation
+
+- README: new "Antialiasing" section with comparison table and example.
+- npm search SEO: deduplicated keywords, added precise search phrases (`dxf-viewer`, `dxf-three`, `dxf-js`, `render-dxf`, `parser`, `viewer`, `blueprint`); homepage now points to the live demo; added the `bugs` field.
+
+### Bug Fixes
+
+- Added `"browser": { "fs": false }` to package.json — eliminates `Could not resolve "fs"` when bundling for the browser (Vite / esbuild / Angular CLI). The Node branch of `opentype.js` (file-system font loading) is now automatically stripped by downstream bundlers.
+
 ## 1.2.0
 
 ### Features

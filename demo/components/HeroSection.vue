@@ -1,6 +1,6 @@
 <template>
   <section class="hero">
-    <span class="hero-brand">dxf-render</span>
+    <span class="hero-brand">dxf-render · dxf-vuer</span>
     <h1>Render AutoCAD DXF Drawings in&nbsp;the&nbsp;Browser</h1>
     <p class="hero-subtitle">
       TypeScript DXF parser and Three.js WebGL renderer. Use standalone with React, Svelte, or
@@ -37,27 +37,6 @@
           <polyline points="20 6 9 17 4 12" />
         </svg>
       </button>
-    </div>
-    <div class="hero-stats">
-      <div class="hero-stat">
-        <span class="hero-stat-value">21</span>
-        <span class="hero-stat-label">entity types</span>
-      </div>
-      <div class="hero-stat-divider" />
-      <div class="hero-stat">
-        <span class="hero-stat-value">−78%</span>
-        <span class="hero-stat-label">draw calls</span>
-      </div>
-      <div class="hero-stat-divider" />
-      <div class="hero-stat">
-        <span class="hero-stat-value">874</span>
-        <span class="hero-stat-label">tests</span>
-      </div>
-      <div class="hero-stat-divider" />
-      <div class="hero-stat">
-        <span class="hero-stat-value">Web Worker</span>
-        <span class="hero-stat-label">parsing</span>
-      </div>
     </div>
   </section>
 </template>
@@ -174,43 +153,6 @@ async function copyInstallCommand() {
   flex-shrink: 0;
 }
 
-.hero-stats {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-md);
-  margin-top: var(--spacing-lg);
-  margin-bottom: var(--spacing-lg);
-}
-
-.hero-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.hero-stat-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--primary-color);
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.hero-stat-label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.hero-stat-divider {
-  width: 1px;
-  height: 32px;
-  background: var(--border-color);
-}
-
 @media (max-width: 768px) {
   .hero {
     padding: 2rem var(--spacing-md) 1.5rem;
@@ -222,14 +164,6 @@ async function copyInstallCommand() {
 
   .hero-subtitle {
     font-size: 1rem;
-  }
-
-  .hero-stats {
-    gap: var(--spacing-sm);
-  }
-
-  .hero-stat-value {
-    font-size: 1.25rem;
   }
 }
 

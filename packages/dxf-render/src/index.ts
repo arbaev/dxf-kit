@@ -12,6 +12,15 @@ export { computePolylinePoints } from "./render/collectors";
 // Scene helpers
 export { useCamera } from "./scene/useCamera";
 export { useControls, useOrbitControls } from "./scene/useControls";
+export {
+  createRenderer,
+  createComposer,
+  isReducedMotionPreferred,
+  type AntialiasingMode,
+  type CreateRendererOptions,
+  type CreateComposerOptions,
+  type AntialiasingPipeline,
+} from "./scene/antialiasing";
 
 // Fonts
 export { loadDefaultFont, loadFont, getDefaultFont, loadSerifFont, getSerifFont } from "./render/text/fontManager";
