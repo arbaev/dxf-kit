@@ -90,7 +90,7 @@ async function loadFile(file) {
 - **Error display** — parse/render/fetch errors shown in the viewer with retry support
 - **Debug overlay** — FPS, draw calls, lines, triangles
 - **Zoom level** — percentage display relative to fit-to-view
-- **TAA anti-aliasing** — smooth edges after idle accumulation
+- **Configurable antialiasing** — choose between MSAA (default, hardware), SMAA, FXAA, TAA, SSAA, or none
 - **TypeScript** — strict types, full `.d.ts` declarations
 
 ## Acknowledgements

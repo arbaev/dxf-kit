@@ -3,7 +3,10 @@
     <h2>What's New</h2>
     <div class="whats-new-list">
       <div v-for="item in whatsNew" :key="item.text" class="whats-new-item">
-        <span class="whats-new-version">{{ item.version }}</span>
+        <span class="whats-new-version" :class="`pkg-${item.pkg}`">
+          <span class="whats-new-pkg">{{ item.pkg }}</span>
+          <span class="whats-new-num">{{ item.version }}</span>
+        </span>
         <span class="whats-new-text">{{ item.text }}</span>
       </div>
     </div>
@@ -11,24 +14,57 @@
 </template>
 
 <script setup lang="ts">
-const whatsNew = [
+type Pkg = "dxf-render" | "dxf-vuer";
+
+interface WhatsNewItem {
+  pkg: Pkg;
+  version: string;
+  text: string;
+}
+
+const whatsNew: WhatsNewItem[] = [
   {
+    pkg: "dxf-vuer",
+    version: "2.4.0",
+    text: "Configurable antialiasing — MSAA (default), SMAA, FXAA, TAA, SSAA, or none — pick the right tradeoff for your drawing",
+  },
+  {
+    pkg: "dxf-render",
     version: "1.2.0",
     text: "Variable-width polylines with per-vertex tapering, arrows, and donuts",
   },
   {
+    pkg: "dxf-render",
     version: "1.2.0",
     text: "GIS origin translation — large UTM/state plane coordinates without precision loss",
   },
-  { version: "1.2.0", text: "Touch support — native one-finger pan on mobile devices" },
-  { version: "1.1.0", text: "Theme-adaptive ACI 250-251 colors — dark grays invert in dark mode" },
   {
+    pkg: "dxf-render",
+    version: "1.2.0",
+    text: "Touch support — native one-finger pan on mobile devices",
+  },
+  {
+    pkg: "dxf-render",
+    version: "1.1.0",
+    text: "Theme-adaptive ACI 250-251 colors — dark grays invert in dark mode",
+  },
+  {
+    pkg: "dxf-vuer",
     version: "1.5.0",
     text: "TAA anti-aliasing — 32-frame temporal accumulation for crisp text and edges",
   },
-  { version: "1.5.0", text: "Instant dark mode — theme switching without full re-render" },
-  { version: "1.4.0", text: "MLINE, XLINE, RAY entities — multilines and construction lines" },
   {
+    pkg: "dxf-vuer",
+    version: "1.5.0",
+    text: "Instant dark mode — theme switching without full re-render",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "1.4.0",
+    text: "MLINE, XLINE, RAY entities — multilines and construction lines",
+  },
+  {
+    pkg: "dxf-vuer",
     version: "1.4.0",
     text: "25 built-in hatch patterns with solid fill optimization (86× faster)",
   },
@@ -68,12 +104,36 @@ const whatsNew = [
 
 .whats-new-version {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--primary-color);
-  background: var(--accent-bg, #f0f4ff);
   padding: 2px 8px;
   border-radius: 4px;
+}
+
+.whats-new-version.pkg-dxf-render {
+  color: var(--primary-color);
+  background: var(--accent-bg, #f0f4ff);
+}
+
+.whats-new-version.pkg-dxf-vuer {
+  color: #2e7d32;
+  background: #e8f5e9;
+}
+
+.app.dark .whats-new-version.pkg-dxf-vuer {
+  color: #81c784;
+  background: #1b3a1f;
+}
+
+.whats-new-pkg {
+  opacity: 0.85;
+}
+
+.whats-new-num {
+  opacity: 1;
 }
 </style>

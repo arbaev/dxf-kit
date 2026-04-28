@@ -23,7 +23,7 @@ const features = [
   {
     title: "WebGL Rendering",
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
-    body: "Three.js-powered rendering with TAA anti-aliasing, pan, zoom, layer visibility, instant dark theme switching, drag-and-drop, and PNG export.",
+    body: "Three.js-powered rendering with 6 antialiasing modes (MSAA, SMAA, FXAA, TAA, SSAA, none), pan, zoom, layer visibility, instant dark theme switching, drag-and-drop, and PNG export.",
   },
   {
     title: "High Performance",

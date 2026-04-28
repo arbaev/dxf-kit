@@ -68,6 +68,7 @@ async function loadFile(file) {
 | `allowDrop` | `boolean` | `false` | Enable drag-and-drop file loading |
 | `darkTheme` | `boolean` | `false` | Dark theme for viewer and scene |
 | `autoFit` | `boolean` | `true` | Auto-fit camera to drawing on load |
+| `antialiasing` | `AntialiasingMode` | `"msaa"` | Anti-aliasing mode (init-time only — recreate the component via `:key` to switch) |
 | `fontUrl` | `string` | `""` | Custom font URL for text rendering |
 | `fileNamePosition` | `OverlayPosition` | `"top-left"` | Position of file name overlay |
 | `toolbarPosition` | `OverlayPosition` | `"top-right"` | Position of toolbar |
@@ -77,6 +78,23 @@ async function loadFile(file) {
 | `overlayPosition` | `OverlayPosition` | `"top-center"` | Position of `#overlay` slot content |
 
 `OverlayPosition` = `"top-left"` | `"top-center"` | `"top-right"` | `"bottom-left"` | `"bottom-center"` | `"bottom-right"`
+
+`AntialiasingMode` = `"msaa"` | `"smaa"` | `"fxaa"` | `"taa"` | `"ssaa"` | `"none"`
+
+| Mode | Description |
+|------|-------------|
+| `msaa` | Hardware multisample antialiasing (default). Crisp geometric edges, almost free runtime cost. Best for CAD with thin lines and text |
+| `smaa` | Edge-detection post-processing AA. Cheap and works while panning. **Note:** can fade pixels at corners of 1px lines — known limitation when applied to line art |
+| `fxaa` | Cheapest fullscreen AA — single shader pass. Smooths edges but tends to blur thin lines and small text |
+| `taa` | Temporal AA: accumulates 32 jittered frames after the camera stops. Very smooth on static views; first frame after movement looks aliased |
+| `ssaa` | Super-sampling: renders at higher resolution and downscales. Reference quality; expensive — not recommended for interactive use on large drawings |
+| `none` | No antialiasing. Maximum performance and pixel sharpness, with visible staircase aliasing on diagonals |
+
+`antialiasing` is init-time only — the renderer is built once with the chosen mode. To let users switch at runtime, recreate `<DXFViewer>` via Vue's `:key` attribute:
+
+```vue
+<DXFViewer :key="aaMode" :antialiasing="aaMode" :dxf-data="dxfData" />
+```
 
 ## DXFViewer Slots
 
@@ -122,7 +140,7 @@ async function loadFile(file) {
 | Composable | Description |
 |------------|-------------|
 | `useDXFRenderer` | Main orchestrator: parsing, display, resize, layer visibility, dark theme |
-| `useThreeScene` | Three.js scene/renderer init with TAA anti-aliasing |
+| `useThreeScene` | Three.js scene/renderer init with configurable antialiasing (MSAA/SMAA/FXAA/TAA/SSAA/none) |
 | `useLayers` | Layer visibility state management |
 
 ## Re-exports

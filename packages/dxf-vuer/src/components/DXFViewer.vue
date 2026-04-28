@@ -190,7 +190,7 @@ import { useDXFRenderer } from "../composables/useDXFRenderer";
 import { useLayers } from "../composables/useLayers";
 import { useLoadError } from "../composables/useLoadError";
 import type { DxfData, DxfLayer } from "dxf-render";
-import type { OverlayPosition } from "../types";
+import type { OverlayPosition, AntialiasingMode } from "../types";
 import LayerPanel from "./LayerPanel.vue";
 import ViewerToolbar from "./ViewerToolbar.vue";
 
@@ -214,6 +214,7 @@ interface Props {
   allowDrop?: boolean;
   darkTheme?: boolean;
   fontUrl?: string;
+  antialiasing?: AntialiasingMode;
   fileNamePosition?: OverlayPosition;
   toolbarPosition?: OverlayPosition;
   coordinatesPosition?: OverlayPosition;
@@ -237,6 +238,7 @@ const props = withDefaults(defineProps<Props>(), {
   allowDrop: false,
   darkTheme: false,
   fontUrl: "",
+  antialiasing: "msaa",
   fileNamePosition: "top-left",
   toolbarPosition: "top-right",
   coordinatesPosition: "bottom-left",
@@ -545,7 +547,7 @@ onMounted(() => {
   document.addEventListener("fullscreenchange", onFullscreenChange);
   nextTick(() => {
     if (dxfContainer.value) {
-      initThreeJS(dxfContainer.value, { enableControls: true });
+      initThreeJS(dxfContainer.value, { enableControls: true, aaMode: props.antialiasing });
 
       if (props.url) {
         loadDXFFromUrl(props.url);

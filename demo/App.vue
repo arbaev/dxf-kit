@@ -89,6 +89,19 @@
         </div>
       </div>
 
+      <div class="aa-selector">
+        <span class="aa-label">Antialiasing:</span>
+        <select v-model="aaMode" class="aa-select">
+          <option value="none">None</option>
+          <option value="msaa">MSAA (hardware, default)</option>
+          <option value="smaa">SMAA</option>
+          <option value="fxaa">FXAA</option>
+          <option value="taa">TAA (jittered, idle-only)</option>
+          <option value="ssaa">SSAA (high quality, slow)</option>
+        </select>
+        <p class="aa-hint">{{ aaDescription }}</p>
+      </div>
+
       <p class="controls-hint">
         {{ isTouchDevice ? "Pinch to zoom · Drag to pan" : "Scroll to zoom · Drag to pan" }}
       </p>
@@ -113,6 +126,7 @@
 
       <div id="viewer" class="viewer-container">
         <DXFViewer
+          :key="aaMode"
           ref="dxfViewerRef"
           :dxf-data="dxfData"
           :file-name="currentFileName"
@@ -123,6 +137,7 @@
           :show-export-button="true"
           :allow-drop="true"
           :dark-theme="isDark"
+          :antialiasing="aaMode"
           @dxf-data="handleDXFData"
           @unsupported-entities="handleUnsupportedEntities"
           @error="handleError"
@@ -155,8 +170,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { FileUploader, UnsupportedEntities, DXFViewer } from "dxf-vuer";
+import type { AntialiasingMode } from "dxf-vuer";
 import "dxf-vuer/style.css";
 import type { DxfData } from "dxf-render";
 import HeroSection from "./components/HeroSection.vue";
@@ -177,6 +193,18 @@ const currentFileName = ref<string>("");
 const dxfViewerRef = ref<InstanceType<typeof DXFViewer> | null>(null);
 const isLoadingSample = ref(false);
 const loadingSampleFile = ref<string | null>(null);
+const aaMode = ref<AntialiasingMode>("msaa");
+
+const aaDescriptions: Record<AntialiasingMode, string> = {
+  msaa: "Hardware multisampling: crisp geometric edges with no blur and almost free runtime cost. Best default for CAD lines and text.",
+  smaa: "Edge-detection post-processing AA. Smooths jagged lines without softening text noticeably; cheap and works while panning.",
+  fxaa: "Cheapest fullscreen AA — single shader pass. Smooths edges but tends to blur thin lines and small text.",
+  taa: "Temporal AA: accumulates 32 jittered frames after the camera stops. Very smooth on static views, but the first frame after movement looks aliased.",
+  ssaa: "Super-sampling: renders at higher resolution and downscales. Reference-quality image; expensive — not for interactive use on big drawings.",
+  none: "No antialiasing — raw rasterization. Maximum performance and pixel sharpness, with visible staircase aliasing on diagonal lines.",
+};
+
+const aaDescription = computed(() => aaDescriptions[aaMode.value]);
 
 const samples = [
   { file: "/entities.dxf", label: "Basic Entities", size: "191 KB" },
@@ -445,6 +473,58 @@ const resetView = () => {
   color: #ffcdd2;
 }
 
+.aa-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0 auto var(--spacing-sm);
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  max-width: 820px;
+}
+
+.aa-hint {
+  font-size: 0.75rem;
+  color: var(--text-color);
+  margin: 0;
+  line-height: 1.4;
+  flex: 1;
+  text-align: left;
+}
+
+.app.dark .aa-selector {
+  border-color: #444;
+}
+
+.aa-label {
+  color: var(--text-color);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.aa-select {
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: white;
+  color: var(--text-color);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.aa-select:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 1px;
+}
+
+.app.dark .aa-select {
+  background: #1e1e1e;
+  border-color: #444;
+  color: var(--text-color);
+}
+
 .controls-hint {
   text-align: center;
   font-size: 0.8125rem;
@@ -478,6 +558,16 @@ const resetView = () => {
 
   .viewer-container {
     height: 50vh;
+  }
+
+  .aa-selector {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .aa-hint {
+    text-align: center;
   }
 }
 

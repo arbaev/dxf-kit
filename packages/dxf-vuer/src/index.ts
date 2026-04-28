@@ -14,7 +14,7 @@ export { useThreeScene } from "./composables/useThreeScene";
 export { useLayers } from "./composables/useLayers";
 
 // Types
-export type { OverlayPosition } from "./types";
+export type { OverlayPosition, AntialiasingMode } from "./types";
 
 // Re-export everything from dxf-render (backward compatibility)
 export * from "dxf-render";
