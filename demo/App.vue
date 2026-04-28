@@ -178,6 +178,7 @@
         />
       </div>
 
+      <StatsSection />
       <FeaturesSection />
       <WhatsNewSection />
       <ExamplesSection />
@@ -207,6 +208,7 @@ import type { AntialiasingMode, OverlayPosition } from "dxf-vuer";
 import "dxf-vuer/style.css";
 import type { DxfData } from "dxf-render";
 import HeroSection from "./components/HeroSection.vue";
+import StatsSection from "./components/StatsSection.vue";
 import FeaturesSection from "./components/FeaturesSection.vue";
 import WhatsNewSection from "./components/WhatsNewSection.vue";
 import ExamplesSection from "./components/ExamplesSection.vue";
