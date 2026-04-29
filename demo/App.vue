@@ -278,7 +278,7 @@
           </template>
           <template v-else>
             <p class="settings-cell-hint">
-              Click a row to highlight its members.
+              Click a row to highlight and zoom to its members.
             </p>
             <div class="associations-list">
               <button
@@ -417,6 +417,7 @@ const highlightAssociation = (a: EntityAssociation) => {
   if (!dxfViewerRef.value) return;
   activeAssociationId.value = a.id;
   dxfViewerRef.value.highlight(a.members);
+  dxfViewerRef.value.zoomToEntity(a.members);
 };
 
 const clearAssociationHighlight = () => {

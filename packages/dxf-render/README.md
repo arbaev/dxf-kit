@@ -331,6 +331,20 @@ const entityIndex = buildEntityIndex(dxf); // Map<handle, DxfEntity>
 const associations = buildAssociations(dxf); // EntityAssociation[]
 ```
 
+To zoom the camera to a set of entities, combine `getZoomBox()` with the `fitCameraToBox()` helper from `useCamera()`:
+
+```ts
+import { buildPickingIndex, getZoomBox, useCamera } from "dxf-render";
+
+const pickingIndex = buildPickingIndex(dxf);
+const { fitCameraToBox } = useCamera();
+
+function zoomTo(handles: string[]) {
+  const box = getZoomBox(pickingIndex, handles, { originOffset });
+  if (box) fitCameraToBox(box, camera);
+}
+```
+
 To raycast, temporarily flip the group's `visible` flag (it's `false` by default so it doesn't show up in normal rendering):
 
 ```ts

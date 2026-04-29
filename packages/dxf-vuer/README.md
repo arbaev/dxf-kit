@@ -159,6 +159,7 @@ async function loadFile(file) {
 | `clearHighlight()`                         | Remove all highlight overlays                                                               |
 | `getAssociations()`                        | Return all `EntityAssociation[]` derived from the loaded DXF                                |
 | `findAssociationsByHandle(handle: string)` | Return all associations a given handle participates in                                      |
+| `zoomToEntity(handles: string[])`          | Fit the camera to the union of the entities' bboxes, with 20% padding. Requires `pickingEnabled` |
 
 ```vue
 <script setup>
@@ -288,9 +289,11 @@ function onClick(e: PickingEvent) {
 function selectFromGrid(handle: string) {
   selectedHandle.value = handle;
   const all = viewer.value?.findAssociationsByHandle(handle) ?? [];
-  // highlight the entity itself plus everything it's associated with
+  // highlight the entity itself plus everything it's associated with,
+  // and pan/zoom the camera so the user can see what was selected.
   const handles = all.length > 0 ? Array.from(new Set(all.flatMap((a) => a.members))) : [handle];
   viewer.value?.highlight(handles);
+  viewer.value?.zoomToEntity(handles);
 }
 </script>
 

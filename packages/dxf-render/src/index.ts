@@ -17,6 +17,7 @@ export {
   setPickingGroupDebug,
 } from "./render/createPickingGroup";
 export { buildEntityIndex, extractEntityText } from "./utils/entityIndex";
+export { getZoomBox, type GetZoomBoxOptions } from "./utils/getZoomBox";
 
 // Associations
 export { buildAssociations } from "./utils/buildAssociations";

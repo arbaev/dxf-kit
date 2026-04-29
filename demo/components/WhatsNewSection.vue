@@ -36,7 +36,7 @@ const whatsNew: WhatsNewItem[] = [
   {
     pkg: "dxf-vuer",
     version: "2.5.0",
-    text: "Imperative API on viewer ref — highlight(handles[]), clearHighlight(), getAssociations(), findAssociationsByHandle() — sync selection with AG Grid or any external UI",
+    text: "Imperative API on viewer ref — highlight(handles[]), clearHighlight(), getAssociations(), findAssociationsByHandle(), zoomToEntity(handles[]) — sync selection and camera with AG Grid or any external UI",
   },
   {
     pkg: "dxf-vuer",

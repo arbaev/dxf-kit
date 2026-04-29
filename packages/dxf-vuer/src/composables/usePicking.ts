@@ -227,6 +227,9 @@ export function usePicking() {
   /** Lookup by unique pick id — returns a single specific instance */
   const getPickingEntryById = (id: string) => pickingIndex?.byId.get(id);
 
+  /** Underlying picking index (or null before any DXF is loaded). */
+  const getPickingIndex = (): PickingIndex | null => pickingIndex;
+
   /** All derived associations for the current DXF */
   const getAssociations = (): EntityAssociation[] => associations;
 
@@ -249,6 +252,7 @@ export function usePicking() {
     setEnabled,
     getPickingEntries,
     getPickingEntryById,
+    getPickingIndex,
     getAssociations,
     findAssociationsByHandle,
     getPickingGroup,

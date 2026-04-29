@@ -192,6 +192,7 @@ import { useLoadError } from "../composables/useLoadError";
 import { usePicking, type PickingEvent } from "../composables/usePicking";
 import { useHighlight } from "../composables/useHighlight";
 import type { DxfData, DxfLayer, PickingEntry, EntityAssociation } from "dxf-render";
+import { getZoomBox } from "dxf-render";
 import type { OverlayPosition } from "../types";
 import type { AntialiasingMode } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
@@ -290,6 +291,7 @@ const {
   displayDXF,
   handleResize,
   resetView,
+  zoomToBox,
   applyLayerVisibility,
   switchTheme,
   cleanup,
@@ -370,6 +372,21 @@ const clearHighlight = (): void => {
 const getAssociations = (): EntityAssociation[] => picking.getAssociations();
 const findAssociationsByHandle = (handle: string): EntityAssociation[] =>
   picking.findAssociationsByHandle(handle);
+
+/**
+ * Fit the camera to the entities with the given DXF handles. Delegates the
+ * scene-space bbox computation to `getZoomBox()` from dxf-render.
+ *
+ * Picking must have been installed (i.e. `pickingEnabled` was true when the
+ * DXF was loaded). Handles that are not in the picking index are skipped
+ * silently — XLINE/RAY are intentionally absent (they're infinite).
+ */
+const zoomToEntity = (handles: string[]): void => {
+  const index = picking.getPickingIndex();
+  if (!index) return;
+  const box = getZoomBox(index, handles, { originOffset: getOriginOffset() });
+  if (box) zoomToBox(box);
+};
 
 const loadingPhase = ref<"" | "fetching" | "parsing" | "rendering">("");
 const { errorMessage, setError, clearError } = useLoadError();
@@ -744,6 +761,7 @@ defineExpose({
   clearHighlight,
   getAssociations,
   findAssociationsByHandle,
+  zoomToEntity,
 });
 </script>
 
