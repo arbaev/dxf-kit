@@ -18,8 +18,9 @@ For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer)
 - **Most entities** — 21 rendered types including all dimension variants, LEADER, MULTILEADER, MLINE
 - **Variable-width polylines** — per-vertex tapering, arrows, donuts rendered as mesh with miter joins
 - **Accurate rendering** — linetype patterns, OCS transforms, hatch patterns, proper color resolution
+- **Picking & associations** — bbox-based raycast index plus DXF-driven entity links (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION)
 - **Two entry points** — full renderer or parser-only (zero deps, works in Node.js)
-- **Battle-tested** — 841 tests covering parser, renderer, and utilities
+- **Battle-tested** — 902 tests covering parser, renderer, and utilities
 - **Modern stack** — TypeScript native, ES modules, tree-shakeable, Vite-built
 - **Framework-agnostic** — works with React, Svelte, Angular, vanilla JS, or any framework
 
@@ -269,14 +270,14 @@ export function DxfViewer({ dxfText }: { dxfText: string }) {
 
 Six modes available via `AntialiasingMode = "msaa" | "smaa" | "fxaa" | "taa" | "ssaa" | "none"`:
 
-| Mode | Use case |
-|------|----------|
-| `msaa` | Hardware multisampling (default). Crisp geometric edges, almost free runtime cost. Best for CAD with thin lines and text |
-| `smaa` | Edge-detection post-processing. Cheap and works while panning. Note: may fade pixels at corners of 1px lines (line-art limitation) |
-| `fxaa` | Cheapest fullscreen AA — single shader pass. Smooths edges but tends to blur thin lines and small text |
-| `taa` | Temporal AA: 32 jittered frames accumulated when the camera stops. Smooth on static views; first frame after movement looks aliased. Skipped when `prefers-reduced-motion: reduce` |
-| `ssaa` | Super-sampling: renders at higher resolution and downscales. Reference quality; expensive |
-| `none` | No antialiasing. Maximum performance and pixel sharpness |
+| Mode   | Use case                                                                                                                                                                           |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `msaa` | Hardware multisampling (default). Crisp geometric edges, almost free runtime cost. Best for CAD with thin lines and text                                                           |
+| `smaa` | Edge-detection post-processing. Cheap and works while panning. Note: may fade pixels at corners of 1px lines (line-art limitation)                                                 |
+| `fxaa` | Cheapest fullscreen AA — single shader pass. Smooths edges but tends to blur thin lines and small text                                                                             |
+| `taa`  | Temporal AA: 32 jittered frames accumulated when the camera stops. Smooth on static views; first frame after movement looks aliased. Skipped when `prefers-reduced-motion: reduce` |
+| `ssaa` | Super-sampling: renders at higher resolution and downscales. Reference quality; expensive                                                                                          |
+| `none` | No antialiasing. Maximum performance and pixel sharpness                                                                                                                           |
 
 ```ts
 import * as THREE from "three";
@@ -301,6 +302,94 @@ function render() {
   }
 }
 ```
+
+### Picking primitives
+
+Framework-agnostic primitives for building hover/click interactivity. The Vue wrapper (`dxf-vuer`) is implemented on top of these.
+
+```ts
+import {
+  buildPickingIndex,
+  createPickingGroup,
+  disposePickingGroup,
+  buildEntityIndex,
+  extractEntityText,
+  buildAssociations,
+} from "dxf-render";
+
+const dxf = parseDxf(dxfText);
+
+// 1. Per-entity bounding boxes (expands INSERTs, ATTRIBs, $INSUNITS, OCS)
+const pickingIndex = buildPickingIndex(dxf);
+
+// 2. Invisible THREE.Group of BoxGeometry meshes — one per entity
+const pickingGroup = createPickingGroup(pickingIndex, originOffset);
+scene.add(pickingGroup);
+
+// 3. Resolve entity data and structural links by handle
+const entityIndex = buildEntityIndex(dxf); // Map<handle, DxfEntity>
+const associations = buildAssociations(dxf); // EntityAssociation[]
+```
+
+To raycast, temporarily flip the group's `visible` flag (it's `false` by default so it doesn't show up in normal rendering):
+
+```ts
+const raycaster = new THREE.Raycaster();
+raycaster.setFromCamera(ndc, camera);
+
+pickingGroup.visible = true;
+const hits = raycaster.intersectObject(pickingGroup, true);
+pickingGroup.visible = false;
+
+if (hits.length > 0) {
+  const handle = hits[0].object.userData.handle as string;
+  const entity = entityIndex.get(handle);
+  console.log("hit", handle, entity?.type, extractEntityText(entity!));
+}
+```
+
+### Associations
+
+`buildAssociations(dxf)` derives links between entities **strictly from DXF data**, no geometric heuristics:
+
+| Kind            | How it's sourced                                          |
+| --------------- | --------------------------------------------------------- |
+| `mleader`       | MULTILEADER inline `contextData` text (DXF code 304)      |
+| `leader`        | LEADER's `annotationHandle` (DXF code 340) → TEXT/MTEXT   |
+| `block-attribs` | INSERT entity with one or more ATTRIB children            |
+| `dimension`     | DIMENSION text override (or `actualMeasurement` fallback) |
+
+```ts
+interface EntityAssociation {
+  id: string; // stable, e.g. "leader:B1"
+  kind: AssociationKind; // 'mleader' | 'leader' | 'block-attribs' | 'dimension' | 'group'
+  primary: string; // primary entity handle
+  members: string[]; // all related handles, including primary
+  text?: string;
+  source: AssociationSource; // 'inline' | 'handle-ref' | 'attribs' | 'group-dict'
+}
+```
+
+A handle can participate in multiple associations; index by member if you need reverse lookup:
+
+```ts
+import { buildAssociations } from "dxf-render";
+
+const associations = buildAssociations(dxf);
+const byHandle = new Map<string, typeof associations>();
+for (const a of associations) {
+  for (const m of a.members) {
+    const list = byHandle.get(m) ?? [];
+    list.push(a);
+    byHandle.set(m, list);
+  }
+}
+
+// "Given any entity, what is it linked to?"
+const linkedToBd8 = byHandle.get("BD8");
+```
+
+> ACAD_GROUP entries from the DXF OBJECTS section are not parsed yet — that source is on the roadmap.
 
 ### Fonts
 
@@ -327,27 +416,27 @@ POLYLINE/LWPOLYLINE support includes per-vertex variable width (tapering), const
 
 ## Comparison
 
-| Feature                   | dxf-render                | dxf-viewer   | dxf-parser | three-dxf |
-| ------------------------- | ------------------------- | ------------ | ---------- | --------- |
-| DXF parsing               | ✅                        | ✅           | ✅         | ✅        |
-| Three.js rendering        | ✅                        | ✅           | ❌         | ✅        |
-| Entity types              | 21 rendered               | ~15          | ~15 parsed | ~8        |
-| Variable-width polylines  | ✅ tapering, arrows, donuts| ❌           | —          | ❌        |
-| Linetype patterns         | ✅ DASHED, CENTER, DOT... | ❌ all solid | —          | ❌        |
-| All dimension types       | ✅ 7 types                | linear only  | —          | ❌        |
-| LEADER / MULTILEADER      | ✅                        | ❌           | —          | ❌        |
-| HATCH patterns            | ✅ 25 built-in            | ✅           | —          | ❌        |
-| OCS (Arbitrary Axis)      | ✅ full                   | Z-flip only  | —          | ❌        |
-| Vector text (opentype.js) | ✅                        | ✅           | —          | ❌        |
-| Geometry merging          | ✅                        | ✅           | —          | ❌        |
-| Dark theme                | ✅ instant switch         | bg only      | —          | ❌        |
-| TypeScript                | ✅ native                 | .d.ts        | ✅         | ❌        |
-| Tests                     | 854 tests                 | 0            | ✅         | 0         |
-| Web Worker parsing        | ✅                        | ✅           | ❌         | ❌        |
-| Parser-only entry         | ✅ zero deps              | ❌           | ✅         | ❌        |
-| Framework                 | agnostic                  | agnostic     | —          | agnostic  |
-| Bundle size               | ~960KB                    | ~1.2MB       | ~50KB      | ~30KB     |
-| Last updated              | 2026                      | 2024         | 2023       | 2019      |
+| Feature                   | dxf-render                  | dxf-viewer   | dxf-parser | three-dxf |
+| ------------------------- | --------------------------- | ------------ | ---------- | --------- |
+| DXF parsing               | ✅                          | ✅           | ✅         | ✅        |
+| Three.js rendering        | ✅                          | ✅           | ❌         | ✅        |
+| Entity types              | 21 rendered                 | ~15          | ~15 parsed | ~8        |
+| Variable-width polylines  | ✅ tapering, arrows, donuts | ❌           | —          | ❌        |
+| Linetype patterns         | ✅ DASHED, CENTER, DOT...   | ❌ all solid | —          | ❌        |
+| All dimension types       | ✅ 7 types                  | linear only  | —          | ❌        |
+| LEADER / MULTILEADER      | ✅                          | ❌           | —          | ❌        |
+| HATCH patterns            | ✅ 25 built-in              | ✅           | —          | ❌        |
+| OCS (Arbitrary Axis)      | ✅ full                     | Z-flip only  | —          | ❌        |
+| Vector text (opentype.js) | ✅                          | ✅           | —          | ❌        |
+| Geometry merging          | ✅                          | ✅           | —          | ❌        |
+| Dark theme                | ✅ instant switch           | bg only      | —          | ❌        |
+| TypeScript                | ✅ native                   | .d.ts        | ✅         | ❌        |
+| Tests                     | 902 tests                   | 0            | ✅         | 0         |
+| Web Worker parsing        | ✅                          | ✅           | ❌         | ❌        |
+| Parser-only entry         | ✅ zero deps                | ❌           | ✅         | ❌        |
+| Framework                 | agnostic                    | agnostic     | —          | agnostic  |
+| Bundle size               | ~960KB                      | ~1.2MB       | ~50KB      | ~30KB     |
+| Last updated              | 2026                        | 2024         | 2023       | 2019      |
 
 ## Bundle sizes
 
