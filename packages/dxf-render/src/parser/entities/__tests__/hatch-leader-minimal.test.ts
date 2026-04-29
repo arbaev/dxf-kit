@@ -417,6 +417,24 @@ describe("parseLeader", () => {
     expect(entity.vertices).toHaveLength(2);
   });
 
+  it("parses annotationHandle from code 340", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "LEADER",
+      "76", "2",
+      "10", "0.0",
+      "20", "0.0",
+      "10", "5.0",
+      "20", "5.0",
+      "340", "2A",
+      "0", "ENDSEC",
+      "0", "EOF",
+    );
+
+    const entity = parseLeader(scanner, group);
+
+    expect(entity.annotationHandle).toBe("2A");
+  });
+
   it("does not set arrowSize when XDATA has no DIMASZ override", () => {
     const { scanner, group } = createScannerAt(
       "0", "LEADER",

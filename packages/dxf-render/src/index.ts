@@ -18,6 +18,14 @@ export {
 } from "./render/createPickingGroup";
 export { buildEntityIndex, extractEntityText } from "./utils/entityIndex";
 
+// Associations
+export { buildAssociations } from "./utils/buildAssociations";
+export type {
+  EntityAssociation,
+  AssociationKind,
+  AssociationSource,
+} from "./types/associations";
+
 // Scene helpers
 export { useCamera } from "./scene/useCamera";
 export { useControls, useOrbitControls } from "./scene/useControls";

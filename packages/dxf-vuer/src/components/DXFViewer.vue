@@ -191,7 +191,7 @@ import { useLayers } from "../composables/useLayers";
 import { useLoadError } from "../composables/useLoadError";
 import { usePicking, type PickingEvent } from "../composables/usePicking";
 import { useHighlight } from "../composables/useHighlight";
-import type { DxfData, DxfLayer, PickingEntry } from "dxf-render";
+import type { DxfData, DxfLayer, PickingEntry, EntityAssociation } from "dxf-render";
 import type { OverlayPosition } from "../types";
 import type { AntialiasingMode } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
@@ -227,6 +227,7 @@ interface Props {
   overlayPosition?: OverlayPosition;
   pickingEnabled?: boolean;
   highlightOnHover?: boolean;
+  highlightAssociated?: boolean;
   highlightColor?: string;
   pickingDebug?: boolean;
 }
@@ -256,6 +257,7 @@ const props = withDefaults(defineProps<Props>(), {
   overlayPosition: "top-center",
   pickingEnabled: false,
   highlightOnHover: true,
+  highlightAssociated: true,
   highlightColor: "#ffaa00",
   pickingDebug: false,
 });
@@ -325,11 +327,26 @@ const handleEntityHover = (event: PickingEvent | null): void => {
   if (!props.highlightOnHover) return;
   if (!event) {
     highlightCtl.clear();
-  } else if (event.pickId) {
-    const entry = picking.getPickingEntryById(event.pickId);
-    if (entry) highlightCtl.highlight([entry]);
+  } else {
+    const entries = collectHighlightEntries(event);
+    if (entries.length > 0) highlightCtl.highlight(entries);
   }
   renderScene();
+};
+
+const collectHighlightEntries = (event: PickingEvent): PickingEntry[] => {
+  if (props.highlightAssociated && event.association) {
+    const entries: PickingEntry[] = [];
+    for (const handle of event.association.members) {
+      entries.push(...picking.getPickingEntries(handle));
+    }
+    return entries;
+  }
+  if (event.pickId) {
+    const entry = picking.getPickingEntryById(event.pickId);
+    if (entry) return [entry];
+  }
+  return [];
 };
 
 const handleEntityClick = (event: PickingEvent): void => {
@@ -349,6 +366,10 @@ const clearHighlight = (): void => {
   highlightCtl.clear();
   renderScene();
 };
+
+const getAssociations = (): EntityAssociation[] => picking.getAssociations();
+const findAssociationsByHandle = (handle: string): EntityAssociation[] =>
+  picking.findAssociationsByHandle(handle);
 
 const loadingPhase = ref<"" | "fetching" | "parsing" | "rendering">("");
 const { errorMessage, setError, clearError } = useLoadError();
@@ -721,6 +742,8 @@ defineExpose({
   getRenderer,
   highlight,
   clearHighlight,
+  getAssociations,
+  findAssociationsByHandle,
 });
 </script>
 

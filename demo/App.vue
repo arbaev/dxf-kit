@@ -107,6 +107,18 @@
           <input type="checkbox" v-model="pickingDebug" :disabled="!pickingEnabled" />
           <span>Show picking bboxes (debug)</span>
         </label>
+        <label class="picking-label">
+          <input type="checkbox" v-model="highlightOnHover" :disabled="!pickingEnabled" />
+          <span>Highlight on hover</span>
+        </label>
+        <label class="picking-label">
+          <input
+            type="checkbox"
+            v-model="highlightAssociated"
+            :disabled="!pickingEnabled || !highlightOnHover"
+          />
+          <span>Highlight associated members (MLEADER / LEADER+TEXT / INSERT+ATTRIB / DIMENSION)</span>
+        </label>
         <p class="picking-hint">
           Toggle &laquo;Entity picking&raquo; in the overlays grid. Hover for live data; click for the snapshot below.
         </p>
@@ -115,6 +127,48 @@
           <span class="picking-meta">handle <code>{{ clickedEntity.handle }}</code></span>
           <span class="picking-meta">layer <code>{{ clickedEntity.layer }}</code></span>
           <span v-if="clickedEntity.text" class="picking-meta">text <code>{{ clickedEntity.text }}</code></span>
+          <span v-if="clickedEntity.association" class="picking-meta">
+            association <code>{{ clickedEntity.association.kind }}</code>
+            (<code>{{ clickedEntity.association.members.length }}</code> members)
+          </span>
+        </div>
+      </div>
+
+      <div v-if="pickingEnabled && associations.length > 0" class="associations-card">
+        <div class="associations-header">
+          <strong>Associations</strong>
+          <span class="associations-count">{{ associations.length }} found</span>
+          <button class="associations-clear" @click="clearAssociationHighlight">Clear</button>
+        </div>
+        <p class="associations-hint">
+          Click a row to highlight its members. Use it to verify
+          MLEADER / LEADER&rarr;TEXT / INSERT+ATTRIB / DIMENSION links from
+          <code>floorplan.dxf</code>.
+        </p>
+        <div class="associations-list">
+          <button
+            v-for="(group, kind) in groupedAssociations"
+            :key="kind"
+            class="associations-kind-btn"
+            :class="{ active: activeKindFilter === kind }"
+            @click="activeKindFilter = activeKindFilter === kind ? null : kind"
+          >
+            {{ kind }} <span class="associations-kind-count">({{ group.length }})</span>
+          </button>
+        </div>
+        <div class="associations-rows">
+          <button
+            v-for="a in visibleAssociations"
+            :key="a.id"
+            class="association-row"
+            :class="{ active: activeAssociationId === a.id }"
+            @click="highlightAssociation(a)"
+          >
+            <span class="association-kind-tag">{{ a.kind }}</span>
+            <code class="association-primary">#{{ a.primary }}</code>
+            <span class="association-members">{{ a.members.length }} members</span>
+            <span v-if="a.text" class="association-text">{{ a.text }}</span>
+          </button>
         </div>
       </div>
 
@@ -187,6 +241,8 @@
           :antialiasing="aaMode"
           :picking-enabled="pickingEnabled"
           :picking-debug="pickingDebug"
+          :highlight-on-hover="highlightOnHover"
+          :highlight-associated="highlightAssociated"
           :overlay-position="pickingPosition"
           @dxf-data="handleDXFData"
           @unsupported-entities="handleUnsupportedEntities"
@@ -235,7 +291,7 @@ import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { FileUploader, UnsupportedEntities, DXFViewer } from "dxf-vuer";
 import type { AntialiasingMode, OverlayPosition, PickingEvent } from "dxf-vuer";
 import "dxf-vuer/style.css";
-import type { DxfData } from "dxf-render";
+import type { DxfData, EntityAssociation } from "dxf-render";
 import HeroSection from "./components/HeroSection.vue";
 import StatsSection from "./components/StatsSection.vue";
 import FeaturesSection from "./components/FeaturesSection.vue";
@@ -258,8 +314,13 @@ const loadingSampleFile = ref<string | null>(null);
 const aaMode = ref<AntialiasingMode>("msaa");
 const pickingEnabled = ref(true);
 const pickingDebug = ref(false);
+const highlightOnHover = ref(true);
+const highlightAssociated = ref(true);
 const hoveredEntity = ref<PickingEvent | null>(null);
 const clickedEntity = ref<PickingEvent | null>(null);
+const associations = ref<EntityAssociation[]>([]);
+const activeKindFilter = ref<string | null>(null);
+const activeAssociationId = ref<string | null>(null);
 
 const handleEntityHover = (event: PickingEvent | null) => {
   hoveredEntity.value = event;
@@ -267,6 +328,32 @@ const handleEntityHover = (event: PickingEvent | null) => {
 
 const handleEntityClick = (event: PickingEvent) => {
   clickedEntity.value = event;
+};
+
+const groupedAssociations = computed(() => {
+  const groups: Record<string, EntityAssociation[]> = {};
+  for (const a of associations.value) {
+    (groups[a.kind] ??= []).push(a);
+  }
+  return groups;
+});
+
+const visibleAssociations = computed(() => {
+  const list = activeKindFilter.value
+    ? groupedAssociations.value[activeKindFilter.value] ?? []
+    : associations.value;
+  return list.slice(0, 100);
+});
+
+const highlightAssociation = (a: EntityAssociation) => {
+  if (!dxfViewerRef.value) return;
+  activeAssociationId.value = a.id;
+  dxfViewerRef.value.highlight(a.members);
+};
+
+const clearAssociationHighlight = () => {
+  activeAssociationId.value = null;
+  if (dxfViewerRef.value) dxfViewerRef.value.clearHighlight();
 };
 
 // Display option toggles (mirror DXFViewer prop defaults the demo overrides)
@@ -444,7 +531,14 @@ const handleError = (errorMsg: string) => {
 const handleDXFLoaded = (success: boolean) => {
   if (!success) {
     dxfData.value = null;
+    associations.value = [];
+    return;
   }
+  if (dxfViewerRef.value) {
+    associations.value = dxfViewerRef.value.getAssociations() ?? [];
+  }
+  activeKindFilter.value = null;
+  activeAssociationId.value = null;
 };
 
 const handleDXFData = (data: DxfData | null) => {
@@ -747,6 +841,171 @@ const resetView = () => {
 }
 
 .app.dark .picking-toggle {
+  border-color: #444;
+}
+
+.associations-card {
+  max-width: 820px;
+  margin: 0 auto var(--spacing-sm);
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.associations-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8125rem;
+}
+
+.associations-count {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.associations-clear {
+  margin-left: auto;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.associations-clear:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.associations-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.associations-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.associations-kind-btn {
+  padding: 3px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background: transparent;
+  font-size: 0.75rem;
+  color: var(--text-color);
+  cursor: pointer;
+  text-transform: lowercase;
+}
+
+.associations-kind-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.associations-kind-btn.active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+.associations-kind-count {
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+.associations-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-top: 4px;
+}
+
+.association-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  font-size: 0.75rem;
+  color: var(--text-color);
+  cursor: pointer;
+  text-align: left;
+}
+
+.association-row:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: var(--border-color);
+}
+
+.association-row.active {
+  border-color: var(--primary-color);
+  background: rgba(74, 144, 217, 0.08);
+}
+
+.association-kind-tag {
+  background: var(--primary-color);
+  color: white;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  flex-shrink: 0;
+}
+
+.association-primary {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.association-members {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.association-text {
+  color: var(--text-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.app.dark .associations-card {
+  border-color: #444;
+}
+
+.app.dark .association-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #444;
+}
+
+.app.dark .association-row.active {
+  background: rgba(107, 143, 212, 0.12);
+  border-color: #6b8fd4;
+}
+
+.app.dark .association-primary {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.app.dark .associations-kind-btn {
   border-color: #444;
 }
 

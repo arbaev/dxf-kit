@@ -6,10 +6,12 @@ import {
   disposePickingGroup,
   setPickingGroupDebug,
   buildEntityIndex,
+  buildAssociations,
   extractEntityText,
   type DxfData,
   type DxfEntity,
   type PickingIndex,
+  type EntityAssociation,
 } from "dxf-render";
 
 /**
@@ -25,6 +27,8 @@ export interface PickingEvent {
   text?: string;
   /** The raw parsed DXF entity (useful for advanced consumers) */
   entity?: DxfEntity;
+  /** First association this entity participates in, if any (MLEADER, LEADER+TEXT, INSERT+ATTRIB, DIMENSION) */
+  association?: EntityAssociation;
 }
 
 /** Pixel distance threshold above which a mousedown→mouseup is treated as pan, not click. */
@@ -38,6 +42,8 @@ export function usePicking() {
   let pickingGroup: THREE.Group | null = null;
   let entityIndex: Map<string, DxfEntity> | null = null;
   let pickingIndex: PickingIndex | null = null;
+  let associations: EntityAssociation[] = [];
+  let associationsByHandle: Map<string, EntityAssociation[]> = new Map();
 
   let canvas: HTMLCanvasElement | null = null;
   let camera: THREE.Camera | null = null;
@@ -64,6 +70,8 @@ export function usePicking() {
     removePickingData(scene);
     pickingIndex = buildPickingIndex(dxf);
     entityIndex = buildEntityIndex(dxf);
+    associations = buildAssociations(dxf);
+    associationsByHandle = indexAssociationsByHandle(associations);
     pickingGroup = createPickingGroup(pickingIndex, originOffset);
     scene.add(pickingGroup);
     // Force matrixWorld computation now — without this, raycasts before the
@@ -80,6 +88,8 @@ export function usePicking() {
     }
     pickingIndex = null;
     entityIndex = null;
+    associations = [];
+    associationsByHandle = new Map();
     lastHoverHandle = null;
     hovered.value = null;
   };
@@ -161,13 +171,15 @@ export function usePicking() {
     if (!handle || !type) return null;
 
     const entity = entityIndex?.get(handle);
+    const association = associationsByHandle.get(handle)?.[0];
     return {
       handle,
       pickId,
       type,
       layer: layer ?? "0",
-      text: entity ? extractEntityText(entity) : undefined,
+      text: association?.text ?? (entity ? extractEntityText(entity) : undefined),
       entity,
+      association,
     };
   };
 
@@ -215,6 +227,13 @@ export function usePicking() {
   /** Lookup by unique pick id — returns a single specific instance */
   const getPickingEntryById = (id: string) => pickingIndex?.byId.get(id);
 
+  /** All derived associations for the current DXF */
+  const getAssociations = (): EntityAssociation[] => associations;
+
+  /** All associations referencing a given handle (entity may be a member of more than one) */
+  const findAssociationsByHandle = (handle: string): EntityAssociation[] =>
+    associationsByHandle.get(handle) ?? [];
+
   const getPickingGroup = () => pickingGroup;
 
   const setDebug = (on: boolean): void => {
@@ -230,9 +249,25 @@ export function usePicking() {
     setEnabled,
     getPickingEntries,
     getPickingEntryById,
+    getAssociations,
+    findAssociationsByHandle,
     getPickingGroup,
     setDebug,
   };
+}
+
+function indexAssociationsByHandle(
+  associations: EntityAssociation[],
+): Map<string, EntityAssociation[]> {
+  const map = new Map<string, EntityAssociation[]>();
+  for (const a of associations) {
+    for (const m of a.members) {
+      const list = map.get(m);
+      if (list) list.push(a);
+      else map.set(m, [a]);
+    }
+  }
+  return map;
 }
 
 function bboxSizeOf(obj: THREE.Object3D): number {
