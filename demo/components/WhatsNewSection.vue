@@ -36,7 +36,7 @@ const whatsNew: WhatsNewItem[] = [
   {
     pkg: "dxf-vuer",
     version: "2.5.0",
-    text: "Imperative API on viewer ref — highlight(handles[]), clearHighlight(), getAssociations(), findAssociationsByHandle(), zoomToEntity(handles[]) — sync selection and camera with AG Grid or any external UI",
+    text: "Imperative API on viewer ref — highlight(handles[]), clearHighlight(), getAssociations(), findAssociationsByHandle(), zoomToEntity(handles[]), getPickingIndex() — sync selection, camera, and search results with AG Grid or any external UI",
   },
   {
     pkg: "dxf-vuer",
@@ -47,6 +47,11 @@ const whatsNew: WhatsNewItem[] = [
     pkg: "dxf-render",
     version: "1.4.0",
     text: "Picking primitives — buildPickingIndex(dxf), createPickingGroup(index, offset), buildEntityIndex(dxf), extractEntityText(entity) — framework-agnostic raycasting building blocks",
+  },
+  {
+    pkg: "dxf-render",
+    version: "1.4.0",
+    text: "getZoomBox(pickingIndex, handles, options?) and findEntitiesByText(dxf, query, options?) — pure utilities for zoom-to-entity and full-text search across all entity text content",
   },
   {
     pkg: "dxf-render",

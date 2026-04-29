@@ -160,6 +160,7 @@ async function loadFile(file) {
 | `getAssociations()`                        | Return all `EntityAssociation[]` derived from the loaded DXF                                |
 | `findAssociationsByHandle(handle: string)` | Return all associations a given handle participates in                                      |
 | `zoomToEntity(handles: string[])`          | Fit the camera to the union of the entities' bboxes, with 20% padding. Requires `pickingEnabled` |
+| `getPickingIndex()`                        | Returns the underlying `PickingIndex \| null`. Useful for filtering external search results (e.g. from `findEntitiesByText`) to entities that are actually rendered in the scene |
 
 ```vue
 <script setup>
@@ -307,6 +308,31 @@ function selectFromGrid(handle: string) {
   />
 </template>
 ```
+
+### Example: find-and-zoom (text search)
+
+`findEntitiesByText` is re-exported from `dxf-render`. Combine it with the
+viewer's imperative API for a "find in drawing" UX:
+
+```ts
+import { findEntitiesByText } from 'dxf-vuer'
+
+function search(query: string) {
+  const dxf = viewer.value!.getRenderer ? /* your loaded DxfData */ : null
+  if (!dxf) return
+  const found = findEntitiesByText(dxf, query) // case-insensitive substring
+
+  // Optionally drop matches that aren't visible (e.g. text inside
+  // unreferenced blocks left over by AutoCAD).
+  const index = viewer.value!.getPickingIndex()
+  const visible = index ? found.filter((h) => index.byHandle.has(h)) : found
+
+  viewer.value!.highlight(visible)
+  viewer.value!.zoomToEntity(visible)
+}
+```
+
+`findEntitiesByText` accepts `{ caseSensitive: true }` or `{ regex: true }`.
 
 ### Example: list every association in the file
 

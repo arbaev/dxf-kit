@@ -20,7 +20,7 @@ For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer)
 - **Accurate rendering** — linetype patterns, OCS transforms, hatch patterns, proper color resolution
 - **Picking & associations** — bbox-based raycast index plus DXF-driven entity links (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION)
 - **Two entry points** — full renderer or parser-only (zero deps, works in Node.js)
-- **Battle-tested** — 902 tests covering parser, renderer, and utilities
+- **Battle-tested** — 923 tests covering parser, renderer, and utilities
 - **Modern stack** — TypeScript native, ES modules, tree-shakeable, Vite-built
 - **Framework-agnostic** — works with React, Svelte, Angular, vanilla JS, or any framework
 
@@ -405,6 +405,31 @@ const linkedToBd8 = byHandle.get("BD8");
 
 > ACAD_GROUP entries from the DXF OBJECTS section are not parsed yet — that source is on the roadmap.
 
+### Text search
+
+`findEntitiesByText(dxf, query, options?)` is a pure utility that returns handles of all entities whose displayable text matches `query`. Searches TEXT, MTEXT, ATTRIB, ATTDEF, DIMENSION text override, and MULTILEADER inline text — across top-level entities, INSERT ATTRIBs, and entities inside blocks.
+
+```ts
+import { findEntitiesByText } from "dxf-render";
+
+// Case-insensitive substring (default)
+findEntitiesByText(dxf, "PART-001");
+
+// Case-sensitive
+findEntitiesByText(dxf, "PART-001", { caseSensitive: true });
+
+// Regex
+findEntitiesByText(dxf, "^PART-\\d+$", { regex: true });
+```
+
+Returns `string[]` of DXF handles. Pair with the picking primitives + a camera helper for find-and-focus UX:
+
+```ts
+const found = findEntitiesByText(dxf, "PART-001");
+const box = getZoomBox(pickingIndex, found, { originOffset });
+if (box) fitCameraToBox(box, camera);
+```
+
 ### Fonts
 
 - `loadDefaultFont(): Promise<Font>` — load embedded Liberation Sans Regular
@@ -445,7 +470,7 @@ POLYLINE/LWPOLYLINE support includes per-vertex variable width (tapering), const
 | Geometry merging          | ✅                          | ✅           | —          | ❌        |
 | Dark theme                | ✅ instant switch           | bg only      | —          | ❌        |
 | TypeScript                | ✅ native                   | .d.ts        | ✅         | ❌        |
-| Tests                     | 902 tests                   | 0            | ✅         | 0         |
+| Tests                     | 923 tests                   | 0            | ✅         | 0         |
 | Web Worker parsing        | ✅                          | ✅           | ❌         | ❌        |
 | Parser-only entry         | ✅ zero deps                | ❌           | ✅         | ❌        |
 | Framework                 | agnostic                    | agnostic     | —          | agnostic  |

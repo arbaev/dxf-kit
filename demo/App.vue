@@ -111,6 +111,67 @@
 
       <UnsupportedEntities v-if="unsupportedEntities.length > 0" :entities="unsupportedEntities" />
 
+      <div v-if="dxfData && dxfData.entities && dxfData.entities.length > 0" class="search-bar">
+        <svg
+          class="search-icon"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input
+          v-model="searchQuery"
+          type="search"
+          class="search-input"
+          placeholder="Search by text — TEXT · MTEXT · ATTRIB · DIMENSION · MULTILEADER"
+          aria-label="Search entities by text"
+          @keyup.enter="zoomToSearchResults"
+        />
+        <span v-if="searchQuery" class="search-count">
+          {{ searchResults.length }} {{ searchResults.length === 1 ? "match" : "matches" }}
+        </span>
+        <button
+          v-if="searchQuery && searchResults.length > 0"
+          class="search-zoom"
+          type="button"
+          title="Zoom to all matches (Enter)"
+          @click="zoomToSearchResults"
+        >
+          Zoom to all
+          <svg
+            class="search-zoom-icon"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="9 10 4 15 9 20" />
+            <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+          </svg>
+        </button>
+        <button
+          v-if="searchQuery"
+          class="search-clear"
+          type="button"
+          aria-label="Clear search"
+          @click="clearSearch"
+        >
+          ×
+        </button>
+      </div>
+
       <div id="viewer" class="viewer-container">
         <DXFViewer
           :key="aaMode"
@@ -340,6 +401,7 @@ import { FileUploader, UnsupportedEntities, DXFViewer } from "dxf-vuer";
 import type { AntialiasingMode, OverlayPosition, PickingEvent } from "dxf-vuer";
 import "dxf-vuer/style.css";
 import type { DxfData, EntityAssociation } from "dxf-render";
+import { findEntitiesByText } from "dxf-render";
 import HeroSection from "./components/HeroSection.vue";
 import StatsSection from "./components/StatsSection.vue";
 import FeaturesSection from "./components/FeaturesSection.vue";
@@ -389,6 +451,43 @@ const clickedEntity = ref<PickingEvent | null>(null);
 const associations = ref<EntityAssociation[]>([]);
 const activeKindFilter = ref<string | null>(null);
 const activeAssociationId = ref<string | null>(null);
+const searchQuery = ref("");
+
+const searchResults = computed<string[]>(() => {
+  if (!dxfData.value || !searchQuery.value) return [];
+  const all = findEntitiesByText(dxfData.value, searchQuery.value);
+  // Filter out matches that aren't visible in the rendered scene (e.g. text
+  // inside unreferenced blocks left over by AutoCAD): the picking index only
+  // contains entities reachable from `dxf.entities` + INSERT-expanded blocks.
+  const index = dxfViewerRef.value?.getPickingIndex?.();
+  if (!index) return all;
+  return all.filter((handle) => index.byHandle.has(handle));
+});
+
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+watch(searchResults, (handles) => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    if (!dxfViewerRef.value) return;
+    if (handles.length === 0) {
+      dxfViewerRef.value.clearHighlight();
+    } else {
+      dxfViewerRef.value.highlight(handles);
+    }
+  }, 150);
+});
+
+const zoomToSearchResults = (): void => {
+  if (dxfViewerRef.value && searchResults.value.length > 0) {
+    dxfViewerRef.value.zoomToEntity(searchResults.value);
+  }
+};
+
+const clearSearch = (): void => {
+  searchQuery.value = "";
+  if (dxfViewerRef.value) dxfViewerRef.value.clearHighlight();
+};
 
 const handleEntityHover = (event: PickingEvent | null) => {
   hoveredEntity.value = event;
@@ -699,6 +798,100 @@ const resetView = () => {
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   overflow: hidden;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--spacing-sm);
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: white;
+  transition: border-color 0.15s;
+}
+
+.search-bar:focus-within {
+  border-color: var(--primary-color);
+}
+
+.search-icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  color: var(--text-color);
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.search-count {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.search-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--primary-color);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--primary-color);
+  cursor: pointer;
+}
+
+.search-zoom-icon {
+  opacity: 0.85;
+}
+
+.search-zoom:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+.search-clear {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.search-clear:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-color);
+}
+
+.app.dark .search-bar {
+  background: #1e1e1e;
+  border-color: #444;
+}
+
+.app.dark .search-clear:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .settings-panel {

@@ -762,6 +762,7 @@ defineExpose({
   getAssociations,
   findAssociationsByHandle,
   zoomToEntity,
+  getPickingIndex: picking.getPickingIndex,
 });
 </script>
 

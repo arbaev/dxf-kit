@@ -18,6 +18,10 @@ export {
 } from "./render/createPickingGroup";
 export { buildEntityIndex, extractEntityText } from "./utils/entityIndex";
 export { getZoomBox, type GetZoomBoxOptions } from "./utils/getZoomBox";
+export {
+  findEntitiesByText,
+  type FindEntitiesByTextOptions,
+} from "./utils/findEntitiesByText";
 
 // Associations
 export { buildAssociations } from "./utils/buildAssociations";
