@@ -62,12 +62,18 @@
         </slot>
 
         <div v-if="coordinatesPosition === pos && (showCoordinates || showZoomLevel)" class="coordinates-overlay">
-          <template v-if="showCoordinates && isCursorVisible">
+          <template v-if="showCoordinates">
             <div class="coord-row">
-              <span class="coord-label">X:</span><span class="coord-value">{{ cursorX.toFixed(2) }}</span>
+              <span class="coord-label">X:</span>
+              <span class="coord-value" :class="{ 'coord-value--na': !isCursorVisible }">
+                {{ isCursorVisible ? cursorX.toFixed(2) : "N/A" }}
+              </span>
             </div>
             <div class="coord-row">
-              <span class="coord-label">Y:</span><span class="coord-value">{{ cursorY.toFixed(2) }}</span>
+              <span class="coord-label">Y:</span>
+              <span class="coord-value" :class="{ 'coord-value--na': !isCursorVisible }">
+                {{ isCursorVisible ? cursorY.toFixed(2) : "N/A" }}
+              </span>
             </div>
           </template>
           <div v-if="showZoomLevel" class="coord-row">
@@ -841,6 +847,11 @@ defineExpose({
 .coord-row {
   display: flex;
   gap: 2px;
+}
+
+.coord-value--na {
+  color: var(--dxf-vuer-text-secondary, #757575);
+  opacity: 0.65;
 }
 
 .coord-label {
