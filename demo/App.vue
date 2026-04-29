@@ -102,6 +102,22 @@
         <p class="aa-hint">{{ aaDescription }}</p>
       </div>
 
+      <div class="picking-toggle">
+        <label class="picking-label">
+          <input type="checkbox" v-model="pickingDebug" :disabled="!pickingEnabled" />
+          <span>Show picking bboxes (debug)</span>
+        </label>
+        <p class="picking-hint">
+          Toggle &laquo;Entity picking&raquo; in the overlays grid. Hover for live data; click for the snapshot below.
+        </p>
+        <div v-if="clickedEntity" class="picking-info">
+          <span class="picking-tag">{{ clickedEntity.type }}</span>
+          <span class="picking-meta">handle <code>{{ clickedEntity.handle }}</code></span>
+          <span class="picking-meta">layer <code>{{ clickedEntity.layer }}</code></span>
+          <span v-if="clickedEntity.text" class="picking-meta">text <code>{{ clickedEntity.text }}</code></span>
+        </div>
+      </div>
+
       <div class="overlays-card">
         <p class="overlays-hint">
           Overlays — click an empty cell to position, click the active (blue) cell to hide
@@ -169,13 +185,26 @@
           :layer-panel-position="layerPanelPosition"
           :dark-theme="isDark"
           :antialiasing="aaMode"
+          :picking-enabled="pickingEnabled"
+          :picking-debug="pickingDebug"
+          :overlay-position="pickingPosition"
           @dxf-data="handleDXFData"
           @unsupported-entities="handleUnsupportedEntities"
           @error="handleError"
           @dxf-loaded="handleDXFLoaded"
           @reset-view="resetView"
           @file-dropped="(name: string) => (currentFileName = name)"
-        />
+          @entity-hover="handleEntityHover"
+          @entity-click="handleEntityClick"
+        >
+          <template #overlay>
+            <div v-if="pickingEnabled && hoveredEntity" class="hover-pill">
+              <span class="hover-tag">{{ hoveredEntity.type }}</span>
+              <code class="hover-handle">#{{ hoveredEntity.handle }}</code>
+              <span v-if="hoveredEntity.text" class="hover-text">{{ hoveredEntity.text }}</span>
+            </div>
+          </template>
+        </DXFViewer>
       </div>
 
       <StatsSection />
@@ -204,7 +233,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { FileUploader, UnsupportedEntities, DXFViewer } from "dxf-vuer";
-import type { AntialiasingMode, OverlayPosition } from "dxf-vuer";
+import type { AntialiasingMode, OverlayPosition, PickingEvent } from "dxf-vuer";
 import "dxf-vuer/style.css";
 import type { DxfData } from "dxf-render";
 import HeroSection from "./components/HeroSection.vue";
@@ -227,6 +256,18 @@ const dxfViewerRef = ref<InstanceType<typeof DXFViewer> | null>(null);
 const isLoadingSample = ref(false);
 const loadingSampleFile = ref<string | null>(null);
 const aaMode = ref<AntialiasingMode>("msaa");
+const pickingEnabled = ref(true);
+const pickingDebug = ref(false);
+const hoveredEntity = ref<PickingEvent | null>(null);
+const clickedEntity = ref<PickingEvent | null>(null);
+
+const handleEntityHover = (event: PickingEvent | null) => {
+  hoveredEntity.value = event;
+};
+
+const handleEntityClick = (event: PickingEvent) => {
+  clickedEntity.value = event;
+};
 
 // Display option toggles (mirror DXFViewer prop defaults the demo overrides)
 const showFileName = ref(true);
@@ -253,6 +294,7 @@ const toolbarPosition = ref<OverlayPosition>("top-right");
 const coordinatesPosition = ref<OverlayPosition>("bottom-left");
 const debugPosition = ref<OverlayPosition>("bottom-center");
 const layerPanelPosition = ref<OverlayPosition>("bottom-right");
+const pickingPosition = ref<OverlayPosition>("top-center");
 
 interface OverlayRow {
   label: string;
@@ -305,6 +347,13 @@ const overlayRows: OverlayRow[] = [
     setPosition: (p) => (layerPanelPosition.value = p),
     isVisible: () => showLayerPanel.value,
     setVisible: (v) => (showLayerPanel.value = v),
+  },
+  {
+    label: "Entity picking",
+    getPosition: () => pickingPosition.value,
+    setPosition: (p) => (pickingPosition.value = p),
+    isVisible: () => pickingEnabled.value,
+    setVisible: (v) => (pickingEnabled.value = v),
   },
 ];
 
@@ -645,6 +694,93 @@ const resetView = () => {
   background: #1e1e1e;
   border-color: #444;
   color: var(--text-color);
+}
+
+.picking-toggle {
+  max-width: 820px;
+  margin: 0 auto var(--spacing-sm);
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.picking-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.picking-hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.picking-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.75rem;
+  color: var(--text-color);
+}
+
+.picking-tag {
+  background: var(--primary-color);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.picking-meta code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.7rem;
+}
+
+.app.dark .picking-toggle {
+  border-color: #444;
+}
+
+.app.dark .picking-meta code {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hover-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: #ccc;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  pointer-events: none;
+}
+
+.hover-tag {
+  color: #fff;
+}
+
+.hover-handle {
+  opacity: 0.7;
+}
+
+.hover-text {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff;
 }
 
 .overlays-card {

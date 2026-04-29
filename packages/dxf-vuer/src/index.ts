@@ -12,6 +12,8 @@ export { default as ViewerToolbar } from "./components/ViewerToolbar.vue";
 export { useDXFRenderer } from "./composables/useDXFRenderer";
 export { useThreeScene } from "./composables/useThreeScene";
 export { useLayers } from "./composables/useLayers";
+export { usePicking, type PickingEvent } from "./composables/usePicking";
+export { useHighlight } from "./composables/useHighlight";
 
 // Types
 export type { OverlayPosition } from "./types";

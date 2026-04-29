@@ -301,6 +301,8 @@ export function useDXFRenderer() {
     cleanup,
     getCamera,
     getRenderer,
+    getScene,
     getOriginOffset,
+    render,
   };
 }
