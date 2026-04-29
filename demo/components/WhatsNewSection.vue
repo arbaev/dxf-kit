@@ -25,6 +25,41 @@ interface WhatsNewItem {
 const whatsNew: WhatsNewItem[] = [
   {
     pkg: "dxf-vuer",
+    version: "2.5.0",
+    text: "Hover and click individual entities — entity-hover / entity-click events with handle, type, layer, text, and full parsed entity payload",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "2.5.0",
+    text: "Semantic associations — events and the built-in highlight automatically expand to all members of MLEADER, LEADER↔TEXT (DXF 340), INSERT+ATTRIB, and DIMENSION groups",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "2.5.0",
+    text: "Imperative API on viewer ref — highlight(handles[]), clearHighlight(), getAssociations(), findAssociationsByHandle() — sync selection with AG Grid or any external UI",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "2.5.0",
+    text: "New props pickingEnabled, highlightOnHover, highlightAssociated, highlightColor — opt-in interactivity, no overhead when disabled",
+  },
+  {
+    pkg: "dxf-render",
+    version: "1.4.0",
+    text: "Picking primitives — buildPickingIndex(dxf), createPickingGroup(index, offset), buildEntityIndex(dxf), extractEntityText(entity) — framework-agnostic raycasting building blocks",
+  },
+  {
+    pkg: "dxf-render",
+    version: "1.4.0",
+    text: "buildAssociations(dxf) — pure function deriving entity links strictly from DXF data (no geometric heuristics): MLEADER, LEADER, INSERT+ATTRIB, DIMENSION",
+  },
+  {
+    pkg: "dxf-render",
+    version: "1.4.0",
+    text: "LEADER parser now extracts annotationHandle (DXF code 340) for linking to TEXT/MTEXT annotations",
+  },
+  {
+    pkg: "dxf-vuer",
     version: "2.4.0",
     text: "Configurable antialiasing — MSAA (default), SMAA, FXAA, TAA, SSAA, or none — pick the right tradeoff for your drawing",
   },
@@ -47,6 +82,16 @@ const whatsNew: WhatsNewItem[] = [
     pkg: "dxf-vuer",
     version: "2.4.0",
     text: "showLayerPanel prop — programmatically hide the layers panel",
+  },
+  {
+    pkg: "dxf-render",
+    version: "1.3.0",
+    text: "Configurable antialiasing pipeline — framework-agnostic factories createRenderer / createComposer / isReducedMotionPreferred for use in React, Svelte, or vanilla JS, with the same AA palette that powers dxf-vuer",
+  },
+  {
+    pkg: "dxf-render",
+    version: "1.3.0",
+    text: "Browser bundling fix — package.json browser.fs=false eliminates 'Could not resolve fs' errors with Vite/esbuild/Angular CLI by stripping opentype.js's Node-only file-system branch",
   },
   {
     pkg: "dxf-render",

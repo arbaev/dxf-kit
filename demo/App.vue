@@ -89,111 +89,6 @@
         </div>
       </div>
 
-      <div class="aa-selector">
-        <span class="aa-label">Antialiasing:</span>
-        <select v-model="aaMode" class="aa-select">
-          <option value="none">None</option>
-          <option value="msaa">MSAA (hardware, default)</option>
-          <option value="smaa">SMAA</option>
-          <option value="fxaa">FXAA</option>
-          <option value="taa">TAA (jittered, idle-only)</option>
-          <option value="ssaa">SSAA (high quality, slow)</option>
-        </select>
-        <p class="aa-hint">{{ aaDescription }}</p>
-      </div>
-
-      <div class="picking-toggle">
-        <label class="picking-label">
-          <input type="checkbox" v-model="pickingDebug" :disabled="!pickingEnabled" />
-          <span>Show picking bboxes (debug)</span>
-        </label>
-        <label class="picking-label">
-          <input type="checkbox" v-model="highlightOnHover" :disabled="!pickingEnabled" />
-          <span>Highlight on hover</span>
-        </label>
-        <label class="picking-label">
-          <input
-            type="checkbox"
-            v-model="highlightAssociated"
-            :disabled="!pickingEnabled || !highlightOnHover"
-          />
-          <span>Highlight associated members (MLEADER / LEADER+TEXT / INSERT+ATTRIB / DIMENSION)</span>
-        </label>
-        <p class="picking-hint">
-          Toggle &laquo;Entity picking&raquo; in the overlays grid. Hover for live data; click for the snapshot below.
-        </p>
-        <div v-if="clickedEntity" class="picking-info">
-          <span class="picking-tag">{{ clickedEntity.type }}</span>
-          <span class="picking-meta">handle <code>{{ clickedEntity.handle }}</code></span>
-          <span class="picking-meta">layer <code>{{ clickedEntity.layer }}</code></span>
-          <span v-if="clickedEntity.text" class="picking-meta">text <code>{{ clickedEntity.text }}</code></span>
-          <span v-if="clickedEntity.association" class="picking-meta">
-            association <code>{{ clickedEntity.association.kind }}</code>
-            (<code>{{ clickedEntity.association.members.length }}</code> members)
-          </span>
-        </div>
-      </div>
-
-      <div v-if="pickingEnabled && associations.length > 0" class="associations-card">
-        <div class="associations-header">
-          <strong>Associations</strong>
-          <span class="associations-count">{{ associations.length }} found</span>
-          <button class="associations-clear" @click="clearAssociationHighlight">Clear</button>
-        </div>
-        <p class="associations-hint">
-          Click a row to highlight its members. Use it to verify
-          MLEADER / LEADER&rarr;TEXT / INSERT+ATTRIB / DIMENSION links from
-          <code>floorplan.dxf</code>.
-        </p>
-        <div class="associations-list">
-          <button
-            v-for="(group, kind) in groupedAssociations"
-            :key="kind"
-            class="associations-kind-btn"
-            :class="{ active: activeKindFilter === kind }"
-            @click="activeKindFilter = activeKindFilter === kind ? null : kind"
-          >
-            {{ kind }} <span class="associations-kind-count">({{ group.length }})</span>
-          </button>
-        </div>
-        <div class="associations-rows">
-          <button
-            v-for="a in visibleAssociations"
-            :key="a.id"
-            class="association-row"
-            :class="{ active: activeAssociationId === a.id }"
-            @click="highlightAssociation(a)"
-          >
-            <span class="association-kind-tag">{{ a.kind }}</span>
-            <code class="association-primary">#{{ a.primary }}</code>
-            <span class="association-members">{{ a.members.length }} members</span>
-            <span v-if="a.text" class="association-text">{{ a.text }}</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="overlays-card">
-        <p class="overlays-hint">
-          Overlays — click an empty cell to position, click the active (blue) cell to hide
-        </p>
-        <div class="overlay-rows">
-          <div v-for="row in overlayRows" :key="row.label" class="overlay-row">
-            <span class="overlay-label" :class="{ off: !row.isVisible() }">{{ row.label }}</span>
-            <div class="layout-mini-grid" role="radiogroup" :aria-label="`${row.label} position`">
-              <button
-                v-for="pos in overlayPositions"
-                :key="pos"
-                class="layout-cell"
-                :class="{ active: row.isVisible() && row.getPosition() === pos }"
-                :aria-label="pos"
-                :title="row.isVisible() && row.getPosition() === pos ? `${pos} (click to hide)` : pos"
-                @click="onCellClick(row, pos)"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
       <p class="controls-hint">
         {{ isTouchDevice ? "Pinch to zoom · Drag to pan" : "Scroll to zoom · Drag to pan" }}
       </p>
@@ -263,6 +158,159 @@
         </DXFViewer>
       </div>
 
+      <section class="settings-panel" aria-label="Viewer settings">
+        <header class="settings-header">
+          <h3 class="settings-title">Settings</h3>
+          <button
+            class="settings-reset"
+            type="button"
+            @click="resetSettings"
+            title="Reset all viewer settings to defaults"
+          >
+            Reset
+          </button>
+        </header>
+
+        <div class="settings-grid">
+        <div class="settings-cell">
+          <header class="settings-cell-header">
+            <span class="settings-cell-title">Overlays</span>
+          </header>
+          <p class="settings-cell-hint">
+            Click an empty cell to position, click the active (blue) cell to hide
+          </p>
+          <div class="overlay-rows">
+            <div v-for="row in overlayRows" :key="row.label" class="overlay-row">
+              <span class="overlay-label" :class="{ off: !row.isVisible() }">{{ row.label }}</span>
+              <div class="layout-mini-grid" role="radiogroup" :aria-label="`${row.label} position`">
+                <button
+                  v-for="pos in overlayPositions"
+                  :key="pos"
+                  class="layout-cell"
+                  :class="{ active: row.isVisible() && row.getPosition() === pos }"
+                  :aria-label="pos"
+                  :title="row.isVisible() && row.getPosition() === pos ? `${pos} (click to hide)` : pos"
+                  @click="onCellClick(row, pos)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-cell">
+          <header class="settings-cell-header">
+            <span class="settings-cell-title">Display</span>
+          </header>
+          <label class="aa-row">
+            <span class="aa-label">Antialiasing</span>
+            <select v-model="aaMode" class="aa-select">
+              <option value="none">None</option>
+              <option value="msaa">MSAA (hardware, default)</option>
+              <option value="smaa">SMAA</option>
+              <option value="fxaa">FXAA</option>
+              <option value="taa">TAA (jittered, idle-only)</option>
+              <option value="ssaa">SSAA (high quality, slow)</option>
+            </select>
+          </label>
+          <p class="settings-cell-hint">{{ aaDescription }}</p>
+        </div>
+
+        <div class="settings-cell">
+          <header class="settings-cell-header">
+            <span class="settings-cell-title">Picking</span>
+          </header>
+          <label class="picking-label">
+            <input type="checkbox" v-model="pickingDebug" :disabled="!pickingEnabled" />
+            <span>Show picking bboxes (debug)</span>
+          </label>
+          <label class="picking-label">
+            <input type="checkbox" v-model="highlightOnHover" :disabled="!pickingEnabled" />
+            <span>Highlight on hover</span>
+          </label>
+          <label class="picking-label">
+            <input
+              type="checkbox"
+              v-model="highlightAssociated"
+              :disabled="!pickingEnabled || !highlightOnHover"
+            />
+            <span>Highlight associated members</span>
+          </label>
+          <p class="settings-cell-hint">
+            Toggle &laquo;Entity picking&raquo; in Overlays. Hover for live data; click for the snapshot below.
+          </p>
+          <div v-if="clickedEntity" class="picking-info">
+            <span class="picking-tag">{{ clickedEntity.type }}</span>
+            <span class="picking-meta">handle <code>{{ clickedEntity.handle }}</code></span>
+            <span class="picking-meta">layer <code>{{ clickedEntity.layer }}</code></span>
+            <span v-if="clickedEntity.text" class="picking-meta">text <code>{{ clickedEntity.text }}</code></span>
+            <span v-if="clickedEntity.association" class="picking-meta">
+              association <code>{{ clickedEntity.association.kind }}</code>
+              (<code>{{ clickedEntity.association.members.length }}</code> members)
+            </span>
+          </div>
+        </div>
+
+        <div class="settings-cell">
+          <header class="settings-cell-header">
+            <span class="settings-cell-title">
+              Associations
+              <span v-if="associations.length > 0" class="settings-badge">{{ associations.length }}</span>
+            </span>
+            <button
+              v-if="pickingEnabled && associations.length > 0"
+              class="settings-cell-action"
+              type="button"
+              @click="clearAssociationHighlight"
+            >
+              Clear
+            </button>
+          </header>
+          <template v-if="!pickingEnabled">
+            <p class="settings-cell-hint">
+              Enable &laquo;Entity picking&raquo; in Overlays to inspect associations.
+            </p>
+          </template>
+          <template v-else-if="associations.length === 0">
+            <p class="settings-cell-hint">
+              No associations in this drawing. Try the <code>Floor Plan</code> sample —
+              it has MLEADER, LEADER&rarr;TEXT, INSERT+ATTRIB and DIMENSION links.
+            </p>
+          </template>
+          <template v-else>
+            <p class="settings-cell-hint">
+              Click a row to highlight its members.
+            </p>
+            <div class="associations-list">
+              <button
+                v-for="(group, kind) in groupedAssociations"
+                :key="kind"
+                class="associations-kind-btn"
+                :class="{ active: activeKindFilter === kind }"
+                @click="activeKindFilter = activeKindFilter === kind ? null : kind"
+              >
+                {{ kind }} <span class="associations-kind-count">({{ group.length }})</span>
+              </button>
+            </div>
+            <div class="associations-rows">
+              <button
+                v-for="a in visibleAssociations"
+                :key="a.id"
+                class="association-row"
+                :class="{ active: activeAssociationId === a.id }"
+                @click="highlightAssociation(a)"
+              >
+                <span class="association-kind-tag">{{ a.kind }}</span>
+                <code class="association-primary">#{{ a.primary }}</code>
+                <span class="association-members">{{ a.members.length }} members</span>
+                <span v-if="a.text" class="association-text">{{ a.text }}</span>
+              </button>
+            </div>
+          </template>
+        </div>
+
+        </div>
+      </section>
+
       <StatsSection />
       <FeaturesSection />
       <WhatsNewSection />
@@ -298,12 +346,32 @@ import FeaturesSection from "./components/FeaturesSection.vue";
 import WhatsNewSection from "./components/WhatsNewSection.vue";
 import ExamplesSection from "./components/ExamplesSection.vue";
 
-const isDark = ref(window.matchMedia("(prefers-color-scheme: dark)").matches);
+const THEME_STORAGE_KEY = "dxf-vuer-demo:dark-theme";
+
+const readSavedTheme = (): boolean | null => {
+  try {
+    const v = localStorage.getItem(THEME_STORAGE_KEY);
+    if (v === "1") return true;
+    if (v === "0") return false;
+  } catch {
+    /* localStorage may be unavailable (private mode, sandboxed iframe) */
+  }
+  return null;
+};
+
+const isDark = ref(
+  readSavedTheme() ?? window.matchMedia("(prefers-color-scheme: dark)").matches,
+);
 const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 
 watch(isDark, (dark) => {
   document.body.style.backgroundColor = dark ? "#121212" : "";
-});
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, dark ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}, { immediate: true });
 const dxfData = ref<DxfData | null>(null);
 const unsupportedEntities = ref<string[]>([]);
 const error = ref<string | null>(null);
@@ -354,6 +422,30 @@ const highlightAssociation = (a: EntityAssociation) => {
 const clearAssociationHighlight = () => {
   activeAssociationId.value = null;
   if (dxfViewerRef.value) dxfViewerRef.value.clearHighlight();
+};
+
+const resetSettings = () => {
+  aaMode.value = "msaa";
+  pickingEnabled.value = true;
+  pickingDebug.value = false;
+  highlightOnHover.value = true;
+  highlightAssociated.value = true;
+  showFileName.value = true;
+  showCoordinates.value = true;
+  showZoomLevel.value = true;
+  showDebugInfo.value = true;
+  showResetButton.value = true;
+  showFullscreenButton.value = true;
+  showExportButton.value = true;
+  showLayerPanel.value = true;
+  fileNamePosition.value = "top-left";
+  toolbarPosition.value = "top-right";
+  coordinatesPosition.value = "bottom-left";
+  debugPosition.value = "bottom-center";
+  layerPanelPosition.value = "bottom-right";
+  pickingPosition.value = "top-center";
+  activeKindFilter.value = null;
+  clearAssociationHighlight();
 };
 
 // Display option toggles (mirror DXFViewer prop defaults the demo overrides)
@@ -608,6 +700,149 @@ const resetView = () => {
   overflow: hidden;
 }
 
+.settings-panel {
+  margin-top: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: white;
+  overflow: hidden;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.settings-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.settings-reset {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: white;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.settings-reset:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  /* Subtle dividers between cells via grid gap painted by panel background */
+}
+
+.settings-cell {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  border-top: 1px solid transparent;
+  border-left: 1px solid transparent;
+}
+
+.settings-cell:nth-child(2),
+.settings-cell:nth-child(4) {
+  border-left-color: var(--border-color);
+}
+
+.settings-cell:nth-child(3),
+.settings-cell:nth-child(4) {
+  border-top-color: var(--border-color);
+}
+
+.settings-cell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-cell-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-color);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settings-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 1px 7px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  background: var(--primary-color);
+  color: white;
+  border-radius: 999px;
+}
+
+.settings-cell-action {
+  padding: 2px 10px;
+  font-size: 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.settings-cell-action:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.settings-cell-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.settings-cell-hint code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.7rem;
+}
+
+@media (max-width: 768px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .settings-cell:nth-child(2),
+  .settings-cell:nth-child(4) {
+    border-left-color: transparent;
+  }
+  .settings-cell:nth-child(2),
+  .settings-cell:nth-child(3),
+  .settings-cell:nth-child(4) {
+    border-top-color: var(--border-color);
+  }
+}
+
 .app-footer {
   text-align: center;
   padding: var(--spacing-lg);
@@ -738,29 +973,12 @@ const resetView = () => {
   color: #ffcdd2;
 }
 
-.aa-selector {
+.aa-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin: 0 auto var(--spacing-sm);
-  padding: 10px 16px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  max-width: 820px;
-}
-
-.aa-hint {
-  font-size: 0.75rem;
+  gap: 10px;
+  font-size: 0.8125rem;
   color: var(--text-color);
-  margin: 0;
-  line-height: 1.4;
-  flex: 1;
-  text-align: left;
-}
-
-.app.dark .aa-selector {
-  border-color: #444;
 }
 
 .aa-label {
@@ -788,17 +1006,6 @@ const resetView = () => {
   background: #1e1e1e;
   border-color: #444;
   color: var(--text-color);
-}
-
-.picking-toggle {
-  max-width: 820px;
-  margin: 0 auto var(--spacing-sm);
-  padding: 10px 16px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 }
 
 .picking-label {
@@ -838,55 +1045,6 @@ const resetView = () => {
   padding: 1px 5px;
   border-radius: 3px;
   font-size: 0.7rem;
-}
-
-.app.dark .picking-toggle {
-  border-color: #444;
-}
-
-.associations-card {
-  max-width: 820px;
-  margin: 0 auto var(--spacing-sm);
-  padding: 10px 16px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.associations-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.8125rem;
-}
-
-.associations-count {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-}
-
-.associations-clear {
-  margin-left: auto;
-  padding: 2px 10px;
-  font-size: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 3px;
-  background: transparent;
-  color: var(--text-color);
-  cursor: pointer;
-}
-
-.associations-clear:hover {
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-}
-
-.associations-hint {
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
 }
 
 .associations-list {
@@ -987,10 +1145,6 @@ const resetView = () => {
   flex: 1;
 }
 
-.app.dark .associations-card {
-  border-color: #444;
-}
-
 .app.dark .association-row:hover {
   background: rgba(255, 255, 255, 0.05);
   border-color: #444;
@@ -998,7 +1152,7 @@ const resetView = () => {
 
 .app.dark .association-row.active {
   background: rgba(107, 143, 212, 0.12);
-  border-color: #6b8fd4;
+  border-color: var(--primary-color);
 }
 
 .app.dark .association-primary {
@@ -1042,27 +1196,9 @@ const resetView = () => {
   color: #fff;
 }
 
-.overlays-card {
-  max-width: 820px;
-  margin: 0 auto var(--spacing-sm);
-  padding: 8px 16px 10px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  font-size: 0.8125rem;
-}
-
-.overlays-hint {
-  margin: 0 0 8px;
-  font-size: 0.6875rem;
-  color: var(--text-secondary);
-  text-align: center;
-  line-height: 1.4;
-}
-
 .overlay-rows {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 10px 22px;
 }
 
@@ -1112,9 +1248,47 @@ const resetView = () => {
   border-color: var(--primary-color);
 }
 
-.app.dark .overlays-card,
-.app.dark .overlays-header {
+.app.dark .settings-panel {
+  background: #1e1e1e;
   border-color: #444;
+}
+
+.app.dark .settings-header {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom-color: #444;
+}
+
+.app.dark .settings-reset {
+  background: transparent;
+  border-color: #444;
+  color: #aaa;
+}
+
+.app.dark .settings-cell:nth-child(2),
+.app.dark .settings-cell:nth-child(4) {
+  border-left-color: #444;
+}
+
+.app.dark .settings-cell:nth-child(3),
+.app.dark .settings-cell:nth-child(4) {
+  border-top-color: #444;
+}
+
+.app.dark .settings-cell-action {
+  border-color: #444;
+  color: #aaa;
+}
+
+.app.dark .settings-cell-hint code {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 768px) {
+  .app.dark .settings-cell:nth-child(2),
+  .app.dark .settings-cell:nth-child(3),
+  .app.dark .settings-cell:nth-child(4) {
+    border-top-color: #444;
+  }
 }
 
 .app.dark .layout-cell {
@@ -1156,16 +1330,9 @@ const resetView = () => {
     height: 50vh;
   }
 
-  .aa-selector {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
+  .aa-row {
+    flex-wrap: wrap;
   }
-
-  .aa-hint {
-    text-align: center;
-  }
-
 }
 
 /* Reduced motion */
@@ -1188,6 +1355,9 @@ const resetView = () => {
 
 /* Dark theme */
 .app.dark {
+  /* Saturated primary that still passes WCAG AA on dark surfaces.
+     #1040b0 on #121212 is ~3.4:1 (fails); #2563eb on #121212 is ~4.6:1. */
+  --primary-color: #2563eb;
   --bg-color: #121212;
   --text-color: #e0e0e0;
   --text-secondary: #999;
@@ -1205,19 +1375,14 @@ const resetView = () => {
   color: #999;
 }
 
-.app.dark .top-action-btn:hover {
-  color: #6b8fd4;
-  border-color: #6b8fd4;
-}
-
 .app.dark .sample-btn {
   background: #1e1e1e;
   border-color: #444;
 }
 
 .app.dark .sample-btn:hover:not(:disabled) {
-  border-color: #6b8fd4;
-  color: #6b8fd4;
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
 .app.dark .sample-btn.active {
@@ -1236,7 +1401,4 @@ const resetView = () => {
   border-color: #5c2b2e;
 }
 
-.app.dark .app-footer a {
-  color: #6b8fd4;
-}
 </style>
