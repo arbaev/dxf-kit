@@ -241,6 +241,20 @@ export function useDXFRenderer() {
     }
   };
 
+  /**
+   * Fit the camera to a given scene-space bounding box.
+   * Used by `zoomToEntity()` to focus on specific entities.
+   */
+  const zoomToBox = (box: THREE.Box3): void => {
+    const camera = getCamera();
+    if (!camera || box.isEmpty()) return;
+    const center = box.getCenter(new THREE.Vector3());
+    setOrbitTarget(center.x, center.y, 0);
+    fitCameraToBox(box, camera);
+    saveOrbitState();
+    render();
+  };
+
   const applyLayerVisibility = (visibleLayers: Set<string>) => {
     if (!state.currentDXFGroup) return;
     state.currentDXFGroup.traverse((child) => {
@@ -296,11 +310,14 @@ export function useDXFRenderer() {
     displayDXF,
     handleResize,
     resetView,
+    zoomToBox,
     applyLayerVisibility,
     switchTheme,
     cleanup,
     getCamera,
     getRenderer,
+    getScene,
     getOriginOffset,
+    render,
   };
 }

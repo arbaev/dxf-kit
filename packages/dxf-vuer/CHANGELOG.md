@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.5.0
+
+### Features
+
+- **Entity picking** — hover and click individual DXF entities. New events `entity-hover` and `entity-click` fire with `{ handle, type, layer, text?, entity?, association? }`. Backed by `dxf-render`'s `buildPickingIndex` + raycasting against an invisible bbox group; the smallest hit among stacked entities wins. Click is distinguished from pan via a 4-pixel mousedown→up distance threshold.
+- **Semantic associations** — picking events automatically include `association?` resolved via `dxf-render`'s `buildAssociations(dxf)`. The built-in highlight expands to all members of MLEADER, LEADER↔TEXT (DXF 340), INSERT+ATTRIB, and DIMENSION groups, so hovering the leader head highlights both the leader line and its text.
+- **Imperative picking API on viewer ref** — sync selection with external UI (AG Grid, search box, layer panel):
+  - `highlight(handles[])`, `clearHighlight()` — drive the highlight overlay programmatically.
+  - `getAssociations()`, `findAssociationsByHandle(handle)` — list / lookup associations.
+  - `zoomToEntity(handles[])` — fit camera to the union bbox of given entities with 20% padding.
+  - `getPickingIndex()` — access the underlying `PickingIndex` for filtering external search results to scene-visible entities only.
+- **New props** — opt-in interactivity, no overhead when disabled:
+  - `pickingEnabled` (default `false`) — master switch for raycasting + events.
+  - `highlightOnHover` (default `true`) — built-in yellow bbox overlay on hover.
+  - `highlightAssociated` (default `true`) — extend hover highlight to all association members.
+  - `highlightColor` (default `'#ffaa00'`).
+- **Public composables** — `usePicking` and `useHighlight` exported for advanced integrations that bypass `<DXFViewer>`.
+
+### Bug Fixes
+
+- Coordinates overlay no longer disappears when the cursor leaves the canvas (last cursor position is preserved).
+
+### Dependencies
+
+- Requires `dxf-render` ≥ 1.4.0 (new picking, association, and zoom-box primitives).
+
 ## 2.4.0
 
 ### Features

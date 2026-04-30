@@ -62,12 +62,18 @@
         </slot>
 
         <div v-if="coordinatesPosition === pos && (showCoordinates || showZoomLevel)" class="coordinates-overlay">
-          <template v-if="showCoordinates && isCursorVisible">
+          <template v-if="showCoordinates">
             <div class="coord-row">
-              <span class="coord-label">X:</span><span class="coord-value">{{ cursorX.toFixed(2) }}</span>
+              <span class="coord-label">X:</span>
+              <span class="coord-value" :class="{ 'coord-value--na': !isCursorVisible }">
+                {{ isCursorVisible ? cursorX.toFixed(2) : "N/A" }}
+              </span>
             </div>
             <div class="coord-row">
-              <span class="coord-label">Y:</span><span class="coord-value">{{ cursorY.toFixed(2) }}</span>
+              <span class="coord-label">Y:</span>
+              <span class="coord-value" :class="{ 'coord-value--na': !isCursorVisible }">
+                {{ isCursorVisible ? cursorY.toFixed(2) : "N/A" }}
+              </span>
             </div>
           </template>
           <div v-if="showZoomLevel" class="coord-row">
@@ -189,7 +195,10 @@ import * as THREE from "three";
 import { useDXFRenderer } from "../composables/useDXFRenderer";
 import { useLayers } from "../composables/useLayers";
 import { useLoadError } from "../composables/useLoadError";
-import type { DxfData, DxfLayer } from "dxf-render";
+import { usePicking, type PickingEvent } from "../composables/usePicking";
+import { useHighlight } from "../composables/useHighlight";
+import type { DxfData, DxfLayer, PickingEntry, EntityAssociation } from "dxf-render";
+import { getZoomBox } from "dxf-render";
 import type { OverlayPosition } from "../types";
 import type { AntialiasingMode } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
@@ -223,6 +232,11 @@ interface Props {
   debugPosition?: OverlayPosition;
   layerPanelPosition?: OverlayPosition;
   overlayPosition?: OverlayPosition;
+  pickingEnabled?: boolean;
+  highlightOnHover?: boolean;
+  highlightAssociated?: boolean;
+  highlightColor?: string;
+  pickingDebug?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -248,6 +262,11 @@ const props = withDefaults(defineProps<Props>(), {
   debugPosition: "bottom-center",
   layerPanelPosition: "bottom-right",
   overlayPosition: "top-center",
+  pickingEnabled: false,
+  highlightOnHover: true,
+  highlightAssociated: true,
+  highlightColor: "#ffaa00",
+  pickingDebug: false,
 });
 
 interface Emits {
@@ -257,6 +276,8 @@ interface Emits {
   (e: "unsupported-entities", entities: string[]): void;
   (e: "reset-view"): void;
   (e: "file-dropped", fileName: string): void;
+  (e: "entity-hover", event: PickingEvent | null): void;
+  (e: "entity-click", event: PickingEvent): void;
 }
 
 const emit = defineEmits<Emits>();
@@ -276,13 +297,102 @@ const {
   displayDXF,
   handleResize,
   resetView,
+  zoomToBox,
   applyLayerVisibility,
   switchTheme,
   cleanup,
   getCamera,
   getRenderer,
+  getScene,
   getOriginOffset,
+  render: renderScene,
 } = useDXFRenderer();
+
+const picking = usePicking();
+const highlightCtl = useHighlight();
+let lastDxfForPicking: DxfData | null = null;
+
+const setupPickingForDxf = (dxf: DxfData): void => {
+  if (!props.pickingEnabled) return;
+  const scene = getScene();
+  if (!scene) return;
+  const oo = getOriginOffset();
+  const offset = { x: oo.x, y: oo.y, z: oo.z };
+  picking.installPickingData(dxf, scene, offset);
+  highlightCtl.init(scene, offset, props.highlightColor);
+  if (props.pickingDebug) picking.setDebug(true);
+  lastDxfForPicking = dxf;
+};
+
+const teardownPicking = (): void => {
+  highlightCtl.dispose();
+  picking.removePickingData(getScene());
+  lastDxfForPicking = null;
+};
+
+const handleEntityHover = (event: PickingEvent | null): void => {
+  emit("entity-hover", event);
+  if (!props.highlightOnHover) return;
+  if (!event) {
+    highlightCtl.clear();
+  } else {
+    const entries = collectHighlightEntries(event);
+    if (entries.length > 0) highlightCtl.highlight(entries);
+  }
+  renderScene();
+};
+
+const collectHighlightEntries = (event: PickingEvent): PickingEntry[] => {
+  if (props.highlightAssociated && event.association) {
+    const entries: PickingEntry[] = [];
+    for (const handle of event.association.members) {
+      entries.push(...picking.getPickingEntries(handle));
+    }
+    return entries;
+  }
+  if (event.pickId) {
+    const entry = picking.getPickingEntryById(event.pickId);
+    if (entry) return [entry];
+  }
+  return [];
+};
+
+const handleEntityClick = (event: PickingEvent): void => {
+  emit("entity-click", event);
+};
+
+const highlight = (handles: string[]): void => {
+  const entries: PickingEntry[] = [];
+  for (const h of handles) {
+    entries.push(...picking.getPickingEntries(h));
+  }
+  highlightCtl.highlight(entries);
+  renderScene();
+};
+
+const clearHighlight = (): void => {
+  highlightCtl.clear();
+  renderScene();
+};
+
+const getAssociations = (): EntityAssociation[] => picking.getAssociations();
+const findAssociationsByHandle = (handle: string): EntityAssociation[] =>
+  picking.findAssociationsByHandle(handle);
+
+/**
+ * Fit the camera to the entities with the given DXF handles. Delegates the
+ * scene-space bbox computation to `getZoomBox()` from dxf-render.
+ *
+ * Picking must have been installed (i.e. `pickingEnabled` was true when the
+ * DXF was loaded). Handles that are not in the picking index are skipped
+ * silently — XLINE/RAY are intentionally absent (they're infinite).
+ */
+const zoomToEntity = (handles: string[]): void => {
+  const index = picking.getPickingIndex();
+  if (!index) return;
+  const box = getZoomBox(index, handles, { originOffset: getOriginOffset() });
+  if (box) zoomToBox(box);
+};
 
 const loadingPhase = ref<"" | "fetching" | "parsing" | "rendering">("");
 const { errorMessage, setError, clearError } = useLoadError();
@@ -451,6 +561,7 @@ const loadDXFFromText = async (dxfText: string) => {
     const unsupportedEntities = await displayDXF(dxf, props.darkTheme, props.fontUrl);
     initLayersFromDXF(dxf, props.darkTheme);
     applyLayerVisibility(visibleLayerNames.value);
+    setupPickingForDxf(dxf);
     emit("dxf-loaded", true);
     emit("dxf-data", dxf);
 
@@ -473,6 +584,7 @@ const loadDXFFromData = async (dxfData: DxfData) => {
     const unsupportedEntities = await displayDXF(dxfData, props.darkTheme, props.fontUrl);
     initLayersFromDXF(dxfData, props.darkTheme);
     applyLayerVisibility(visibleLayerNames.value);
+    setupPickingForDxf(dxfData);
     emit("dxf-loaded", true);
     emit("dxf-data", dxfData);
 
@@ -567,6 +679,45 @@ watch(rendererError, (newError) => {
   }
 });
 
+watch(
+  () => props.pickingEnabled,
+  (enabled) => {
+    picking.setEnabled(enabled);
+    if (!enabled) {
+      teardownPicking();
+    } else if (lastDxfForPicking == null) {
+      const dxf = props.dxfData ?? null;
+      if (dxf && dxf.entities?.length) setupPickingForDxf(dxf);
+    }
+    // (Re-)attach pointer listeners to the canvas if picking just turned on
+    if (enabled) attachPickingIfReady();
+  },
+);
+
+watch(
+  () => props.highlightColor,
+  (color) => { highlightCtl.setColor(color); },
+);
+
+watch(
+  () => props.pickingDebug,
+  (on) => {
+    picking.setDebug(on);
+    renderScene();
+  },
+);
+
+const attachPickingIfReady = (): void => {
+  if (!props.pickingEnabled) return;
+  const renderer = getRenderer();
+  const camera = getCamera();
+  if (!renderer || !camera) return;
+  picking.attach(renderer.domElement, camera, {
+    onHover: handleEntityHover,
+    onClick: handleEntityClick,
+  });
+};
+
 let resizeObserver: ResizeObserver | null = null;
 
 onMounted(() => {
@@ -574,6 +725,7 @@ onMounted(() => {
   nextTick(() => {
     if (dxfContainer.value) {
       initThreeJS(dxfContainer.value, { enableControls: true, aaMode: props.antialiasing });
+      attachPickingIfReady();
 
       if (props.url) {
         loadDXFFromUrl(props.url);
@@ -596,6 +748,8 @@ onBeforeUnmount(() => {
     resizeObserver = null;
   }
 
+  picking.detach();
+  teardownPicking();
   cleanup();
 });
 
@@ -609,6 +763,12 @@ defineExpose({
   resetView,
   exportToPNG,
   getRenderer,
+  highlight,
+  clearHighlight,
+  getAssociations,
+  findAssociationsByHandle,
+  zoomToEntity,
+  getPickingIndex: picking.getPickingIndex,
 });
 </script>
 
@@ -687,6 +847,11 @@ defineExpose({
 .coord-row {
   display: flex;
   gap: 2px;
+}
+
+.coord-value--na {
+  color: var(--dxf-vuer-text-secondary, #757575);
+  opacity: 0.65;
 }
 
 .coord-label {

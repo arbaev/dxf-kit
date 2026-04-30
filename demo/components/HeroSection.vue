@@ -92,6 +92,11 @@ async function copyInstallCommand() {
   margin-bottom: var(--spacing-sm);
   letter-spacing: -0.5px;
   line-height: 1.15;
+  /* Per-letter halo: tight inner glow + soft outer halo, primary-color tinted */
+  text-shadow:
+    0 0 1px rgba(74, 144, 217, 0.5),
+    0 0 12px rgba(74, 144, 217, 0.22),
+    0 0 28px rgba(74, 144, 217, 0.12);
 }
 
 .hero-subtitle {
@@ -160,11 +165,23 @@ async function copyInstallCommand() {
 
   .hero h1 {
     font-size: 1.75rem;
+    text-shadow:
+      0 0 1px rgba(74, 144, 217, 0.5),
+      0 0 8px rgba(74, 144, 217, 0.18),
+      0 0 18px rgba(74, 144, 217, 0.10);
   }
 
   .hero-subtitle {
     font-size: 1rem;
   }
+}
+
+/* Dark theme: brighter, cooler halo against #121212 background */
+:global(.app.dark) .hero h1 {
+  text-shadow:
+    0 0 1px rgba(107, 143, 212, 0.55),
+    0 0 14px rgba(107, 143, 212, 0.35),
+    0 0 32px rgba(107, 143, 212, 0.18);
 }
 
 </style>

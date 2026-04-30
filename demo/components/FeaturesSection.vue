@@ -36,6 +36,11 @@ const features = [
     body: "Lines, arcs, splines, multilines, construction lines, hatches with 25 AutoCAD patterns, architectural dimensions, block inserts with attributes, leader/multileader. Variable-width polylines with per-vertex tapering, arrows, and donuts. Linetypes, OCS transforms, and paper space filtering.",
   },
   {
+    title: "Picking & Associations",
+    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7 18 2-8 8-2z"/><line x1="13" y1="13" x2="21" y2="21"/></svg>',
+    body: "Hover and click individual entities with raycasting. Built-in highlight overlay plus <code>entity-hover</code> / <code>entity-click</code> events for external UI sync (AG Grid, side panels). Highlight a whole semantic group automatically — MLEADER, LEADER&rarr;TEXT (DXF code 340), INSERT+ATTRIB, DIMENSION — through the pure-data <code>buildAssociations()</code> API.",
+  },
+  {
     title: "Framework Flexible",
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
     body: 'Vue 3 component via dxf-vuer, or use <a href="https://www.npmjs.com/package/dxf-render" target="_blank" rel="noopener noreferrer">dxf-render</a> standalone with React, Svelte, or vanilla JS. Parser-only mode for Node.js. Full TypeScript support.',

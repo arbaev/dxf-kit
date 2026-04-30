@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.4.0
+
+### Features
+
+- **Picking primitives** — framework-agnostic raycasting building blocks:
+  - `buildPickingIndex(dxf)` → `{ entries, byHandle }` — pure function that walks `dxf.entities`, expands INSERTs (with array `columnCount`/`rowCount` support, OCS, `$INSUNITS` scale), and emits one entry per child plus an aggregate entry per INSERT instance. ATTRIBs become independent entries. XLINE/RAY skipped (infinite). Each entry carries a world-space `THREE.Box3`.
+  - `createPickingGroup(index, originOffset?)` — builds an invisible `THREE.Group` of bbox meshes (`userData.handle`/`dxfType`/`layerName`) for raycasting. `disposePickingGroup(group)` for cleanup.
+  - `buildEntityIndex(dxf)` → `Map<handle, DxfEntity>` — O(1) lookup including INSERT ATTRIBs and entities inside blocks.
+  - `extractEntityText(entity)` — pulls displayable text from TEXT/MTEXT/ATTRIB/ATTDEF/DIMENSION/MULTILEADER.
+- **Semantic associations** — `buildAssociations(dxf)` returns `EntityAssociation[]` derived strictly from DXF data (no geometric heuristics): MULTILEADER (inline contextData text), LEADER↔TEXT/MTEXT (via DXF code 340 `annotationHandle`), INSERT+ATTRIB (concatenated tag/text), DIMENSION (text override or `actualMeasurement`, `<>` resolved). New exported types `EntityAssociation`, `AssociationKind`, `AssociationSource`.
+- **`getZoomBox(pickingIndex, handles, options?)`** → `THREE.Box3 | null` — pure helper that unions bboxes of given handles, subtracts `originOffset`, and pads by `paddingRatio` (default 20%). Feed the result into `fitCameraToBox()` to build "zoom-to-entity" in any framework.
+- **`findEntitiesByText(dxf, query, options?)`** → `string[]` — pure full-text search across all entity text content (TEXT/MTEXT/ATTRIB/ATTDEF/DIMENSION/MULTILEADER, including children of INSERT and BLOCK definitions). Case-insensitive substring by default; supports `caseSensitive` and `regex` options.
+- **LEADER `annotationHandle`** — LEADER parser now stores DXF code 340 on `DxfLeaderEntity` so consumers can resolve the linked TEXT/MTEXT.
+
+### Stats
+
+- 923 tests across 41 files (was 854 across 36).
+
 ## 1.3.0
 
 ### Features

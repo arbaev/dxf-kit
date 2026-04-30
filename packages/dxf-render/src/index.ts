@@ -9,6 +9,28 @@ export { createThreeObjectsFromDXF, type CreateDXFSceneOptions } from "./render/
 export { MaterialCacheStore } from "./render/materialCache";
 export { computePolylinePoints } from "./render/collectors";
 
+// Picking
+export { buildPickingIndex, type PickingIndex, type PickingEntry } from "./render/pickingIndex";
+export {
+  createPickingGroup,
+  disposePickingGroup,
+  setPickingGroupDebug,
+} from "./render/createPickingGroup";
+export { buildEntityIndex, extractEntityText } from "./utils/entityIndex";
+export { getZoomBox, type GetZoomBoxOptions } from "./utils/getZoomBox";
+export {
+  findEntitiesByText,
+  type FindEntitiesByTextOptions,
+} from "./utils/findEntitiesByText";
+
+// Associations
+export { buildAssociations } from "./utils/buildAssociations";
+export type {
+  EntityAssociation,
+  AssociationKind,
+  AssociationSource,
+} from "./types/associations";
+
 // Scene helpers
 export { useCamera } from "./scene/useCamera";
 export { useControls, useOrbitControls } from "./scene/useControls";
@@ -23,11 +45,28 @@ export {
 } from "./scene/antialiasing";
 
 // Fonts
-export { loadDefaultFont, loadFont, getDefaultFont, loadSerifFont, getSerifFont } from "./render/text/fontManager";
+export {
+  loadDefaultFont,
+  loadFont,
+  getDefaultFont,
+  loadSerifFont,
+  getSerifFont,
+} from "./render/text/fontManager";
 
 // Utils
-export { resolveEntityColor, rgbNumberToHex, ACI7_COLOR, resolveAci7Hex, isThemeAdaptiveColor, resolveThemeColor } from "./utils/colorResolver";
-export { resolveEntityLinetype, scalePattern, applyLinetypePattern } from "./utils/linetypeResolver";
+export {
+  resolveEntityColor,
+  rgbNumberToHex,
+  ACI7_COLOR,
+  resolveAci7Hex,
+  isThemeAdaptiveColor,
+  resolveThemeColor,
+} from "./utils/colorResolver";
+export {
+  resolveEntityLinetype,
+  scalePattern,
+  applyLinetypePattern,
+} from "./utils/linetypeResolver";
 export { default as ACI_PALETTE } from "./parser/acadColorIndex";
 
 // Constants
