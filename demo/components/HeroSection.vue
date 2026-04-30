@@ -1,5 +1,21 @@
 <template>
   <section class="hero">
+    <svg
+      class="hero-bg"
+      :viewBox="`0 0 ${BG_W} ${BG_H}`"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <polyline
+        v-for="(tri, i) in triangles"
+        :key="i"
+        :points="tri"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="0.6"
+        vector-effect="non-scaling-stroke"
+      />
+    </svg>
     <span class="hero-brand">dxf-render · dxf-vuer</span>
     <h1>Render AutoCAD DXF Drawings in&nbsp;the&nbsp;Browser</h1>
     <p class="hero-subtitle">
@@ -46,6 +62,61 @@ import { ref } from "vue";
 
 const copied = ref(false);
 
+const BG_W = 1200;
+const BG_H = 520;
+
+function buildTriangles(): string[] {
+  const cols = 14;
+  const rows = 6;
+  const cellW = BG_W / cols;
+  const cellH = BG_H / rows;
+  const jitter = 0.42;
+
+  // Deterministic pseudo-random so the pattern is stable across renders
+  let seed = 1337;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0xffffffff;
+  };
+
+  const pt = (c: number, r: number): [number, number] => {
+    const onEdge = c === 0 || r === 0 || c === cols || r === rows;
+    const jx = onEdge ? 0 : (rand() - 0.5) * 2 * jitter * cellW;
+    const jy = onEdge ? 0 : (rand() - 0.5) * 2 * jitter * cellH;
+    return [c * cellW + jx, r * cellH + jy];
+  };
+
+  const grid: [number, number][][] = [];
+  for (let r = 0; r <= rows; r++) {
+    const row: [number, number][] = [];
+    for (let c = 0; c <= cols; c++) row.push(pt(c, r));
+    grid.push(row);
+  }
+
+  const out: string[] = [];
+  const fmt = (p: [number, number]) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const a = grid[r][c];
+      const b = grid[r][c + 1];
+      const cc = grid[r + 1][c];
+      const d = grid[r + 1][c + 1];
+      // Alternate diagonal direction per cell for visual variety
+      if ((r + c) % 2 === 0) {
+        out.push(`${fmt(a)} ${fmt(b)} ${fmt(d)} ${fmt(a)}`);
+        out.push(`${fmt(a)} ${fmt(d)} ${fmt(cc)} ${fmt(a)}`);
+      } else {
+        out.push(`${fmt(a)} ${fmt(b)} ${fmt(cc)} ${fmt(a)}`);
+        out.push(`${fmt(b)} ${fmt(d)} ${fmt(cc)} ${fmt(b)}`);
+      }
+    }
+  }
+  return out;
+}
+
+const triangles = buildTriangles();
+
 async function copyInstallCommand() {
   try {
     await navigator.clipboard.writeText("npm install dxf-vuer dxf-render three");
@@ -66,11 +137,34 @@ async function copyInstallCommand() {
 
 <style scoped>
 .hero {
+  position: relative;
   text-align: center;
   padding: 3rem var(--spacing-lg) 3rem;
   max-width: var(--content-max-width);
   margin: 0 auto;
 }
+
+.hero-bg {
+  position: absolute;
+  top: calc(-1 * var(--spacing-lg));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  height: clamp(420px, 70vh, 600px);
+  pointer-events: none;
+  color: var(--primary-color, #4a90d9);
+  opacity: 0.22;
+  z-index: -1;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+}
+
+.hero > *:not(.hero-bg) {
+  position: relative;
+  z-index: 0;
+}
+
+/* Dark theme uses same opacity as light; --primary-color is already redefined for dark in App.vue */
 
 .hero-brand {
   display: inline-block;
@@ -92,11 +186,6 @@ async function copyInstallCommand() {
   margin-bottom: var(--spacing-sm);
   letter-spacing: -0.5px;
   line-height: 1.15;
-  /* Per-letter halo: tight inner glow + soft outer halo, primary-color tinted */
-  text-shadow:
-    0 0 1px rgba(74, 144, 217, 0.5),
-    0 0 12px rgba(74, 144, 217, 0.22),
-    0 0 28px rgba(74, 144, 217, 0.12);
 }
 
 .hero-subtitle {
@@ -165,23 +254,10 @@ async function copyInstallCommand() {
 
   .hero h1 {
     font-size: 1.75rem;
-    text-shadow:
-      0 0 1px rgba(74, 144, 217, 0.5),
-      0 0 8px rgba(74, 144, 217, 0.18),
-      0 0 18px rgba(74, 144, 217, 0.10);
   }
 
   .hero-subtitle {
     font-size: 1rem;
   }
 }
-
-/* Dark theme: brighter, cooler halo against #121212 background */
-:global(.app.dark) .hero h1 {
-  text-shadow:
-    0 0 1px rgba(107, 143, 212, 0.55),
-    0 0 14px rgba(107, 143, 212, 0.35),
-    0 0 32px rgba(107, 143, 212, 0.18);
-}
-
 </style>

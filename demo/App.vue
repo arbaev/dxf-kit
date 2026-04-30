@@ -233,142 +233,158 @@
         </header>
 
         <div class="settings-grid">
-        <div class="settings-cell">
-          <header class="settings-cell-header">
-            <span class="settings-cell-title">Overlays</span>
-          </header>
-          <p class="settings-cell-hint">
-            Click an empty cell to position, click the active (blue) cell to hide
-          </p>
-          <div class="overlay-rows">
-            <div v-for="row in overlayRows" :key="row.label" class="overlay-row">
-              <span class="overlay-label" :class="{ off: !row.isVisible() }">{{ row.label }}</span>
-              <div class="layout-mini-grid" role="radiogroup" :aria-label="`${row.label} position`">
-                <button
-                  v-for="pos in overlayPositions"
-                  :key="pos"
-                  class="layout-cell"
-                  :class="{ active: row.isVisible() && row.getPosition() === pos }"
-                  :aria-label="pos"
-                  :title="row.isVisible() && row.getPosition() === pos ? `${pos} (click to hide)` : pos"
-                  @click="onCellClick(row, pos)"
-                />
+          <div class="settings-cell">
+            <header class="settings-cell-header">
+              <span class="settings-cell-title">Overlays</span>
+            </header>
+            <p class="settings-cell-hint">
+              Click an empty cell to position, click the active (blue) cell to hide
+            </p>
+            <div class="overlay-rows">
+              <div v-for="row in overlayRows" :key="row.label" class="overlay-row">
+                <span class="overlay-label" :class="{ off: !row.isVisible() }">{{
+                  row.label
+                }}</span>
+                <div
+                  class="layout-mini-grid"
+                  role="radiogroup"
+                  :aria-label="`${row.label} position`"
+                >
+                  <button
+                    v-for="pos in overlayPositions"
+                    :key="pos"
+                    class="layout-cell"
+                    :class="{ active: row.isVisible() && row.getPosition() === pos }"
+                    :aria-label="pos"
+                    :title="
+                      row.isVisible() && row.getPosition() === pos ? `${pos} (click to hide)` : pos
+                    "
+                    @click="onCellClick(row, pos)"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div class="settings-cell">
-          <header class="settings-cell-header">
-            <span class="settings-cell-title">Display</span>
-          </header>
-          <label class="aa-row">
-            <span class="aa-label">Antialiasing</span>
-            <select v-model="aaMode" class="aa-select">
-              <option value="none">None</option>
-              <option value="msaa">MSAA (hardware, default)</option>
-              <option value="smaa">SMAA</option>
-              <option value="fxaa">FXAA</option>
-              <option value="taa">TAA (jittered, idle-only)</option>
-              <option value="ssaa">SSAA (high quality, slow)</option>
-            </select>
-          </label>
-          <p class="settings-cell-hint">{{ aaDescription }}</p>
-        </div>
-
-        <div class="settings-cell">
-          <header class="settings-cell-header">
-            <span class="settings-cell-title">Picking</span>
-          </header>
-          <label class="picking-label">
-            <input type="checkbox" v-model="pickingDebug" :disabled="!pickingEnabled" />
-            <span>Show picking bboxes (debug)</span>
-          </label>
-          <label class="picking-label">
-            <input type="checkbox" v-model="highlightOnHover" :disabled="!pickingEnabled" />
-            <span>Highlight on hover</span>
-          </label>
-          <label class="picking-label">
-            <input
-              type="checkbox"
-              v-model="highlightAssociated"
-              :disabled="!pickingEnabled || !highlightOnHover"
-            />
-            <span>Highlight associated members</span>
-          </label>
-          <p class="settings-cell-hint">
-            Toggle &laquo;Entity picking&raquo; in Overlays. Hover for live data; click for the snapshot below.
-          </p>
-          <div v-if="clickedEntity" class="picking-info">
-            <span class="picking-tag">{{ clickedEntity.type }}</span>
-            <span class="picking-meta">handle <code>{{ clickedEntity.handle }}</code></span>
-            <span class="picking-meta">layer <code>{{ clickedEntity.layer }}</code></span>
-            <span v-if="clickedEntity.text" class="picking-meta">text <code>{{ clickedEntity.text }}</code></span>
-            <span v-if="clickedEntity.association" class="picking-meta">
-              association <code>{{ clickedEntity.association.kind }}</code>
-              (<code>{{ clickedEntity.association.members.length }}</code> members)
-            </span>
+          <div class="settings-cell">
+            <header class="settings-cell-header">
+              <span class="settings-cell-title">Display</span>
+            </header>
+            <label class="aa-row">
+              <span class="aa-label">Antialiasing</span>
+              <select v-model="aaMode" class="aa-select">
+                <option value="none">None</option>
+                <option value="msaa">MSAA (hardware, default)</option>
+                <option value="smaa">SMAA</option>
+                <option value="fxaa">FXAA</option>
+                <option value="taa">TAA (jittered, idle-only)</option>
+                <option value="ssaa">SSAA (high quality, slow)</option>
+              </select>
+            </label>
+            <p class="settings-cell-hint">{{ aaDescription }}</p>
           </div>
-        </div>
 
-        <div class="settings-cell">
-          <header class="settings-cell-header">
-            <span class="settings-cell-title">
-              Associations
-              <span v-if="associations.length > 0" class="settings-badge">{{ associations.length }}</span>
-            </span>
-            <button
-              v-if="pickingEnabled && associations.length > 0"
-              class="settings-cell-action"
-              type="button"
-              @click="clearAssociationHighlight"
-            >
-              Clear
-            </button>
-          </header>
-          <template v-if="!pickingEnabled">
+          <div class="settings-cell">
+            <header class="settings-cell-header">
+              <span class="settings-cell-title">Picking</span>
+            </header>
+            <label class="picking-label">
+              <input type="checkbox" v-model="pickingDebug" :disabled="!pickingEnabled" />
+              <span>Show picking bboxes (debug)</span>
+            </label>
+            <label class="picking-label">
+              <input type="checkbox" v-model="highlightOnHover" :disabled="!pickingEnabled" />
+              <span>Highlight on hover</span>
+            </label>
+            <label class="picking-label">
+              <input
+                type="checkbox"
+                v-model="highlightAssociated"
+                :disabled="!pickingEnabled || !highlightOnHover"
+              />
+              <span>Highlight associated members</span>
+            </label>
             <p class="settings-cell-hint">
-              Enable &laquo;Entity picking&raquo; in Overlays to inspect associations.
+              Toggle &laquo;Entity picking&raquo; in Overlays. Hover for live data; click for the
+              snapshot below.
             </p>
-          </template>
-          <template v-else-if="associations.length === 0">
-            <p class="settings-cell-hint">
-              No associations in this drawing. Try the <code>Floor Plan</code> sample —
-              it has MLEADER, LEADER&rarr;TEXT, INSERT+ATTRIB and DIMENSION links.
-            </p>
-          </template>
-          <template v-else>
-            <p class="settings-cell-hint">
-              Click a row to highlight and zoom to its members.
-            </p>
-            <div class="associations-list">
-              <button
-                v-for="(group, kind) in groupedAssociations"
-                :key="kind"
-                class="associations-kind-btn"
-                :class="{ active: activeKindFilter === kind }"
-                @click="activeKindFilter = activeKindFilter === kind ? null : kind"
+            <div v-if="clickedEntity" class="picking-info">
+              <span class="picking-tag">{{ clickedEntity.type }}</span>
+              <span class="picking-meta"
+                >handle <code>{{ clickedEntity.handle }}</code></span
               >
-                {{ kind }} <span class="associations-kind-count">({{ group.length }})</span>
-              </button>
-            </div>
-            <div class="associations-rows">
-              <button
-                v-for="a in visibleAssociations"
-                :key="a.id"
-                class="association-row"
-                :class="{ active: activeAssociationId === a.id }"
-                @click="highlightAssociation(a)"
+              <span class="picking-meta"
+                >layer <code>{{ clickedEntity.layer }}</code></span
               >
-                <span class="association-kind-tag">{{ a.kind }}</span>
-                <code class="association-primary">#{{ a.primary }}</code>
-                <span class="association-members">{{ a.members.length }} members</span>
-                <span v-if="a.text" class="association-text">{{ a.text }}</span>
-              </button>
+              <span v-if="clickedEntity.text" class="picking-meta"
+                >text <code>{{ clickedEntity.text }}</code></span
+              >
+              <span v-if="clickedEntity.association" class="picking-meta">
+                association <code>{{ clickedEntity.association.kind }}</code> (<code>{{
+                  clickedEntity.association.members.length
+                }}</code>
+                members)
+              </span>
             </div>
-          </template>
-        </div>
+          </div>
 
+          <div class="settings-cell">
+            <header class="settings-cell-header">
+              <span class="settings-cell-title">
+                Associations
+                <span v-if="associations.length > 0" class="settings-badge">{{
+                  associations.length
+                }}</span>
+              </span>
+              <button
+                v-if="pickingEnabled && associations.length > 0"
+                class="settings-cell-action"
+                type="button"
+                @click="clearAssociationHighlight"
+              >
+                Clear
+              </button>
+            </header>
+            <template v-if="!pickingEnabled">
+              <p class="settings-cell-hint">
+                Enable &laquo;Entity picking&raquo; in Overlays to inspect associations.
+              </p>
+            </template>
+            <template v-else-if="associations.length === 0">
+              <p class="settings-cell-hint">
+                No associations in this drawing. Try the <code>Floor Plan</code> sample — it has
+                MLEADER, LEADER&rarr;TEXT, INSERT+ATTRIB and DIMENSION links.
+              </p>
+            </template>
+            <template v-else>
+              <p class="settings-cell-hint">Click a row to highlight and zoom to its members.</p>
+              <div class="associations-list">
+                <button
+                  v-for="(group, kind) in groupedAssociations"
+                  :key="kind"
+                  class="associations-kind-btn"
+                  :class="{ active: activeKindFilter === kind }"
+                  @click="activeKindFilter = activeKindFilter === kind ? null : kind"
+                >
+                  {{ kind }} <span class="associations-kind-count">({{ group.length }})</span>
+                </button>
+              </div>
+              <div class="associations-rows">
+                <button
+                  v-for="a in visibleAssociations"
+                  :key="a.id"
+                  class="association-row"
+                  :class="{ active: activeAssociationId === a.id }"
+                  @click="highlightAssociation(a)"
+                >
+                  <span class="association-kind-tag">{{ a.kind }}</span>
+                  <code class="association-primary">#{{ a.primary }}</code>
+                  <span class="association-members">{{ a.members.length }} members</span>
+                  <span v-if="a.text" class="association-text">{{ a.text }}</span>
+                </button>
+              </div>
+            </template>
+          </div>
         </div>
       </section>
 
@@ -421,19 +437,22 @@ const readSavedTheme = (): boolean | null => {
   return null;
 };
 
-const isDark = ref(
-  readSavedTheme() ?? window.matchMedia("(prefers-color-scheme: dark)").matches,
-);
+const isDark = ref(readSavedTheme() ?? window.matchMedia("(prefers-color-scheme: dark)").matches);
 const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 
-watch(isDark, (dark) => {
-  document.body.style.backgroundColor = dark ? "#121212" : "";
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, dark ? "1" : "0");
-  } catch {
-    /* ignore */
-  }
-}, { immediate: true });
+watch(
+  isDark,
+  (dark) => {
+    document.documentElement.style.backgroundColor = dark ? "#121212" : "";
+    document.body.style.backgroundColor = "";
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, dark ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  },
+  { immediate: true },
+);
 const dxfData = ref<DxfData | null>(null);
 const unsupportedEntities = ref<string[]>([]);
 const error = ref<string | null>(null);
@@ -507,7 +526,7 @@ const groupedAssociations = computed(() => {
 
 const visibleAssociations = computed(() => {
   const list = activeKindFilter.value
-    ? groupedAssociations.value[activeKindFilter.value] ?? []
+    ? (groupedAssociations.value[activeKindFilter.value] ?? [])
     : associations.value;
   return list.slice(0, 100);
 });
@@ -605,8 +624,7 @@ const overlayRows: OverlayRow[] = [
     label: "Toolbar",
     getPosition: () => toolbarPosition.value,
     setPosition: (p) => (toolbarPosition.value = p),
-    isVisible: () =>
-      showResetButton.value || showFullscreenButton.value || showExportButton.value,
+    isVisible: () => showResetButton.value || showFullscreenButton.value || showExportButton.value,
     setVisible: (v) => {
       showResetButton.value = v;
       showFullscreenButton.value = v;
@@ -1430,7 +1448,9 @@ const resetView = () => {
   border-radius: 2px;
   background: transparent;
   cursor: pointer;
-  transition: border-color 0.1s, background 0.1s;
+  transition:
+    border-color 0.1s,
+    background 0.1s;
 }
 
 .layout-cell:hover {
@@ -1559,7 +1579,6 @@ const resetView = () => {
   --accent-bg: #1a2744;
   --input-bg: #1e1e1e;
   --card-bg: #1e1e1e;
-  background-color: var(--bg-color);
   color: var(--text-color);
 }
 
@@ -1594,5 +1613,4 @@ const resetView = () => {
   color: #f5a0a5;
   border-color: #5c2b2e;
 }
-
 </style>
