@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "dxf-render@*"
+      - "dxf-vuer@*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse tag
+        id: tag
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          PKG="${TAG%@*}"
+          VERSION="${TAG#*@}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "pkg=$PKG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # dxf-render is the core package — mark as Latest on GitHub.
+          # dxf-vuer is a wrapper — keep it off Latest so npm/GH defaults stay sensible.
+          if [ "$PKG" = "dxf-render" ]; then
+            echo "latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: |
+          CHANGELOG="packages/${{ steps.tag.outputs.pkg }}/CHANGELOG.md"
+          VERSION="${{ steps.tag.outputs.version }}"
+          if [ ! -f "$CHANGELOG" ]; then
+            echo "::error::CHANGELOG not found at $CHANGELOG"
+            exit 1
+          fi
+          # Extract the section between "## <version>" and the next "## " header.
+          NOTES=$(awk -v ver="$VERSION" '
+            $0 ~ "^## " ver "([^0-9].*)?$" { flag=1; next }
+            /^## / { if (flag) exit }
+            flag { print }
+          ' "$CHANGELOG")
+          if [ -z "$(echo "$NOTES" | tr -d '[:space:]')" ]; then
+            echo "::error::No release notes found for version $VERSION in $CHANGELOG"
+            exit 1
+          fi
+          {
+            echo "$NOTES"
+            echo ""
+            echo "---"
+            echo ""
+            echo "📦 [\`${{ steps.tag.outputs.pkg }}@$VERSION\` on npm](https://www.npmjs.com/package/${{ steps.tag.outputs.pkg }}/v/$VERSION)"
+          } > /tmp/release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARGS=(
+            "${{ steps.tag.outputs.tag }}"
+            --title "${{ steps.tag.outputs.tag }}"
+            --notes-file /tmp/release-notes.md
+            --verify-tag
+          )
+          if [ "${{ steps.tag.outputs.latest }}" = "true" ]; then
+            ARGS+=(--latest)
+          else
+            ARGS+=(--latest=false)
+          fi
+          gh release create "${ARGS[@]}"
