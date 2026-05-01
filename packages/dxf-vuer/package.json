@@ -5,7 +5,7 @@
   "type": "module",
   "license": "MIT",
   "author": "Timur Arbaev",
-  "homepage": "https://dxf-vuer.netlify.app",
+  "homepage": "https://dxf-kit.netlify.app",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/arbaev/dxf-kit.git",

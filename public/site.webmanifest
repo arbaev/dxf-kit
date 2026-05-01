@@ -1,6 +1,6 @@
 {
-  "name": "DXF Vuer",
-  "short_name": "DXF Vuer",
+  "name": "dxf-kit",
+  "short_name": "dxf-kit",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",

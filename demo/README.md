@@ -1,6 +1,6 @@
 # dxf-vuer demo
 
-Demo application for the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer) library. Deployed at [dxf-vuer.netlify.app](https://dxf-vuer.netlify.app).
+Demo application for the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer) library. Deployed at [dxf-kit.netlify.app](https://dxf-kit.netlify.app).
 
 ## Running Locally
 
