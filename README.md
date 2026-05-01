@@ -83,8 +83,12 @@ async function loadFile(file) {
 - **Linetype rendering** — DASHED, HIDDEN, CENTER, PHANTOM, DOT, DASHDOT with LTSCALE support
 - **Hatch patterns** — 25 built-in AutoCAD patterns with multi-boundary clipping
 - **Vector text** — crisp at any zoom; Liberation Sans/Serif fonts; bold, italic, underline, MTEXT formatting
+- **Picking & associations** — bbox-based raycast, hover/click events, semantic links derived from DXF (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION)
+- **Search APIs** — `findEntitiesByText` / `findEntitiesByLayer` / `findEntitiesByType`, paired with `viewer.zoomToEntity` / `zoomToLayer` for find-and-focus UX
 - **Dark theme** — instant switching
-- **Layer panel** — toggle visibility with color indicators
+- **Layer panel** — toggle visibility with color indicators; optional `localStorage` persistence per file
+- **Keyboard navigation** — arrow keys pan, `+`/`-` zoom, `0` reset
+- **Accessibility** — ARIA roles/labels on toolbar, layer panel, status/error overlays; respects `prefers-reduced-motion`
 - **Overlay positioning** — 6-cell grid system for positioning UI overlays (toolbar, coordinates, layers, etc.)
 - **Customizable UI** — 6 named slots (`#toolbar`, `#toolbar-extra`, `#loading`, `#error`, `#empty-state`, `#overlay`) with scoped data
 - **Error display** — parse/render/fetch errors shown in the viewer with retry support

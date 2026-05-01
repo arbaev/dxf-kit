@@ -83,6 +83,8 @@ async function loadFile(file) {
 | `highlightOnHover`     | `boolean`          | `true`            | Draw a built-in highlight overlay on the hovered entity. Turn off if you render selection from your own UI                                                              |
 | `highlightAssociated`  | `boolean`          | `true`            | When the hovered entity participates in an association (MLEADER / LEADER+TEXT / INSERT+ATTRIB / DIMENSION), highlight all its members instead of just the entity itself |
 | `highlightColor`       | `string`           | `"#ffaa00"`       | Color used by the built-in hover highlight                                                                                                                              |
+| `keyboardNavigation`   | `boolean`          | `true`            | Enable keyboard pan/zoom (arrow keys, `+`/`-`, `0`). Listener fires only when the canvas is focused                                                                     |
+| `persistLayersKey`     | `string`           | `""`              | When set, layer visibility is persisted to `localStorage` under `${persistLayersKey}:${fileName \|\| "default"}`. Empty string disables persistence                     |
 
 `OverlayPosition` = `"top-left"` | `"top-center"` | `"top-right"` | `"bottom-left"` | `"bottom-center"` | `"bottom-right"`
 
@@ -162,6 +164,7 @@ async function loadFile(file) {
 | `getAssociations()`                        | Return all `EntityAssociation[]` derived from the loaded DXF                                |
 | `findAssociationsByHandle(handle: string)` | Return all associations a given handle participates in                                      |
 | `zoomToEntity(handles: string[])`          | Fit the camera to the union of the entities' bboxes, with 20% padding. Requires `pickingEnabled` |
+| `zoomToLayer(layerName: string)`           | Fit the camera to all entities on the given layer. Requires `pickingEnabled`. Layer names are case-sensitive (DXF spec) |
 | `getPickingIndex()`                        | Returns the underlying `PickingIndex \| null`. Useful for filtering external search results (e.g. from `findEntitiesByText`) to entities that are actually rendered in the scene |
 
 ```vue
@@ -336,6 +339,18 @@ function search(query: string) {
 
 `findEntitiesByText` accepts `{ caseSensitive: true }` or `{ regex: true }`.
 
+For layer-based or type-based focus, the matching helpers are `findEntitiesByLayer` and `findEntitiesByType` (also re-exported from `dxf-render`); pair them with `zoomToLayer` / `highlight`:
+
+```ts
+import { findEntitiesByType } from 'dxf-vuer'
+
+// Highlight every dimension on the drawing
+viewer.value!.highlight(findEntitiesByType(dxf, 'DIMENSION'))
+
+// Or focus the camera on the WALLS layer (no need to gather handles yourself)
+viewer.value!.zoomToLayer('WALLS')
+```
+
 ### Example: list every association in the file
 
 Handy for sanity-checking a DXF or building a "Notes" panel:
@@ -361,17 +376,45 @@ if (firstMleader) viewer.value!.highlight(firstMleader.members);
 
 ## Accessibility
 
+- **Keyboard navigation** — when `keyboardNavigation` is on (default), the canvas becomes focusable (`tabindex="0"`) and responds to:
+
+  | Keys             | Action                       |
+  | ---------------- | ---------------------------- |
+  | `←` `↑` `→` `↓`  | Pan by 5% of the viewport    |
+  | `+` / `=`        | Zoom in (×1.2)               |
+  | `-` / `_`        | Zoom out (÷1.2)              |
+  | `0`              | Reset to fit-to-view         |
+
+  Listener bails out when the focused element is an `<input>`, `<textarea>`, or `contenteditable` so it never steals keystrokes from forms inside `#toolbar-extra` or `#overlay`.
+
+- **ARIA** — viewer container exposes `role="region"` + `aria-label` and reflects `aria-busy` while loading. Toolbar is `role="toolbar"`; buttons carry per-action `aria-label`, fullscreen toggle has `aria-pressed`. Layer panel header is keyboard-activatable (Enter/Space) with `aria-expanded`; per-layer toggles are `role="button"` with `aria-pressed` / `aria-disabled`. Loading overlay is `role="status" aria-live="polite"`; error overlay is `role="alert" aria-live="assertive"`.
+
 - **`prefers-reduced-motion`** — when the user has enabled "reduce motion" in their OS, the TAA antialiasing mode renders a single frame without the 32-frame jitter accumulation animation. Other AA modes are unaffected.
+
+## Persisting layer visibility
+
+Set `persistLayersKey` to enable per-file persistence in `localStorage`:
+
+```vue
+<DXFViewer
+  :dxf-data="dxfData"
+  :file-name="currentFileName"
+  persist-layers-key="my-app:layers"
+/>
+```
+
+Hidden layer names are stored under `${persistLayersKey}:${fileName || "default"}`. Different files keep separate visibility configurations. Stored names that no longer exist in the current DXF are silently ignored, so changing files between sessions is safe. Frozen layers are never persisted (they're already hidden by DXF flags).
 
 ## Composables
 
-| Composable       | Description                                                                                                                                                                                         |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `useDXFRenderer` | Main orchestrator: parsing, display, resize, layer visibility, dark theme                                                                                                                           |
-| `useThreeScene`  | Three.js scene/renderer init with configurable antialiasing (MSAA/SMAA/FXAA/TAA/SSAA/none)                                                                                                          |
-| `useLayers`      | Layer visibility state management                                                                                                                                                                   |
-| `usePicking`     | Builds the picking index + associations, wires pointer listeners to a canvas, emits enriched `PickingEvent`s. Exposes `installPickingData`, `attach`, `getAssociations`, `findAssociationsByHandle` |
-| `useHighlight`   | Manages an overlay group of LineSegments per highlighted bbox. `init`, `setColor`, `highlight(entries)`, `clear`, `dispose`                                                                         |
+| Composable              | Description                                                                                                                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useDXFRenderer`        | Main orchestrator: parsing, display, resize, layer visibility, dark theme                                                                                                                           |
+| `useThreeScene`         | Three.js scene/renderer init with configurable antialiasing (MSAA/SMAA/FXAA/TAA/SSAA/none)                                                                                                          |
+| `useLayers`             | Layer visibility state management. Accepts `{ getStorageKey?: () => string \| null }` for `localStorage` persistence                                                                                |
+| `useKeyboardNavigation` | Wires arrow-key pan, `+`/`-` zoom, and `0` reset on any focusable element. `attach`, `detach`, `setEnabled`                                                                                         |
+| `usePicking`            | Builds the picking index + associations, wires pointer listeners to a canvas, emits enriched `PickingEvent`s. Exposes `installPickingData`, `attach`, `getAssociations`, `findAssociationsByHandle` |
+| `useHighlight`          | Manages an overlay group of LineSegments per highlighted bbox. `init`, `setColor`, `highlight(entries)`, `clear`, `dispose`                                                                         |
 
 ## Re-exports
 

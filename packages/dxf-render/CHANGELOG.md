@@ -10,7 +10,7 @@
 
 ### Stats
 
-- 945 tests across 47 files (was 923 across 41).
+- 945 tests across 44 files (was 923 across 41).
 
 ## 1.4.0
 
