@@ -3,6 +3,9 @@
     ref="dxfContainer"
     class="dxf-viewer"
     :class="{ 'dark-theme': darkTheme }"
+    role="region"
+    aria-label="DXF drawing viewer"
+    :aria-busy="isLoading"
     @mousemove="handleMouseMove"
     @mouseleave="handleMouseLeave"
     @dragover.prevent="handleDragOver"
@@ -104,7 +107,7 @@
       </div>
     </div>
 
-    <div v-if="isLoading" class="message-overlay loading-overlay">
+    <div v-if="isLoading" class="message-overlay loading-overlay" role="status" aria-live="polite">
       <slot name="loading" :phase="loadingPhase" :progress="displayProgress">
         <div class="message-content">
           <div class="spinner"></div>
@@ -127,7 +130,7 @@
       </slot>
     </div>
 
-    <div v-else-if="errorMessage" class="message-overlay error-overlay">
+    <div v-else-if="errorMessage" class="message-overlay error-overlay" role="alert" aria-live="assertive">
       <slot name="error" :message="errorMessage" :retry="retry">
         <div class="message-content error">
           <svg
@@ -197,8 +200,9 @@ import { useLayers } from "../composables/useLayers";
 import { useLoadError } from "../composables/useLoadError";
 import { usePicking, type PickingEvent } from "../composables/usePicking";
 import { useHighlight } from "../composables/useHighlight";
+import { useKeyboardNavigation } from "../composables/useKeyboardNavigation";
 import type { DxfData, DxfLayer, PickingEntry, EntityAssociation } from "dxf-render";
-import { getZoomBox } from "dxf-render";
+import { getZoomBox, getZoomBoxForLayer } from "dxf-render";
 import type { OverlayPosition } from "../types";
 import type { AntialiasingMode } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
@@ -237,6 +241,8 @@ interface Props {
   highlightAssociated?: boolean;
   highlightColor?: string;
   pickingDebug?: boolean;
+  persistLayersKey?: string;
+  keyboardNavigation?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -267,6 +273,8 @@ const props = withDefaults(defineProps<Props>(), {
   highlightAssociated: true,
   highlightColor: "#ffaa00",
   pickingDebug: false,
+  persistLayersKey: "",
+  keyboardNavigation: true,
 });
 
 interface Emits {
@@ -304,9 +312,19 @@ const {
   getCamera,
   getRenderer,
   getScene,
+  getControls,
   getOriginOffset,
   render: renderScene,
 } = useDXFRenderer();
+
+const keyboardNav = useKeyboardNavigation({
+  getCamera,
+  getControls,
+  resetView: () => {
+    handleResetView();
+  },
+  render: () => renderScene(),
+});
 
 const picking = usePicking();
 const highlightCtl = useHighlight();
@@ -391,6 +409,18 @@ const zoomToEntity = (handles: string[]): void => {
   const index = picking.getPickingIndex();
   if (!index) return;
   const box = getZoomBox(index, handles, { originOffset: getOriginOffset() });
+  if (box) zoomToBox(box);
+};
+
+/**
+ * Fit the camera to all entities of a given layer. Requires `pickingEnabled`
+ * (the picking index is the source of bboxes). Returns silently when picking
+ * is disabled or no entries on the layer.
+ */
+const zoomToLayer = (layerName: string): void => {
+  const index = picking.getPickingIndex();
+  if (!index) return;
+  const box = getZoomBoxForLayer(index, layerName, { originOffset: getOriginOffset() });
   if (box) zoomToBox(box);
 };
 
@@ -484,7 +514,12 @@ const {
   hideAllLayers,
   updateLayerThemeColors,
   clearLayers,
-} = useLayers();
+} = useLayers({
+  getStorageKey: () => {
+    if (!props.persistLayersKey) return null;
+    return `${props.persistLayersKey}:${props.fileName || "default"}`;
+  },
+});
 
 const hasDXFData = computed(() => {
   return props.dxfData && props.dxfData.entities && props.dxfData.entities.length > 0;
@@ -707,6 +742,19 @@ watch(
   },
 );
 
+watch(
+  () => props.keyboardNavigation,
+  (on) => {
+    keyboardNav.setEnabled(on);
+    if (on) {
+      const renderer = getRenderer();
+      if (renderer) keyboardNav.attach(renderer.domElement);
+    } else {
+      keyboardNav.detach();
+    }
+  },
+);
+
 const attachPickingIfReady = (): void => {
   if (!props.pickingEnabled) return;
   const renderer = getRenderer();
@@ -726,6 +774,11 @@ onMounted(() => {
     if (dxfContainer.value) {
       initThreeJS(dxfContainer.value, { enableControls: true, aaMode: props.antialiasing });
       attachPickingIfReady();
+
+      const renderer = getRenderer();
+      if (renderer && props.keyboardNavigation) {
+        keyboardNav.attach(renderer.domElement);
+      }
 
       if (props.url) {
         loadDXFFromUrl(props.url);
@@ -749,6 +802,7 @@ onBeforeUnmount(() => {
   }
 
   picking.detach();
+  keyboardNav.detach();
   teardownPicking();
   cleanup();
 });
@@ -768,6 +822,7 @@ defineExpose({
   getAssociations,
   findAssociationsByHandle,
   zoomToEntity,
+  zoomToLayer,
   getPickingIndex: picking.getPickingIndex,
 });
 </script>

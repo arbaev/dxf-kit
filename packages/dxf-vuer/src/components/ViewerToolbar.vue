@@ -1,10 +1,11 @@
 <template>
-  <div class="viewer-toolbar">
+  <div class="viewer-toolbar" role="toolbar" aria-label="DXF viewer toolbar">
     <button
       v-if="showExportButton"
       class="toolbar-button"
       @click="$emit('export')"
       title="Export PNG"
+      aria-label="Export current view as PNG"
     >
       <svg
         width="20"
@@ -26,6 +27,7 @@
       class="toolbar-button"
       @click="$emit('reset-view')"
       title="Fit to View"
+      aria-label="Reset camera and fit drawing to view"
     >
       <svg
         width="20"
@@ -49,6 +51,8 @@
       class="toolbar-button"
       @click="$emit('toggle-fullscreen')"
       :title="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'"
+      :aria-label="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
+      :aria-pressed="isFullscreen"
     >
       <svg
         v-if="!isFullscreen"
