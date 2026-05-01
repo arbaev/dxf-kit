@@ -1,4 +1,4 @@
-# Netlify configuration for DXF Vuer
+# Netlify configuration for dxf-kit
 
 [build]
   command = "pnpm install && pnpm build && pnpm build:demo"
@@ -7,6 +7,19 @@
 
   [build.environment]
     NODE_VERSION = "20"
+
+# Proxy Umami analytics through our domain so adblockers don't block first-party paths
+[[redirects]]
+  from = "/script.js"
+  to = "https://cloud.umami.is/script.js"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/send"
+  to = "https://cloud.umami.is/api/send"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/*"
