@@ -1,7 +1,12 @@
 declare global {
   interface Window {
     umami?: {
-      track: (event: string, props?: Record<string, unknown>) => void;
+      track: (
+        nameOrPayload:
+          | string
+          | { name: string; tag?: string; data?: Record<string, unknown> },
+        data?: Record<string, unknown>,
+      ) => void;
     };
   }
 }
@@ -23,8 +28,20 @@ export function trackEvent(
 ): void;
 export function trackEvent(name: string, props?: Record<string, unknown>): void {
   try {
-    window.umami?.track(name, props);
+    const tag = props ? pickTag(props) : undefined;
+    if (tag !== undefined) {
+      window.umami?.track({ name, tag, data: props });
+    } else {
+      window.umami?.track(name, props);
+    }
   } catch {
     // Analytics failures must never break the app (adblock, sandbox, etc.)
   }
+}
+
+// Umami's Breakdown view supports the special `tag` dimension but not arbitrary event data,
+// so we promote the single defining prop of each event to a tag for slicing.
+function pickTag(props: Record<string, unknown>): string | undefined {
+  const value = props.framework ?? props.target ?? props.source ?? props.name;
+  return typeof value === "string" ? value : undefined;
 }
