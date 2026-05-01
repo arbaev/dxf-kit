@@ -1,12 +1,12 @@
+type UmamiPayload = Record<string, unknown>;
+
 declare global {
   interface Window {
     umami?: {
-      track: (
-        nameOrPayload:
-          | string
-          | { name: string; tag?: string; data?: Record<string, unknown> },
-        data?: Record<string, unknown>,
-      ) => void;
+      track: {
+        (name: string, data?: Record<string, unknown>): void;
+        (callback: (defaults: UmamiPayload) => UmamiPayload): void;
+      };
     };
   }
 }
@@ -30,7 +30,9 @@ export function trackEvent(name: string, props?: Record<string, unknown>): void 
   try {
     const tag = props ? pickTag(props) : undefined;
     if (tag !== undefined) {
-      window.umami?.track({ name, tag, data: props });
+      // Callback form preserves auto-collected payload (website, hostname, screen, etc.).
+      // The plain { name, tag } object form drops the website ID and gets rejected.
+      window.umami?.track((defaults) => ({ ...defaults, name, tag, data: props }));
     } else {
       window.umami?.track(name, props);
     }
