@@ -59,6 +59,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { trackEvent } from "../analytics";
 
 const copied = ref(false);
 
@@ -132,6 +133,7 @@ async function copyInstallCommand() {
     copied.value = true;
     setTimeout(() => (copied.value = false), 2000);
   }
+  trackEvent("copy-install");
 }
 </script>
 

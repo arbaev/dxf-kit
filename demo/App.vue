@@ -8,6 +8,7 @@
         rel="noopener noreferrer"
         aria-label="View on GitHub"
         title="View on GitHub"
+        @click="trackEvent('external-link', { target: 'github' })"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
           <path
@@ -205,7 +206,7 @@
           @error="handleError"
           @dxf-loaded="handleDXFLoaded"
           @reset-view="resetView"
-          @file-dropped="(name: string) => (currentFileName = name)"
+          @file-dropped="handleFileDropped"
           @entity-hover="handleEntityHover"
           @entity-click="handleEntityClick"
         >
@@ -395,15 +396,27 @@
 
       <footer class="app-footer">
         MIT License &middot;
-        <a href="https://www.npmjs.com/package/dxf-render" target="_blank" rel="noopener noreferrer"
+        <a
+          href="https://www.npmjs.com/package/dxf-render"
+          target="_blank"
+          rel="noopener noreferrer"
+          @click="trackEvent('external-link', { target: 'npm-render' })"
           >dxf-render</a
         >
         &middot;
-        <a href="https://www.npmjs.com/package/dxf-vuer" target="_blank" rel="noopener noreferrer"
+        <a
+          href="https://www.npmjs.com/package/dxf-vuer"
+          target="_blank"
+          rel="noopener noreferrer"
+          @click="trackEvent('external-link', { target: 'npm-vuer' })"
           >dxf-vuer</a
         >
         &middot;
-        <a href="https://github.com/arbaev/dxf-kit" target="_blank" rel="noopener noreferrer"
+        <a
+          href="https://github.com/arbaev/dxf-kit"
+          target="_blank"
+          rel="noopener noreferrer"
+          @click="trackEvent('external-link', { target: 'github' })"
           >GitHub</a
         >
       </footer>
@@ -423,6 +436,7 @@ import StatsSection from "./components/StatsSection.vue";
 import FeaturesSection from "./components/FeaturesSection.vue";
 import WhatsNewSection from "./components/WhatsNewSection.vue";
 import ExamplesSection from "./components/ExamplesSection.vue";
+import { trackEvent } from "./analytics";
 
 const THEME_STORAGE_KEY = "dxf-vuer-demo:dark-theme";
 
@@ -683,12 +697,18 @@ const samples = [
   { file: "/samples/house-plan.dxf", label: "House Plan", size: "17 MB", heavy: true },
 ];
 
-async function loadSample(sample: { file: string; label: string; size: string; heavy?: boolean }) {
+async function loadSample(
+  sample: { file: string; label: string; size: string; heavy?: boolean },
+  options: { trackInteraction?: boolean } = { trackInteraction: true },
+) {
   if (isLoadingSample.value) return;
   isLoadingSample.value = true;
   loadingSampleFile.value = sample.file;
   error.value = null;
   unsupportedEntities.value = [];
+  if (options.trackInteraction) {
+    trackEvent("sample-load", { name: sample.label });
+  }
   try {
     const response = await fetch(sample.file);
     const text = await response.text();
@@ -699,6 +719,7 @@ async function loadSample(sample: { file: string; label: string; size: string; h
     }
   } catch {
     error.value = `Failed to load ${sample.label}`;
+    trackEvent("dxf-error", { source: "sample-fetch" });
   } finally {
     isLoadingSample.value = false;
     loadingSampleFile.value = null;
@@ -707,10 +728,11 @@ async function loadSample(sample: { file: string; label: string; size: string; h
 
 onMounted(async () => {
   await nextTick();
-  loadSample(samples[0]);
+  loadSample(samples[0], { trackInteraction: false });
 });
 
 const handleFileSelected = async (file: File) => {
+  trackEvent("file-upload", { source: "button" });
   try {
     error.value = null;
     unsupportedEntities.value = [];
@@ -727,6 +749,7 @@ const handleFileSelected = async (file: File) => {
     error.value = err instanceof Error ? err.message : "Error loading file";
     dxfData.value = null;
     unsupportedEntities.value = [];
+    trackEvent("dxf-error", { source: "file-read" });
   }
 };
 
@@ -736,6 +759,12 @@ const handleUnsupportedEntities = (entities: string[]) => {
 
 const handleError = (errorMsg: string) => {
   error.value = errorMsg;
+  trackEvent("dxf-error", { source: "viewer" });
+};
+
+const handleFileDropped = (name: string) => {
+  currentFileName.value = name;
+  trackEvent("file-upload", { source: "drag-drop" });
 };
 
 const handleDXFLoaded = (success: boolean) => {

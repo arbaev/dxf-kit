@@ -12,6 +12,7 @@
         target="_blank"
         rel="noopener noreferrer"
         class="example-card"
+        @click="trackEvent('stackblitz-open', { framework: example.framework })"
       >
         <span class="example-icon" v-html="example.icon" />
         <div>
@@ -24,10 +25,13 @@
 </template>
 
 <script setup lang="ts">
+import { trackEvent } from "../analytics";
+
 const STACKBLITZ_BASE = "https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples";
 
 const examples = [
   {
+    framework: "vanilla-ts",
     title: "Vanilla TypeScript",
     description:
       "Minimal setup with dxf-render and Three.js — parse, render, and display a DXF file.",
@@ -35,12 +39,14 @@ const examples = [
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>',
   },
   {
+    framework: "react",
     title: "React",
     description: "DXF viewer as a React component with useEffect, useRef, and Three.js rendering.",
     url: `${STACKBLITZ_BASE}/react?file=src/DxfViewer.tsx&title=dxf-render+React`,
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="2"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/></svg>',
   },
   {
+    framework: "vue",
     title: "Vue 3",
     description:
       "Drop-in DXF viewer using the dxf-vuer component — dark theme, layers, and export.",
@@ -48,6 +54,7 @@ const examples = [
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3l10 19L22 3"/><path d="M6.5 3L12 14.5 17.5 3"/></svg>',
   },
   {
+    framework: "leaflet-dxf",
     title: "Leaflet + DXF",
     description:
       "Overlay DXF on OpenStreetMap with geo-referencing — parser-only, no Three.js. Includes Florence city center sample.",
@@ -55,13 +62,14 @@ const examples = [
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>',
   },
   {
+    framework: "dxf-to-pdf",
     title: "DXF to PDF",
     description:
       "Export DXF drawings to PDF — offscreen Three.js rendering with page size and orientation options.",
     url: `${STACKBLITZ_BASE}/dxf-to-pdf?file=src/main.ts&title=dxf-render+PDF+Export`,
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
   },
-];
+] as const;
 </script>
 
 <style scoped>
