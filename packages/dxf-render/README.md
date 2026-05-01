@@ -20,7 +20,7 @@ For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer)
 - **Accurate rendering** — linetype patterns, OCS transforms, hatch patterns, proper color resolution
 - **Picking & associations** — bbox-based raycast index plus DXF-driven entity links (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION)
 - **Two entry points** — full renderer or parser-only (zero deps, works in Node.js)
-- **Battle-tested** — 923 tests covering parser, renderer, and utilities
+- **Battle-tested** — 945 tests covering parser, renderer, and utilities
 - **Modern stack** — TypeScript native, ES modules, tree-shakeable, Vite-built
 - **Framework-agnostic** — works with React, Svelte, Angular, vanilla JS, or any framework
 
@@ -345,6 +345,18 @@ function zoomTo(handles: string[]) {
 }
 ```
 
+For "zoom to layer", use `getZoomBoxForLayer()` — same semantics, but unions every entry on the named layer. Layer names are case-sensitive by default:
+
+```ts
+import { getZoomBoxForLayer } from "dxf-render";
+
+const box = getZoomBoxForLayer(pickingIndex, "WALLS", { originOffset });
+if (box) fitCameraToBox(box, camera);
+
+// Forgiving lookup
+getZoomBoxForLayer(pickingIndex, "walls", { originOffset, caseSensitive: false });
+```
+
 To raycast, temporarily flip the group's `visible` flag (it's `false` by default so it doesn't show up in normal rendering):
 
 ```ts
@@ -430,6 +442,22 @@ const box = getZoomBox(pickingIndex, found, { originOffset });
 if (box) fitCameraToBox(box, camera);
 ```
 
+`findEntitiesByLayer(dxf, layerName, options?)` and `findEntitiesByType(dxf, type | type[])` cover the two other common queries — same coverage (top-level entities, INSERT ATTRIBs, entities inside blocks), no picking index needed:
+
+```ts
+import { findEntitiesByLayer, findEntitiesByType } from "dxf-render";
+
+// All entities on the WALLS layer (case-sensitive by default — DXF spec)
+findEntitiesByLayer(dxf, "WALLS");
+findEntitiesByLayer(dxf, "walls", { caseSensitive: false });
+
+// All TEXT + MTEXT handles
+findEntitiesByType(dxf, ["TEXT", "MTEXT"]);
+
+// Single type
+findEntitiesByType(dxf, "DIMENSION");
+```
+
 ### Fonts
 
 - `loadDefaultFont(): Promise<Font>` — load embedded Liberation Sans Regular
@@ -470,7 +498,7 @@ POLYLINE/LWPOLYLINE support includes per-vertex variable width (tapering), const
 | Geometry merging          | ✅                          | ✅           | —          | ❌        |
 | Dark theme                | ✅ instant switch           | bg only      | —          | ❌        |
 | TypeScript                | ✅ native                   | .d.ts        | ✅         | ❌        |
-| Tests                     | 923 tests                   | 0            | ✅         | 0         |
+| Tests                     | 945 tests                   | 0            | ✅         | 0         |
 | Web Worker parsing        | ✅                          | ✅           | ❌         | ❌        |
 | Parser-only entry         | ✅ zero deps                | ❌           | ✅         | ❌        |
 | Framework                 | agnostic                    | agnostic     | —          | agnostic  |
