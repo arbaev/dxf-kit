@@ -72,8 +72,8 @@ function buildTriangles(): string[] {
   const cellH = BG_H / rows;
   const jitter = 0.42;
 
-  // Deterministic pseudo-random so the pattern is stable across renders
-  let seed = 1337;
+  // Random seed per page load so the pattern changes on each refresh
+  let seed = (Math.random() * 0xffffffff) >>> 0;
   const rand = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 0xffffffff;
