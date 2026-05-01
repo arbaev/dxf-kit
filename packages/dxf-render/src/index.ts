@@ -19,9 +19,18 @@ export {
 export { buildEntityIndex, extractEntityText } from "./utils/entityIndex";
 export { getZoomBox, type GetZoomBoxOptions } from "./utils/getZoomBox";
 export {
+  getZoomBoxForLayer,
+  type GetZoomBoxForLayerOptions,
+} from "./utils/getZoomBoxForLayer";
+export {
   findEntitiesByText,
   type FindEntitiesByTextOptions,
 } from "./utils/findEntitiesByText";
+export {
+  findEntitiesByLayer,
+  type FindEntitiesByLayerOptions,
+} from "./utils/findEntitiesByLayer";
+export { findEntitiesByType } from "./utils/findEntitiesByType";
 
 // Associations
 export { buildAssociations } from "./utils/buildAssociations";

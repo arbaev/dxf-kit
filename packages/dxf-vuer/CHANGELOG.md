@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.6.0
+
+### Features
+
+- **`persistLayersKey` prop** — opt-in persistence of layer visibility via `localStorage`. When set, hidden layer names are stored under `${persistLayersKey}:${fileName || 'default'}` and restored on the next load of the same file. Stored names that no longer exist in the current DXF are silently ignored. Disabled by default.
+- **Keyboard navigation** — arrow keys pan (5% of viewport per press), `+`/`=` and `-`/`_` zoom in/out (×1.2 per press), `0` resets the view. Active when the canvas is focused; new prop `keyboardNavigation` (default `true`) toggles the listener. Canvas is now focusable (`tabindex="0"`).
+- **`viewer.zoomToLayer(layerName)`** — imperative method on the viewer ref that fits the camera to all entities of a given layer. Requires `pickingEnabled`.
+- **Public composable `useKeyboardNavigation`** — exported for advanced integrations that bypass `<DXFViewer>`.
+- **ARIA improvements** — `role="region"` + `aria-label` on the viewer container, `role="toolbar"` + per-button `aria-label`/`aria-pressed` on the toolbar, `role="region"` + `aria-expanded` on the layer panel header, per-layer toggles get `role="button"` + `aria-pressed`/`aria-disabled` and Enter/Space keyboard activation, loading overlay is `role="status" aria-live="polite"`, error overlay is `role="alert" aria-live="assertive"`, viewer container reflects `aria-busy` during loads.
+
+### Dependencies
+
+- Requires `dxf-render` ≥ 1.5.0 (new `getZoomBoxForLayer`, `findEntitiesByLayer`, `findEntitiesByType`).
+
 ## 2.5.0
 
 ### Features

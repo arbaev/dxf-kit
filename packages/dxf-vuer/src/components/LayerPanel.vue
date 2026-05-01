@@ -1,16 +1,35 @@
 <template>
-  <div class="layer-panel" :class="{ collapsed: !isExpanded }">
-    <div class="layer-panel-header" @click="isExpanded = !isExpanded">
+  <div
+    class="layer-panel"
+    :class="{ collapsed: !isExpanded }"
+    role="region"
+    aria-label="Layer visibility panel"
+  >
+    <div
+      class="layer-panel-header"
+      role="button"
+      tabindex="0"
+      :aria-expanded="isExpanded"
+      :aria-label="isExpanded ? 'Collapse layer panel' : 'Expand layer panel'"
+      @click="isExpanded = !isExpanded"
+      @keydown.enter.prevent="isExpanded = !isExpanded"
+      @keydown.space.prevent="isExpanded = !isExpanded"
+    >
       <span class="layer-panel-title">Layers ({{ layers.length }})</span>
-      <button class="collapse-btn" :title="isExpanded ? 'Collapse' : 'Expand'">
+      <button
+        class="collapse-btn"
+        :title="isExpanded ? 'Collapse' : 'Expand'"
+        :aria-label="isExpanded ? 'Collapse' : 'Expand'"
+        tabindex="-1"
+      >
         {{ isExpanded ? '−' : '+' }}
       </button>
     </div>
 
     <div v-if="isExpanded" class="layer-panel-body">
       <div class="layer-panel-actions">
-        <button @click.stop="$emit('show-all')" class="action-btn">All</button>
-        <button @click.stop="$emit('hide-all')" class="action-btn">None</button>
+        <button @click.stop="$emit('show-all')" class="action-btn" aria-label="Show all layers">All</button>
+        <button @click.stop="$emit('hide-all')" class="action-btn" aria-label="Hide all layers">None</button>
       </div>
 
       <div v-if="layers.length > 5" class="layer-filter-wrapper">
@@ -37,7 +56,14 @@
           :key="layer.name"
           class="layer-item"
           :class="{ hidden: !layer.visible, frozen: layer.frozen }"
+          role="button"
+          :tabindex="layer.frozen ? -1 : 0"
+          :aria-pressed="layer.visible"
+          :aria-disabled="layer.frozen"
+          :aria-label="`Toggle visibility of layer ${layer.name}`"
           @click="!layer.frozen && $emit('toggle-layer', layer.name)"
+          @keydown.enter.prevent="!layer.frozen && $emit('toggle-layer', layer.name)"
+          @keydown.space.prevent="!layer.frozen && $emit('toggle-layer', layer.name)"
         >
           <!-- Frozen: snowflake icon -->
           <svg

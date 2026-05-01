@@ -6,6 +6,7 @@
         type="file"
         accept=".dxf"
         class="file-input"
+        aria-label="Select a DXF file to load"
         @change="handleFileChange"
       />
       <div class="file-button">

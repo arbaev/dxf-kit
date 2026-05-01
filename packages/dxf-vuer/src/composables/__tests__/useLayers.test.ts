@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { useLayers } from "../useLayers";
 import type { DxfLayer } from "dxf-render";
 
@@ -378,6 +378,171 @@ describe("layerList", () => {
     const layerA = list.find((l) => l.name === "A");
     expect(layerA).toBeDefined();
     expect(layerA!.entityCount).toBe(10);
+  });
+});
+
+// ── persistence (getStorageKey) ─────────────────────────────────────────
+
+// Minimal in-memory localStorage stub for the Node environment (vitest default).
+function installLocalStorageStub() {
+  const store = new Map<string, string>();
+  const stub = {
+    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+    setItem: (k: string, v: string) => { store.set(k, String(v)); },
+    removeItem: (k: string) => { store.delete(k); },
+    clear: () => { store.clear(); },
+    key: (i: number) => Array.from(store.keys())[i] ?? null,
+    get length() { return store.size; },
+  };
+  if (typeof globalThis.window === "undefined") {
+    (globalThis as unknown as { window: { localStorage: typeof stub } }).window = { localStorage: stub };
+  } else {
+    (globalThis.window as unknown as { localStorage: typeof stub }).localStorage = stub;
+  }
+}
+
+describe("persistence via getStorageKey", () => {
+  beforeEach(() => {
+    installLocalStorageStub();
+  });
+
+  it("does not write to storage when getStorageKey returns null", () => {
+    const { initLayers, toggleLayerVisibility } = useLayers({
+      getStorageKey: () => null,
+    });
+
+    initLayers({ A: makeLayer({ name: "A", visible: true, frozen: false }) }, {});
+    toggleLayerVisibility("A");
+
+    expect(window.localStorage.length).toBe(0);
+  });
+
+  it("persists hidden layer names on toggle", () => {
+    const { initLayers, toggleLayerVisibility } = useLayers({
+      getStorageKey: () => "test-key",
+    });
+
+    initLayers(
+      {
+        A: makeLayer({ name: "A", visible: true, frozen: false }),
+        B: makeLayer({ name: "B", visible: true, frozen: false }),
+      },
+      {},
+    );
+
+    toggleLayerVisibility("A");
+
+    expect(JSON.parse(window.localStorage.getItem("test-key")!)).toEqual(["A"]);
+
+    toggleLayerVisibility("B");
+
+    expect(JSON.parse(window.localStorage.getItem("test-key")!).sort()).toEqual(["A", "B"]);
+
+    toggleLayerVisibility("A");
+
+    expect(JSON.parse(window.localStorage.getItem("test-key")!)).toEqual(["B"]);
+  });
+
+  it("restores hidden state from storage on initLayers", () => {
+    window.localStorage.setItem("test-key", JSON.stringify(["B"]));
+
+    const { initLayers, layers } = useLayers({
+      getStorageKey: () => "test-key",
+    });
+
+    initLayers(
+      {
+        A: makeLayer({ name: "A", visible: true, frozen: false }),
+        B: makeLayer({ name: "B", visible: true, frozen: false }),
+      },
+      {},
+    );
+
+    expect(layers.value.get("A")!.visible).toBe(true);
+    expect(layers.value.get("B")!.visible).toBe(false);
+  });
+
+  it("ignores stored layer names that do not exist in the current DXF", () => {
+    window.localStorage.setItem("test-key", JSON.stringify(["GHOST", "A"]));
+
+    const { initLayers, layers } = useLayers({
+      getStorageKey: () => "test-key",
+    });
+
+    initLayers({ A: makeLayer({ name: "A", visible: true, frozen: false }) }, {});
+
+    expect(layers.value.size).toBe(1);
+    expect(layers.value.get("A")!.visible).toBe(false);
+  });
+
+  it("does not override frozen layers on restore", () => {
+    window.localStorage.setItem("test-key", JSON.stringify(["F"]));
+
+    const { initLayers, layers } = useLayers({
+      getStorageKey: () => "test-key",
+    });
+
+    initLayers(
+      { F: makeLayer({ name: "F", visible: true, frozen: true }) },
+      {},
+    );
+
+    // Frozen → visible already false; the persisted entry is harmless,
+    // but our toggle/persist logic intentionally excludes frozen names.
+    expect(layers.value.get("F")!.visible).toBe(false);
+  });
+
+  it("persists on showAllLayers and hideAllLayers", () => {
+    const { initLayers, showAllLayers, hideAllLayers } = useLayers({
+      getStorageKey: () => "test-key",
+    });
+
+    initLayers(
+      {
+        A: makeLayer({ name: "A", visible: true, frozen: false }),
+        B: makeLayer({ name: "B", visible: true, frozen: false }),
+      },
+      {},
+    );
+
+    hideAllLayers();
+    expect(JSON.parse(window.localStorage.getItem("test-key")!).sort()).toEqual(["A", "B"]);
+
+    showAllLayers();
+    expect(JSON.parse(window.localStorage.getItem("test-key")!)).toEqual([]);
+  });
+
+  it("survives malformed storage data without throwing", () => {
+    window.localStorage.setItem("test-key", "{not json");
+
+    const { initLayers, layers } = useLayers({
+      getStorageKey: () => "test-key",
+    });
+
+    expect(() =>
+      initLayers({ A: makeLayer({ name: "A", visible: true, frozen: false }) }, {}),
+    ).not.toThrow();
+
+    expect(layers.value.get("A")!.visible).toBe(true);
+  });
+
+  it("supports a dynamic key (different fileName → different storage slot)", () => {
+    let currentFile = "file1";
+    const factory = () =>
+      useLayers({ getStorageKey: () => `prefix:${currentFile}` });
+
+    const a = factory();
+    a.initLayers({ X: makeLayer({ name: "X", visible: true, frozen: false }) }, {});
+    a.toggleLayerVisibility("X");
+
+    expect(JSON.parse(window.localStorage.getItem("prefix:file1")!)).toEqual(["X"]);
+
+    currentFile = "file2";
+    const b = factory();
+    b.initLayers({ X: makeLayer({ name: "X", visible: true, frozen: false }) }, {});
+
+    // file2 has no stored state — X must be visible
+    expect(b.layers.value.get("X")!.visible).toBe(true);
   });
 });
 

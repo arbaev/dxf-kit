@@ -25,6 +25,26 @@ interface WhatsNewItem {
 const whatsNew: WhatsNewItem[] = [
   {
     pkg: "dxf-vuer",
+    version: "2.6.0",
+    text: "Keyboard navigation — arrow keys pan, +/- zoom, 0 resets the view; canvas is now focusable and respects form fields",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "2.6.0",
+    text: "persistLayersKey prop — remember which layers were hidden across reloads via localStorage, scoped per file",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "2.6.0",
+    text: "viewer.zoomToLayer(layerName) — fit the camera to a single layer; ARIA roles/labels added to toolbar, layer panel, and status overlays",
+  },
+  {
+    pkg: "dxf-render",
+    version: "1.5.0",
+    text: "getZoomBoxForLayer / findEntitiesByLayer / findEntitiesByType — three pure utilities for layer- and type-based zoom and search",
+  },
+  {
+    pkg: "dxf-vuer",
     version: "2.5.0",
     text: "Hover and click individual entities — entity-hover / entity-click events with handle, type, layer, text, and full parsed entity payload",
   },

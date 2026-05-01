@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.0
+
+### Features
+
+- **`getZoomBoxForLayer(pickingIndex, layerName, options?)`** → `THREE.Box3 | null` — pure helper that unions bboxes of all picking entries on a given layer. Same options as `getZoomBox` plus `caseSensitive` (default `true`, since DXF layer names are case-sensitive). Feed the result into `fitCameraToBox()` to implement "zoom to layer" in any framework.
+- **`findEntitiesByLayer(dxf, layerName, options?)`** → `string[]` — find handles of all entities belonging to a given layer. Walks top-level entities, INSERT ATTRIBs, and entities inside blocks (same coverage as `findEntitiesByText`). Case-sensitive by default; pass `{ caseSensitive: false }` to relax.
+- **`findEntitiesByType(dxf, type | type[])`** → `string[]` — find handles by DXF entity type. Accepts a single type or an array; input case is normalized (DXF types are uppercase per spec).
+
+### Stats
+
+- 945 tests across 44 files (was 923 across 41).
+
 ## 1.4.0
 
 ### Features

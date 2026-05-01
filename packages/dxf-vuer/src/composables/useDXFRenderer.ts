@@ -317,6 +317,7 @@ export function useDXFRenderer() {
     getCamera,
     getRenderer,
     getScene,
+    getControls,
     getOriginOffset,
     render,
   };

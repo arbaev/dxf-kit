@@ -61,7 +61,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "dxf-render": "^1.4.0",
+    "dxf-render": "^1.5.0",
     "three": ">=0.160.0",
     "vue": "^3.4.0"
   },
