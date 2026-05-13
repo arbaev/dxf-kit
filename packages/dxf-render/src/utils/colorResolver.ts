@@ -46,6 +46,19 @@ const aciGraySentinel = (colorIndex: number): string | null => {
 };
 
 /**
+ * Map an ACI (AutoCAD Color Index, 1-255) to a color string.
+ * Indices 7/255 and 250/251 return theme-adaptive sentinels — the rest
+ * are converted directly to hex from the ACI palette. Use this anywhere
+ * an ACI index is the source of a color so the theme switch keeps working.
+ */
+export function aciToColor(colorIndex: number): string {
+  if (colorIndex === 7 || colorIndex === 255) return ACI7_COLOR;
+  const gray = aciGraySentinel(colorIndex);
+  if (gray) return gray;
+  return rgbNumberToHex(ACI_PALETTE[colorIndex]);
+}
+
+/**
  * Resolve entity color following AutoCAD priority rules:
  * trueColor (code 420) > colorIndex (code 62) > layerColor
  *
@@ -71,14 +84,7 @@ export function resolveEntityColor(
     if (trueColor !== undefined) {
       return rgbNumberToHex(trueColor);
     }
-    // ACI 7 and 255 are white in palette, rendered as black on light / white on dark
-    if (colorIndex === 7 || colorIndex === 255) {
-      return ACI7_COLOR;
-    }
-    // Dark ACI grays: theme-adaptive sentinels
-    const graySentinel = aciGraySentinel(colorIndex);
-    if (graySentinel) return graySentinel;
-    return rgbNumberToHex(ACI_PALETTE[colorIndex]);
+    return aciToColor(colorIndex);
   }
 
   // ByLayer (colorIndex === 256, unset, or other)
@@ -95,21 +101,10 @@ export function resolveEntityColor(
     const layer = layers[layerName];
     // layer.color is an ACI palette RGB value (from getAcadColor), not trueColor
     if (layer.color !== undefined && layer.color !== 0) {
-      const layerColorIndex = layer.colorIndex;
-      if (layerColorIndex === 7 || layerColorIndex === 255) {
-        return ACI7_COLOR;
-      }
-      const layerGraySentinel = aciGraySentinel(layerColorIndex);
-      if (layerGraySentinel) return layerGraySentinel;
-      return rgbNumberToHex(layer.color);
+      return aciToColor(layer.colorIndex);
     }
     if (layer.colorIndex >= 1 && layer.colorIndex <= 255) {
-      if (layer.colorIndex === 7 || layer.colorIndex === 255) {
-        return ACI7_COLOR;
-      }
-      const layerGraySentinel = aciGraySentinel(layer.colorIndex);
-      if (layerGraySentinel) return layerGraySentinel;
-      return rgbNumberToHex(ACI_PALETTE[layer.colorIndex]);
+      return aciToColor(layer.colorIndex);
     }
   }
 

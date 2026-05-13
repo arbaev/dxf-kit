@@ -1,8 +1,7 @@
 import * as THREE from "three";
 import type { DxfEntity, DxfData } from "@/types/dxf";
 import { isDimensionEntity } from "@/types/dxf";
-import { resolveEntityColor, rgbNumberToHex } from "@/utils/colorResolver";
-import ACI_PALETTE from "@/parser/acadColorIndex";
+import { resolveEntityColor, aciToColor } from "@/utils/colorResolver";
 import { DEGREES_TO_RADIANS_DIVISOR } from "@/constants";
 import { type RenderContext, degreesToRadians } from "../primitives";
 import type { GeometryCollector } from "../mergeCollectors";
@@ -60,10 +59,12 @@ export function collectDimensionEntity(
   const dimdec = dimStyleEntry ? (dimStyleEntry.dimdec ?? colorCtx.headerDimdec) : colorCtx.headerDimdec;
   const dimFmt: DimFormatOptions | undefined = dimlunit !== undefined ? { dimlunit, dimzin, dimdec } : undefined;
 
-  // DIMCLRT: dimension text color from DIMSTYLE (ACI index)
+  // DIMCLRT: dimension text color from DIMSTYLE (ACI index).
+  // Route through aciToColor so ACI 7/255 stay theme-adaptive — otherwise
+  // a DIMSTYLE with DIMCLRT=7 renders white text invisible on a light background.
   let textColor = entityColor;
   if (dimStyleEntry && dimStyleEntry.dimclrt !== undefined && dimStyleEntry.dimclrt > 0 && dimStyleEntry.dimclrt <= 255) {
-    textColor = rgbNumberToHex(ACI_PALETTE[dimStyleEntry.dimclrt]);
+    textColor = aciToColor(dimStyleEntry.dimclrt);
   }
 
   // DIMTSZ / DIMBLK from DIMSTYLE overrides header values

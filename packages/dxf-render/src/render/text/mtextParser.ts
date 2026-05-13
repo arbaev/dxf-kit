@@ -1,5 +1,4 @@
-import ACI_PALETTE from "@/parser/acadColorIndex";
-import { rgbNumberToHex } from "@/utils/colorResolver";
+import { aciToColor } from "@/utils/colorResolver";
 
 /** MTEXT line with optional color, height, and style overrides */
 export interface MTextLine {
@@ -134,7 +133,9 @@ export const parseMTextContent = (rawText: string, defaultHeight?: number): MTex
       if (idx === 0 || idx === 256) {
         currentColor = undefined; // ByBlock/ByLayer — use entity color
       } else if (idx >= 1 && idx <= 255) {
-        currentColor = rgbNumberToHex(ACI_PALETTE[idx]);
+        // Route through aciToColor so ACI 7/255 and grays 250/251 stay
+        // theme-adaptive instead of resolving to a literal white/gray hex.
+        currentColor = aciToColor(idx);
       }
       return "";
     });

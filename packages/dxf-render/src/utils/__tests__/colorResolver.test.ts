@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rgbNumberToHex, resolveEntityColor, ACI7_COLOR, resolveAci7Hex, isThemeAdaptiveColor, resolveThemeColor } from "@/utils/colorResolver";
+import { rgbNumberToHex, resolveEntityColor, ACI7_COLOR, resolveAci7Hex, isThemeAdaptiveColor, resolveThemeColor, aciToColor } from "@/utils/colorResolver";
 import type { DxfEntity, DxfLayer } from "@/types/dxf";
 
 // Helper to create a minimal DxfEntity for testing color resolution.
@@ -115,6 +115,37 @@ describe("resolveThemeColor", () => {
     expect(light).not.toBe(dark);
     // Dark mode should be lighter than light mode
     expect(parseInt(dark.slice(1, 3), 16)).toBeGreaterThan(parseInt(light.slice(1, 3), 16));
+  });
+});
+
+// ── aciToColor ────────────────────────────────────────────────────────
+
+describe("aciToColor", () => {
+  it("returns ACI7_COLOR sentinel for index 7 (white-on-light / black-on-dark)", () => {
+    expect(aciToColor(7)).toBe(ACI7_COLOR);
+  });
+
+  it("returns ACI7_COLOR sentinel for index 255", () => {
+    expect(aciToColor(255)).toBe(ACI7_COLOR);
+  });
+
+  it("returns dark-gray sentinel for index 250", () => {
+    const color = aciToColor(250);
+    expect(isThemeAdaptiveColor(color)).toBe(true);
+    expect(color).toBe("\0ACI250");
+  });
+
+  it("returns dark-gray sentinel for index 251", () => {
+    const color = aciToColor(251);
+    expect(isThemeAdaptiveColor(color)).toBe(true);
+    expect(color).toBe("\0ACI251");
+  });
+
+  it("returns concrete hex for chromatic ACI indices", () => {
+    // ACI 1 is red — should be a literal hex, not a sentinel
+    const color = aciToColor(1);
+    expect(isThemeAdaptiveColor(color)).toBe(false);
+    expect(color).toMatch(/^#[0-9a-f]{6}$/);
   });
 });
 
