@@ -55,6 +55,32 @@ describe("parseTables", () => {
       expect(layers.HiddenLayer.colorIndex).toBe(3);
     });
 
+    it("does not mark layer as frozen when only bit 2 is set in code 70", () => {
+      // Bit 2 (0x02) means "frozen by default in new viewports", which is a
+      // template setting for newly created viewports. It must not hide the
+      // layer in model space. Regression: previously bit 2 was OR-ed into
+      // `frozen`, which silently hid visible layers in many real-world files.
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "LAYER",
+        "70", "1",
+        "0", "LAYER",
+        "2", "VisibleLayer",
+        "62", "5",
+        "70", "2",          // bit 2 only — must NOT mean currently frozen
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const layers = tables.layer.layers as Record<string, ILayer>;
+      expect(layers.VisibleLayer.frozen).toBe(false);
+      expect(layers.VisibleLayer.locked).toBe(false);
+      expect(layers.VisibleLayer.visible).toBe(true);
+    });
+
     it("marks layer as frozen when bit 1 is set in code 70", () => {
       const scanner = createScanner(
         "0", "TABLE",
@@ -195,7 +221,8 @@ describe("parseTables", () => {
 
       expect(layers.Layer2.visible).toBe(false);
       expect(layers.Layer2.colorIndex).toBe(5);
-      expect(layers.Layer2.frozen).toBe(true);
+      // flags=2 = "frozen by default in new viewports" only, not currently frozen
+      expect(layers.Layer2.frozen).toBe(false);
     });
   });
 

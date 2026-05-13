@@ -194,10 +194,12 @@ function parseLayers(scanner: DxfScanner): Record<string, ILayer> {
         curr = scanner.next();
         break;
       case 70: {
-        // Bits 1 and 2: frozen and frozen by default in new viewports
+        // Bit 1 (0x01): frozen in current drawing.
+        // Bit 2 (0x02): "frozen by default in new viewports" — does not
+        // hide the layer in model space, so it must not affect `frozen`.
+        // Bit 4 (0x04): locked.
         const flags = curr.value as number;
-        layer.frozen = (flags & 1) !== 0 || (flags & 2) !== 0;
-        // Bit 4 (0x04): locked
+        layer.frozen = (flags & 1) !== 0;
         layer.locked = (flags & 4) !== 0;
         curr = scanner.next();
         break;
