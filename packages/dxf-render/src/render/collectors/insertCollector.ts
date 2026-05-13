@@ -72,13 +72,16 @@ function renderAttribs(
   colorCtx: RenderContext,
   collector: GeometryCollector,
   insertLayer: string,
+  insertColor: string,
 ): void {
   for (const attrib of attribs) {
     if (attrib.invisible) continue;
     const text = attrib.text;
     if (!text) continue;
 
-    const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor);
+    // Pass insertColor as blockColor: it lets ByBlock (colorIndex=0) and
+    // layer "0" (ByLayer) both resolve to the parent INSERT's effective color.
+    const attribColor = resolveEntityColor(attrib, colorCtx.layers, insertColor);
     const textHeight = attrib.textHeight || colorCtx.defaultTextHeight;
 
     const hasJustification =
@@ -272,7 +275,7 @@ export async function collectInsertEntity(
 
     // Handle ATTRIBs for template path (only for first array instance)
     if (row === 0 && col === 0 && insertEntity.attribs && insertEntity.attribs.length > 0) {
-      renderAttribs(insertEntity.attribs, colorCtx, collector, insertLayer);
+      renderAttribs(insertEntity.attribs, colorCtx, collector, insertLayer, insertColor);
     }
 
     continue;
@@ -330,7 +333,7 @@ export async function collectInsertEntity(
 
   // Handle ATTRIB entities (only for first array instance)
   if (row === 0 && col === 0 && insertEntity.attribs && insertEntity.attribs.length > 0) {
-    renderAttribs(insertEntity.attribs, colorCtx, collector, insertLayer);
+    renderAttribs(insertEntity.attribs, colorCtx, collector, insertLayer, insertColor);
   }
 
   } // for col

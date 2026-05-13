@@ -258,4 +258,53 @@ describe("resolveEntityColor", () => {
     const result = resolveEntityColor(entity, {});
     expect(result).toBe(ACI7_COLOR);
   });
+
+  // -- Layer "0" inside a block inherits from INSERT (AutoCAD convention) --
+
+  it("layer \"0\" with ByLayer inherits blockColor when set", () => {
+    // Regression: AEC Gridline Bubble — ATTRIBs/ARC on layer "0" inside an
+    // INSERT on a green-coded layer must render green, not white.
+    const layers = makeLayer("0", { colorIndex: 7, color: 0 });
+    const entity = makeEntity({ layer: "0" }); // no explicit color → ByLayer
+    const result = resolveEntityColor(entity, layers, "#00ff00");
+    expect(result).toBe("#00ff00");
+  });
+
+  it("empty layer name with ByLayer inherits blockColor when set", () => {
+    const entity = makeEntity({ layer: "" });
+    const result = resolveEntityColor(entity, {}, "#123456");
+    expect(result).toBe("#123456");
+  });
+
+  it("layer \"0\" with ByLayer falls back to ACI 7 when no blockColor", () => {
+    // Top-level entity on layer "0" — backward-compatible: white/black.
+    const layers = makeLayer("0", { colorIndex: 7, color: 0 });
+    const entity = makeEntity({ layer: "0" });
+    const result = resolveEntityColor(entity, layers);
+    expect(result).toBe(ACI7_COLOR);
+  });
+
+  it("layer \"0\" with explicit colorIndex=5 uses entity color, not blockColor", () => {
+    // Explicit color always wins, even on layer "0".
+    const layers = makeLayer("0", { colorIndex: 7, color: 0 });
+    const entity = makeEntity({ layer: "0", colorIndex: 5 });
+    const result = resolveEntityColor(entity, layers, "#00ff00");
+    // ACI 5 = blue (0x0000FF)
+    expect(result).toBe("#0000ff");
+  });
+
+  it("layer \"0\" with ByBlock uses blockColor (regression-protect existing path)", () => {
+    // colorIndex=0 (ByBlock) → blockColor branch fires first, layer-0 branch never reached.
+    const entity = makeEntity({ layer: "0", colorIndex: 0 });
+    const result = resolveEntityColor(entity, {}, "#abcdef");
+    expect(result).toBe("#abcdef");
+  });
+
+  it("non-zero layer with ByLayer ignores blockColor, uses layer color", () => {
+    // Layer "WALL" entity inside a block keeps the WALL layer color, not INSERT's.
+    const layers = makeLayer("WALL", { colorIndex: 3, color: 0x00FF00 });
+    const entity = makeEntity({ layer: "WALL" });
+    const result = resolveEntityColor(entity, layers, "#ff0000");
+    expect(result).toBe("#00ff00");
+  });
 });

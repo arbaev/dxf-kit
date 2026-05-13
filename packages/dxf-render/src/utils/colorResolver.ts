@@ -83,6 +83,14 @@ export function resolveEntityColor(
 
   // ByLayer (colorIndex === 256, unset, or other)
   const layerName = entity.layer;
+
+  // Special case: an entity on layer "0" inside a BLOCK (or an ATTRIB attached
+  // to an INSERT) inherits its parent INSERT's effective color. AutoCAD treats
+  // layer "0" inside blocks as a sentinel for "use the inserter's color".
+  if ((!layerName || layerName === "0") && blockColor !== undefined) {
+    return blockColor;
+  }
+
   if (layerName && layers[layerName]) {
     const layer = layers[layerName];
     // layer.color is an ACI palette RGB value (from getAcadColor), not trueColor

@@ -167,6 +167,37 @@ describe("buildBlockTemplate", () => {
     expect(keys[0].includes(BYBLOCK_COLOR)).toBe(true);
   });
 
+  it("uses BYBLOCK_COLOR sentinel for layer-0 ByLayer entities (inherit from INSERT)", () => {
+    // Regression: AEC Gridline Bubble — ARC on layer "0" with no explicit color
+    // must inherit the INSERT's color. The template can't bake the color in
+    // because the same block may be inserted on different colored layers.
+    const entities: DxfEntity[] = [
+      { type: "LINE", layer: "0" } as DxfEntity, // no colorIndex → ByLayer
+    ];
+
+    const template = buildBlockTemplate("TEST", entities, makeColorCtx(), stubCollect);
+
+    const keys = [...template.buckets.keys()];
+    expect(keys.length).toBe(1);
+    // Key encodes "INHERIT_LAYER::BYBLOCK_COLOR" — both sentinels resolved at instantiation
+    expect(keys[0].startsWith(INHERIT_LAYER)).toBe(true);
+    expect(keys[0].includes(BYBLOCK_COLOR)).toBe(true);
+  });
+
+  it("bakes explicit color even on layer 0 (no inheritance)", () => {
+    const entities: DxfEntity[] = [
+      { type: "LINE", layer: "0", colorIndex: 1 } as DxfEntity, // explicit ACI 1 (red)
+    ];
+
+    const template = buildBlockTemplate("TEST", entities, makeColorCtx(), stubCollect);
+
+    const keys = [...template.buckets.keys()];
+    expect(keys.length).toBe(1);
+    // Layer inherits, but color is explicit and gets baked
+    expect(keys[0].startsWith(INHERIT_LAYER)).toBe(true);
+    expect(keys[0].includes(BYBLOCK_COLOR)).toBe(false);
+  });
+
   it("puts ByBlock linetype entities into fallback", () => {
     const entities: DxfEntity[] = [
       { type: "LINE", layer: "0", lineType: "BYBLOCK" } as DxfEntity,

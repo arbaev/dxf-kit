@@ -113,14 +113,11 @@ export function buildBlockTemplate(
       ? INHERIT_LAYER
       : entity.layer;
 
-    // Determine color: ByBlock (colorIndex=0) → sentinel
-    let overrideColor: string | undefined;
-    if (entity.colorIndex === 0) {
-      overrideColor = BYBLOCK_COLOR;
-    } else {
-      // Resolve fixed color (ByLayer on named layer, or explicit ACI/trueColor)
-      overrideColor = resolveEntityColor(entity, colorCtx.layers, undefined);
-    }
+    // Determine color: ByBlock (colorIndex=0) → sentinel.
+    // Layer "0" + ByLayer also inherits from INSERT — resolveEntityColor handles
+    // both cases when we pass BYBLOCK_COLOR as the blockColor argument. The sentinel
+    // is replaced with insertColor at instantiation time.
+    const overrideColor = resolveEntityColor(entity, colorCtx.layers, BYBLOCK_COLOR);
 
     // Collect geometry in local coordinates (no worldMatrix)
     const collected = collectEntityFn({
