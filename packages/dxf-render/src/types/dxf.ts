@@ -485,6 +485,7 @@ export interface DxfDimStyle {
   dimexe?: number;   // code 44: extension line extension past dimension line
   dimclrt?: number;  // code 178: dimension text color (ACI index)
   dimlunit?: number; // code 277: 2=Decimal, 4=Architectural
+  dimdec?: number;   // code 271: decimal places for primary units (arch: 2^dimdec is fraction denominator)
   dimzin?: number;   // code 78: zero suppression flags
   dimblkHandle?: string; // code 342: handle of dimension arrow block (-> BLOCK_RECORD name)
   dimldrblkHandle?: string; // code 341: handle of leader arrow block (-> BLOCK_RECORD name)

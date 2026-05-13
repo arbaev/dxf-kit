@@ -168,9 +168,10 @@ export async function createThreeObjectsFromDXF(
     }
   }
 
-  // DIMSTYLE table and header $DIMLUNIT for architectural dimension formatting
+  // DIMSTYLE table and header $DIMLUNIT/$DIMDEC for architectural dimension formatting
   const dimStyles = dxf.tables?.dimStyle?.dimStyles;
   const headerDimlunit = dxf.header?.$DIMLUNIT;
+  const headerDimdec = dxf.header?.$DIMDEC;
 
   // Build handle -> name map from BLOCK_RECORD for DIMBLK resolution
   let blockHandleToName: Map<string, string> | undefined;
@@ -201,6 +202,7 @@ export async function createThreeObjectsFromDXF(
     mirrText,
     dimStyles,
     headerDimlunit,
+    headerDimdec,
     blockHandleToName,
   };
 

@@ -48,6 +48,9 @@ export interface DxfHeader {
   $DIMBLK?: string;
   /** Dimension linear unit format (2 = Decimal, 4 = Architectural, ...). */
   $DIMLUNIT?: number;
+  /** Decimal places for primary dimension units. For architectural units, the
+   * fraction denominator is `2 ** $DIMDEC` (3 → 1/8", 4 → 1/16", default 4). */
+  $DIMDEC?: number;
 
   // ── Point display ──────────────────────────────────────────────────
   /** Point display mode (0 = dot, 1 = none, 2 = plus, 3 = cross, ...). */

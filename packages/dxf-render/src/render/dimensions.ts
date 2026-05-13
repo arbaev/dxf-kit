@@ -466,6 +466,7 @@ export const createRotatedDimensionLines = (p: RotatedDimensionLinesParams): THR
 export interface DimFormatOptions {
   dimlunit?: number; // 2=Decimal, 4=Architectural
   dimzin?: number;   // Zero suppression flags
+  dimdec?: number;   // Decimal places for primary units (arch: 2^dimdec = fraction denominator)
 }
 
 export const extractDimensionData = (entity: DxfDimensionEntity, dv: DimVars = DEFAULT_DIM_VARS, fmt?: DimFormatOptions) => {
@@ -480,7 +481,7 @@ export const extractDimensionData = (entity: DxfDimensionEntity, dv: DimVars = D
 
   const formatMeasurement = (value: number): string =>
     fmt?.dimlunit === 4
-      ? formatArchitectural(value, fmt.dimzin)
+      ? formatArchitectural(value, fmt.dimzin, fmt.dimdec)
       : formatDimNumber(value);
 
   // Detect radial dimension BEFORE generating text to add "R" prefix
@@ -611,10 +612,16 @@ export const formatDimNumber = (value: number): string =>
   parseFloat(value.toFixed(DIM_TEXT_DECIMAL_PLACES)).toString();
 
 /**
- * Max fraction denominator for architectural dimensions.
- * 2^4 = 16 → 1/16" precision (standard DIMDEC=4).
+ * Default DIMDEC for architectural fractions when not specified by DIMSTYLE/header.
+ * 2^4 = 16 → 1/16" precision.
  */
-const ARCH_FRAC_DENOM = 16;
+const DEFAULT_ARCH_DIMDEC = 4;
+
+/**
+ * Upper bound on DIMDEC for architectural fractions. 2^8 = 1/256" is more than enough;
+ * higher values would produce nonsensical denominators and risk Math.round overflow.
+ */
+const MAX_ARCH_DIMDEC = 8;
 
 /**
  * Format a measurement in inches as architectural: feet'-inches".
@@ -625,8 +632,15 @@ const ARCH_FRAC_DENOM = 16;
  *   bit 2 (4): suppress 0 feet → "4\"" instead of "0'-4\""
  *   bit 3 (8): suppress 0 inches → "7'" instead of "7'-0\""
  * Default (dimzin=0): suppress both zero feet and zero inches.
+ *
+ * dimdec sets the fraction denominator as 2^dimdec (DXF code 271 / $DIMDEC):
+ *   0 → whole inches only; 1 → 1/2; 2 → 1/4; 3 → 1/8; 4 → 1/16 (default); 5 → 1/32; ...
  */
-export const formatArchitectural = (totalInches: number, dimzin?: number): string => {
+export const formatArchitectural = (
+  totalInches: number,
+  dimzin?: number,
+  dimdec?: number,
+): string => {
   const sign = totalInches < 0 ? "-" : "";
   const abs = Math.abs(totalInches);
   let feet = Math.floor(abs / 12);
@@ -634,12 +648,21 @@ export const formatArchitectural = (totalInches: number, dimzin?: number): strin
   let wholeInches = Math.floor(remInches);
   const fracPart = remInches - wholeInches;
 
+  const dec = Math.min(Math.max(dimdec ?? DEFAULT_ARCH_DIMDEC, 0), MAX_ARCH_DIMDEC);
+  const denom = 1 << dec; // 2^dec; dec=0 → 1 (no fraction, round to whole inch)
+
   // Convert fractional part to nearest fraction with power-of-2 denominator
   let fracNum = 0;
   let fracDen = 1;
-  if (fracPart > 1 / (ARCH_FRAC_DENOM * 2)) {
-    fracNum = Math.round(fracPart * ARCH_FRAC_DENOM);
-    fracDen = ARCH_FRAC_DENOM;
+  if (denom === 1) {
+    // DIMDEC=0: round fractional part to nearest whole inch
+    if (fracPart >= 0.5) {
+      wholeInches++;
+      if (wholeInches >= 12) { feet++; wholeInches -= 12; }
+    }
+  } else if (fracPart > 1 / (denom * 2)) {
+    fracNum = Math.round(fracPart * denom);
+    fracDen = denom;
     if (fracNum >= fracDen) {
       // Fraction rounds up to next whole inch
       fracNum = 0;

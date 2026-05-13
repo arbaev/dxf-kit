@@ -652,6 +652,49 @@ describe("formatArchitectural", () => {
   it("handles negative fractional value", () => {
     expect(formatArchitectural(-6.5)).toBe("-6\\S1/2;\"");
   });
+
+  // DIMDEC overrides — fraction denominator = 2^DIMDEC
+  it("uses 1/8\" precision when DIMDEC=3 (AEC AutoCAD default)", () => {
+    // 73.33503 → 6'-1.33503"; with denom=8 → 0.33503*8=2.68 → round to 3 → 3/8
+    expect(formatArchitectural(73.33503010082154, undefined, 3)).toBe("6'-1\\S3/8;\"");
+  });
+
+  it("uses 1/16\" precision when DIMDEC=4 (default)", () => {
+    // Same value with denom=16 → 0.33503*16=5.36 → round to 5 → 5/16
+    expect(formatArchitectural(73.33503010082154, undefined, 4)).toBe("6'-1\\S5/16;\"");
+  });
+
+  it("uses 1/4\" precision when DIMDEC=2", () => {
+    // 9.3 → fracPart=0.3; denom=4 → 0.3*4=1.2 → round to 1 → 1/4
+    expect(formatArchitectural(9.3, undefined, 2)).toBe("9\\S1/4;\"");
+  });
+
+  it("uses 1/2\" precision when DIMDEC=1", () => {
+    // 9.3 → fracPart=0.3; denom=2 → 0.3*2=0.6 → round to 1 → 1/2
+    expect(formatArchitectural(9.3, undefined, 1)).toBe("9\\S1/2;\"");
+  });
+
+  it("rounds to whole inches when DIMDEC=0", () => {
+    expect(formatArchitectural(9.3, undefined, 0)).toBe("9\"");
+    expect(formatArchitectural(9.7, undefined, 0)).toBe("10\"");
+    expect(formatArchitectural(11.7, undefined, 0)).toBe("1'");
+  });
+
+  it("uses 1/32\" precision when DIMDEC=5", () => {
+    // 6 + 1/32 = 6.03125
+    expect(formatArchitectural(6.03125, undefined, 5)).toBe("6\\S1/32;\"");
+  });
+
+  it("clamps absurdly large DIMDEC to safe upper bound", () => {
+    // DIMDEC=99 should not produce nonsense — clamped to 8 (1/256)
+    // 6 + 1/256 = 6.00390625, with denom=256 → fracPart*256=1 → 1/256
+    expect(formatArchitectural(6.00390625, undefined, 99)).toBe("6\\S1/256;\"");
+  });
+
+  it("falls back to 1/16\" when dimdec is undefined", () => {
+    // Identical to the no-dimdec case — backward compatibility check
+    expect(formatArchitectural(6.0625)).toBe(formatArchitectural(6.0625, undefined, 4));
+  });
 });
 
 // =====================================================================
@@ -707,6 +750,20 @@ describe("extractDimensionData with DIMLUNIT=4", () => {
     const data = extractDimensionData(entity, DEFAULT_DIM_VARS, { dimlunit: 4 });
     expect(data).not.toBeNull();
     expect(data!.dimensionText).toBe("custom");
+  });
+
+  it("honors DIMDEC=3 → 1/8\" precision (AEC AutoCAD default)", () => {
+    // Regression: AEC Plan Elev Sample, handle D9B071D01A0BB051, actualMeasurement 73.33503010082154
+    // DIMSTYLE DIM96 has DIMDEC=3 → fraction denominator 2^3=8 → 3/8 (was 5/16 with hardcoded 16)
+    const entity = makeDimEntity({
+      linearOrAngularPoint1: { x: 0, y: 0, z: 0 },
+      linearOrAngularPoint2: { x: 0, y: 73.33503010082154, z: 0 },
+      anchorPoint: { x: 5, y: 0, z: 0 },
+      actualMeasurement: 73.33503010082154,
+    });
+    const data = extractDimensionData(entity, DEFAULT_DIM_VARS, { dimlunit: 4, dimdec: 3 });
+    expect(data).not.toBeNull();
+    expect(data!.dimensionText).toBe("6'-1\\S3/8;\"");
   });
 });
 

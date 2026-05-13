@@ -54,10 +54,11 @@ export function collectDimensionEntity(
   }
   const dv = mergeEntityDimVars(baseDv, entity);
 
-  // Resolve DIMLUNIT: DIMSTYLE -> header -> undefined (defaults)
+  // Resolve DIMLUNIT/DIMDEC: DIMSTYLE -> header -> undefined (defaults)
   const dimlunit = dimStyleEntry ? dimStyleEntry.dimlunit : colorCtx.headerDimlunit;
   const dimzin = dimStyleEntry ? dimStyleEntry.dimzin : undefined;
-  const dimFmt: DimFormatOptions | undefined = dimlunit !== undefined ? { dimlunit, dimzin } : undefined;
+  const dimdec = dimStyleEntry ? (dimStyleEntry.dimdec ?? colorCtx.headerDimdec) : colorCtx.headerDimdec;
+  const dimFmt: DimFormatOptions | undefined = dimlunit !== undefined ? { dimlunit, dimzin, dimdec } : undefined;
 
   // DIMCLRT: dimension text color from DIMSTYLE (ACI index)
   let textColor = entityColor;
