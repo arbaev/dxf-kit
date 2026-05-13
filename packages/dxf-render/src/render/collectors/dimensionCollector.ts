@@ -45,7 +45,7 @@ export function collectDimensionEntity(
   const matrix = worldMatrix ?? new THREE.Matrix4();
 
   // Resolve dimension variables: header -> DIMSTYLE -> entity XDATA overrides
-  const dimStyleEntry = entity.styleName && colorCtx.dimStyles?.[entity.styleName];
+  const dimStyleEntry = entity.styleName ? colorCtx.dimStyles?.[entity.styleName] : undefined;
   let baseDv = colorCtx.dimVars ?? resolveDimVarsFromHeader(undefined);
   // Apply DIMSTYLE-level overrides (DIMSCALE, DIMTXT, DIMASZ) between header and entity
   if (dimStyleEntry) {
@@ -53,11 +53,16 @@ export function collectDimensionEntity(
   }
   const dv = mergeEntityDimVars(baseDv, entity);
 
-  // Resolve DIMLUNIT/DIMDEC: DIMSTYLE -> header -> undefined (defaults)
-  const dimlunit = dimStyleEntry ? dimStyleEntry.dimlunit : colorCtx.headerDimlunit;
-  const dimzin = dimStyleEntry ? dimStyleEntry.dimzin : undefined;
-  const dimdec = dimStyleEntry ? (dimStyleEntry.dimdec ?? colorCtx.headerDimdec) : colorCtx.headerDimdec;
-  const dimFmt: DimFormatOptions | undefined = dimlunit !== undefined ? { dimlunit, dimzin, dimdec } : undefined;
+  // Resolve formatting variables: DIMSTYLE → header → undefined (defaults).
+  const dimlunit = dimStyleEntry?.dimlunit ?? colorCtx.headerDimlunit;
+  const dimzin = dimStyleEntry?.dimzin ?? colorCtx.headerDimzin;
+  const dimdec = dimStyleEntry?.dimdec ?? colorCtx.headerDimdec;
+  const dimadec = dimStyleEntry?.dimadec ?? colorCtx.headerDimadec;
+  // Build dimFmt whenever any of these is defined so DIMDEC alone (without DIMLUNIT) is enough.
+  const dimFmt: DimFormatOptions | undefined =
+    dimlunit !== undefined || dimzin !== undefined || dimdec !== undefined || dimadec !== undefined
+      ? { dimlunit, dimzin, dimdec, dimadec }
+      : undefined;
 
   // DIMCLRT: dimension text color from DIMSTYLE (ACI index).
   // Route through aciToColor so ACI 7/255 stay theme-adaptive — otherwise
@@ -103,7 +108,7 @@ export function collectDimensionEntity(
   const resolvedColor = colorCtx.materials.resolveColor(entityColor);
 
   // Ordinate dimension (type 6 = Y-ordinate, type 7 = X-ordinate)
-  const dimParams = { entity, color: resolvedColor, font, collector, layer, transform, dv };
+  const dimParams = { entity, color: resolvedColor, font, collector, layer, transform, dv, fmt: dimFmt };
   if ((baseDimType & 0x0e) === 6) {
     result = createOrdinateDimension(dimParams);
   } else if (baseDimType === 2) {

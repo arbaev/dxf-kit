@@ -43,6 +43,8 @@ export interface DimensionContext {
   dimStyles?: Record<string, DxfDimStyle>;
   headerDimlunit?: number;
   headerDimdec?: number;
+  headerDimadec?: number;
+  headerDimzin?: number;
   blockHandleToName?: Map<string, string>;
 }
 
@@ -59,7 +61,9 @@ export interface RenderContext extends ColorContext, LinetypeContext {
   dimVars?: import("./dimensions").DimVars; // Resolved dimension variables
   dimStyles?: Record<string, DxfDimStyle>; // DIMSTYLE table for dimension formatting
   headerDimlunit?: number; // $DIMLUNIT from header (fallback for dimension formatting)
-  headerDimdec?: number; // $DIMDEC from header (fallback for architectural fraction precision)
+  headerDimdec?: number; // $DIMDEC from header (fallback for decimal places / architectural fraction precision)
+  headerDimadec?: number; // $DIMADEC from header (fallback for angular dimension decimal places)
+  headerDimzin?: number; // $DIMZIN from header (fallback for zero-suppression flags)
   blockHandleToName?: Map<string, string>; // BLOCK_RECORD handle → name (for DIMBLK resolution)
   xlineClipSize?: number; // Half-length for clipping XLINE/RAY to drawing extents
   originOffset?: { x: number; y: number; z: number }; // Subtracted from coords for Float32 precision

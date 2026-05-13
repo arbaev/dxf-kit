@@ -557,6 +557,27 @@ describe("parseTables", () => {
       expect(dimStyles.ARCHARR.dimtxt).toBe(0.1875);
       expect(dimStyles.ARCHARR.dimclrt).toBe(1);
     });
+
+    it("parses DIMSTYLE with dimadec (code 179) for angular precision", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "DIMSTYLE",
+        "70", "1",
+        "0", "DIMSTYLE",
+        "2", "stil1",
+        "271", "2",            // DIMDEC — linear precision
+        "179", "1",            // DIMADEC — angular precision
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const dimStyles = tables.dimStyle.dimStyles as Record<string, IDimStyle>;
+      expect(dimStyles.stil1.dimdec).toBe(2);
+      expect(dimStyles.stil1.dimadec).toBe(1);
+    });
   });
 
   // ── Empty TABLES section ────────────────────────────────────────────

@@ -185,6 +185,8 @@ export interface DimensionTypeParams {
   layer?: string;
   transform?: readonly number[];
   dv?: DimVars;
+  /** Dimension formatting options (DIMDEC, DIMZIN, DIMADEC, DIMLUNIT). */
+  fmt?: DimFormatOptions;
 }
 
 /** Params for createLinearDimensionLines */
@@ -467,6 +469,7 @@ export interface DimFormatOptions {
   dimlunit?: number; // 2=Decimal, 4=Architectural
   dimzin?: number;   // Zero suppression flags
   dimdec?: number;   // Decimal places for primary units (arch: 2^dimdec = fraction denominator)
+  dimadec?: number;  // Decimal places for angular dimensions
 }
 
 export const extractDimensionData = (entity: DxfDimensionEntity, dv: DimVars = DEFAULT_DIM_VARS, fmt?: DimFormatOptions) => {
@@ -482,7 +485,7 @@ export const extractDimensionData = (entity: DxfDimensionEntity, dv: DimVars = D
   const formatMeasurement = (value: number): string =>
     fmt?.dimlunit === 4
       ? formatArchitectural(value, fmt.dimzin, fmt.dimdec)
-      : formatDimNumber(value);
+      : formatDimNumber(value, fmt?.dimdec, fmt?.dimzin);
 
   // Detect radial dimension BEFORE generating text to add "R" prefix
   if (!point1 && !point2 && diameterOrRadiusPoint && anchorPoint) {
@@ -513,7 +516,7 @@ export const extractDimensionData = (entity: DxfDimensionEntity, dv: DimVars = D
   }
 
   if (!isRadial && dimensionText && !isNaN(parseFloat(dimensionText)) && fmt?.dimlunit !== 4) {
-    dimensionText = formatDimNumber(parseFloat(dimensionText));
+    dimensionText = formatDimNumber(parseFloat(dimensionText), fmt?.dimdec, fmt?.dimzin);
   }
 
   if (!point1 || !point2 || !anchorPoint || !dimensionText) {
@@ -605,11 +608,22 @@ export const createDimensionGroup = (p: DimensionGroupParams): THREE.Group => {
 };
 
 /**
- * Format dimension number: up to DIM_TEXT_DECIMAL_PLACES digits, no trailing zeros.
- * 28 -> "28", 28.28 -> "28.28", 28.10 -> "28.1"
+ * Format a dimension number with optional `decimals` (DIMDEC for linear,
+ * DIMADEC for angular) and `dimzin` zero-suppression flags. In decimal mode
+ * DIMZIN uses bit 2 (4) for leading zeros and bit 3 (8) for trailing zeros.
+ *
+ * When `dimzin` is undefined trailing zeros are stripped — preserves the
+ * pre-DIMDEC default (caller passes the raw value).
  */
-export const formatDimNumber = (value: number): string =>
-  parseFloat(value.toFixed(DIM_TEXT_DECIMAL_PLACES)).toString();
+export const formatDimNumber = (value: number, decimals?: number, dimzin?: number): string => {
+  const places = decimals ?? DIM_TEXT_DECIMAL_PLACES;
+  let s = value.toFixed(places);
+  const stripTrailing = dimzin === undefined || (dimzin & 8) !== 0;
+  const stripLeading = dimzin !== undefined && (dimzin & 4) !== 0;
+  if (stripTrailing) s = parseFloat(s).toString();
+  if (stripLeading) s = s.replace(/^(-?)0\./, "$1.");
+  return s;
+};
 
 /**
  * Default DIMDEC for architectural fractions when not specified by DIMSTYLE/header.
@@ -738,7 +752,7 @@ export const cleanDimensionMText = (rawText: string): string => {
  * No arrows or dashed lines -- solid lines only (per AutoCAD convention).
  */
 export const createOrdinateDimension = (p: DimensionTypeParams): THREE.Object3D[] | null => {
-  const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS } = p;
+  const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS, fmt } = p;
   const feature = entity.linearOrAngularPoint1; // Code 13 -- point on object
   const leader = entity.linearOrAngularPoint2; // Code 14 -- end of diagonal
   const textPos = entity.middleOfText; // Code 11
@@ -749,11 +763,11 @@ export const createOrdinateDimension = (p: DimensionTypeParams): THREE.Object3D[
   const measurement = entity.actualMeasurement;
 
   if (dimensionText && typeof measurement === "number") {
-    dimensionText = dimensionText.replace(/<>/g, formatDimNumber(measurement));
+    dimensionText = dimensionText.replace(/<>/g, formatDimNumber(measurement, fmt?.dimdec, fmt?.dimzin));
   }
 
   if (!dimensionText && typeof measurement === "number") {
-    dimensionText = formatDimNumber(measurement);
+    dimensionText = formatDimNumber(measurement, fmt?.dimdec, fmt?.dimzin);
   }
 
   if (!dimensionText) return null;
@@ -868,7 +882,7 @@ export const createOrdinateDimension = (p: DimensionTypeParams): THREE.Object3D[
  * Line from text edge to the point on the arc, arrow pointing outward at the arc.
  */
 export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] | null => {
-  const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS } = p;
+  const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS, fmt } = p;
   const center = entity.anchorPoint; // code 10
   const arcPt = entity.diameterOrRadiusPoint; // code 15
   const textPos = entity.middleOfText; // code 11
@@ -881,12 +895,12 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
     Math.sqrt((center.x - arcPt.x) ** 2 + (center.y - arcPt.y) ** 2);
 
   if (dimensionText) {
-    const measStr = "R" + formatDimNumber(measurement);
+    const measStr = "R" + formatDimNumber(measurement, fmt?.dimdec, fmt?.dimzin);
     dimensionText = dimensionText.replace(/<>/g, measStr);
   }
 
   if (!dimensionText) {
-    dimensionText = "R" + formatDimNumber(measurement);
+    dimensionText = "R" + formatDimNumber(measurement, fmt?.dimdec, fmt?.dimzin);
   }
 
   const textHeight = entity.textHeight || dv.textHeight;
@@ -963,7 +977,7 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
  * Text can be along the line or offset with a leader.
  */
 export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D[] | null => {
-  const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS } = p;
+  const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS, fmt } = p;
   const p10 = entity.anchorPoint; // code 10 -- first point on circle
   const p15 = entity.diameterOrRadiusPoint; // code 15 -- opposite point
   const textPos = entity.middleOfText; // code 11
@@ -975,11 +989,11 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
     Math.sqrt((p10.x - p15.x) ** 2 + (p10.y - p15.y) ** 2);
 
   if (dimensionText) {
-    dimensionText = dimensionText.replace(/<>/g, formatDimNumber(measurement));
+    dimensionText = dimensionText.replace(/<>/g, formatDimNumber(measurement, fmt?.dimdec, fmt?.dimzin));
   }
 
   if (!dimensionText) {
-    dimensionText = formatDimNumber(measurement);
+    dimensionText = formatDimNumber(measurement, fmt?.dimdec, fmt?.dimzin);
   }
 
   const textHeight = entity.textHeight || dv.textHeight;
@@ -1139,7 +1153,7 @@ export const isAngleInSweep = (startAngle: number, endAngle: number, testAngle: 
  * Arc between two rays with extension lines, arrows, and angle text in degrees.
  */
 export const createAngularDimension = (p: DimensionTypeParams): THREE.Object3D[] | null => {
-  const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS } = p;
+  const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS, fmt } = p;
   const p13 = entity.linearOrAngularPoint1; // code 13 -- end 1 of first line
   const p14 = entity.linearOrAngularPoint2; // code 14 -- end 2 of first line
   const p15 = entity.diameterOrRadiusPoint; // code 15 -- end 1 of second line
@@ -1261,10 +1275,11 @@ export const createAngularDimension = (p: DimensionTypeParams): THREE.Object3D[]
   let dimensionText = entity.text;
   const measurement = entity.actualMeasurement;
 
-  // Angular measurement is stored in radians; convert to degrees for display
+  // Angular measurement is stored in radians; convert to degrees for display.
+  // Use DIMADEC for decimal places (defaults to 0 in AutoCAD if not specified).
   if (typeof measurement === "number") {
     const degrees = (measurement * DEGREES_TO_RADIANS_DIVISOR) / Math.PI;
-    const measStr = formatDimNumber(degrees) + "\u00B0";
+    const measStr = formatDimNumber(degrees, fmt?.dimadec, fmt?.dimzin) + "\u00B0";
     if (dimensionText) {
       dimensionText = dimensionText.replace(/<>/g, measStr);
     } else {

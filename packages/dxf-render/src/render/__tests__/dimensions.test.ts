@@ -59,6 +59,66 @@ describe("formatDimNumber", () => {
   it("rounds very small values beyond 4 decimal places to zero", () => {
     expect(formatDimNumber(0.00001)).toBe("0");
   });
+
+  // ─── DIMDEC / DIMZIN ───────────────────────────────────────────────
+
+  it("honors explicit DIMDEC for decimal places", () => {
+    // 60.49747752399162 with DIMDEC=2 rounds to "60.50" then strips trailing → "60.5"
+    expect(formatDimNumber(60.49747752399162, 2)).toBe("60.5");
+    expect(formatDimNumber(60.49747752399162, 0)).toBe("60");
+    expect(formatDimNumber(60.49747752399162, 6)).toBe("60.497478");
+  });
+
+  it("keeps trailing zeros when DIMZIN bit 8 is unset", () => {
+    // DIMZIN=0 → include trailing zeros in decimal mode
+    expect(formatDimNumber(60.5, 2, 0)).toBe("60.50");
+    expect(formatDimNumber(60.0, 2, 0)).toBe("60.00");
+  });
+
+  it("strips trailing zeros when DIMZIN bit 8 is set", () => {
+    expect(formatDimNumber(60.5, 2, 8)).toBe("60.5");
+    expect(formatDimNumber(60.0, 2, 8)).toBe("60");
+  });
+
+  it("strips leading zero when DIMZIN bit 4 is set", () => {
+    // 0.50 with DIMZIN bit 4 → ".50"; with bit 4 | bit 8 (=12) → ".5"
+    expect(formatDimNumber(0.5, 2, 4)).toBe(".50");
+    expect(formatDimNumber(0.5, 2, 12)).toBe(".5");
+    // Negative numbers keep their sign before the dot
+    expect(formatDimNumber(-0.5, 2, 12)).toBe("-.5");
+  });
+});
+
+// =====================================================================
+// extractDimensionData — DIMDEC/DIMZIN integration
+// =====================================================================
+
+describe("extractDimensionData — formatting", () => {
+  const baseEntity = {
+    type: "DIMENSION" as const,
+    dimensionType: 0,
+    actualMeasurement: 60.49747752399162,
+    anchorPoint: { x: 0, y: 0, z: 0 },
+    middleOfText: { x: 0, y: 5, z: 0 },
+    linearOrAngularPoint1: { x: -5, y: 10, z: 0 },
+    linearOrAngularPoint2: { x: -5, y: 0, z: 0 },
+    angle: 90,
+  };
+
+  it("honors DIMDEC=2 + DIMZIN=8 for decimal dimensions (60.4974... → 60.5)", () => {
+    const data = extractDimensionData(baseEntity as any, undefined, { dimlunit: 2, dimdec: 2, dimzin: 8 });
+    expect(data?.dimensionText).toBe("60.5");
+  });
+
+  it("keeps trailing zeros with DIMZIN=0 (60.4974... → 60.50)", () => {
+    const data = extractDimensionData(baseEntity as any, undefined, { dimlunit: 2, dimdec: 2, dimzin: 0 });
+    expect(data?.dimensionText).toBe("60.50");
+  });
+
+  it("falls back to 4 decimals when DIMDEC is not provided", () => {
+    const data = extractDimensionData(baseEntity as any, undefined, undefined);
+    expect(data?.dimensionText).toBe("60.4975");
+  });
 });
 
 // =====================================================================

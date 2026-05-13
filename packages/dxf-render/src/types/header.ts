@@ -51,6 +51,11 @@ export interface DxfHeader {
   /** Decimal places for primary dimension units. For architectural units, the
    * fraction denominator is `2 ** $DIMDEC` (3 → 1/8", 4 → 1/16", default 4). */
   $DIMDEC?: number;
+  /** Decimal places for angular dimensions. Defaults to 0 in AutoCAD. */
+  $DIMADEC?: number;
+  /** Zero-suppression flags for dimension text. For decimal mode:
+   * bit 2 (4) suppresses leading zeros, bit 3 (8) suppresses trailing zeros. */
+  $DIMZIN?: number;
 
   // ── Point display ──────────────────────────────────────────────────
   /** Point display mode (0 = dot, 1 = none, 2 = plus, 3 = cross, ...). */
