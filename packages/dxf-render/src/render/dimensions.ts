@@ -11,6 +11,7 @@ import {
   EXTENSION_LINE_DASH_SIZE,
   EXTENSION_LINE_GAP_SIZE,
   EXTENSION_LINE_EXTENSION,
+  OUTSIDE_ARROW_THRESHOLD_RATIO,
   DEGREES_TO_RADIANS_DIVISOR,
   EPSILON,
   CIRCLE_SEGMENTS,
@@ -289,26 +290,35 @@ export const createLinearDimensionLines = (p: LinearDimensionLinesParams): THREE
   const max = Math.max(getMainCoord(point1), getMainCoord(point2));
   const anchorFixed = getFixedCoord(anchorPoint);
 
-  // Split dimension line around text if text lies on the line
-  if (textPos && Math.abs(getFixedCoord(textPos) - anchorFixed) < 1) {
+  // When the dim line is too short to fit two inward-pointing arrows, flip them
+  // to point inward from outside and extend the dim line by arrowSize on each side
+  // so the arrow bases land on the extended segment instead of overlapping in the middle.
+  const useOutsideArrows = !dv.useTicks && (max - min) < OUTSIDE_ARROW_THRESHOLD_RATIO * dv.arrowSize;
+  const dimMin = useOutsideArrows ? min - dv.arrowSize : min;
+  const dimMax = useOutsideArrows ? max + dv.arrowSize : max;
+
+  // Split dimension line around text only when arrows fit inside —
+  // outside-arrow mode keeps a continuous extended line; the text usually sits
+  // off the line (per file) and the gap would land outside the measurement.
+  if (textPos && !useOutsideArrows && Math.abs(getFixedCoord(textPos) - anchorFixed) < 1) {
     const gapStart = getMainCoord(textPos) - dv.textGap / 2;
     const gapEnd = getMainCoord(textPos) + dv.textGap / 2;
 
-    if (min < gapStart) {
+    if (dimMin < gapStart) {
       objects.push(
         createExtensionLine(
-          createVec3(min, anchorFixed, 0),
+          createVec3(dimMin, anchorFixed, 0),
           createVec3(gapStart, anchorFixed, 0),
           dimLineMaterial,
         ),
       );
     }
 
-    if (max > gapEnd) {
+    if (dimMax > gapEnd) {
       objects.push(
         createExtensionLine(
           createVec3(gapEnd, anchorFixed, 0),
-          createVec3(max, anchorFixed, 0),
+          createVec3(dimMax, anchorFixed, 0),
           dimLineMaterial,
         ),
       );
@@ -316,8 +326,8 @@ export const createLinearDimensionLines = (p: LinearDimensionLinesParams): THREE
   } else {
     objects.push(
       createExtensionLine(
-        createVec3(min, anchorFixed, 0),
-        createVec3(max, anchorFixed, 0),
+        createVec3(dimMin, anchorFixed, 0),
+        createVec3(dimMax, anchorFixed, 0),
         dimLineMaterial,
       ),
     );
@@ -348,6 +358,10 @@ export const createLinearDimensionLines = (p: LinearDimensionLinesParams): THREE
     const dimAngle = isHorizontal ? 0 : Math.PI / 2;
     objects.push(createTick(createVec3(min, anchorFixed, 0.1), dv.tickSize, dimAngle, dimLineMaterial));
     objects.push(createTick(createVec3(max, anchorFixed, 0.1), dv.tickSize, dimAngle, dimLineMaterial));
+  } else if (useOutsideArrows) {
+    // Flipped: tips at min/max pointing inward, bases at dimMin/dimMax (outside)
+    objects.push(createArrow(createVec3(dimMin, anchorFixed, 0.1), createVec3(min, anchorFixed, 0.1), dv.arrowSize, arrowMaterial));
+    objects.push(createArrow(createVec3(dimMax, anchorFixed, 0.1), createVec3(max, anchorFixed, 0.1), dv.arrowSize, arrowMaterial));
   } else {
     objects.push(createArrow(createVec3(max, anchorFixed, 0.1), createVec3(min, anchorFixed, 0.1), dv.arrowSize, arrowMaterial));
     objects.push(createArrow(createVec3(min, anchorFixed, 0.1), createVec3(max, anchorFixed, 0.1), dv.arrowSize, arrowMaterial));
@@ -400,8 +414,26 @@ export const createRotatedDimensionLines = (p: RotatedDimensionLinesParams): THR
     0,
   );
 
-  // Split dimension line around text if text lies on it (perpendicular distance < 1)
-  if (textPos) {
+  // When the dim line is too short to fit two inward-pointing arrows, flip them
+  // to point inward from outside and extend the dim line by arrowSize on each side
+  // so the arrow bases land on the extended segment instead of overlapping in the middle.
+  const useOutsideArrows = !dv.useTicks && (tMax - tMin) < OUTSIDE_ARROW_THRESHOLD_RATIO * dv.arrowSize;
+  const tDimMin = useOutsideArrows ? tMin - dv.arrowSize : tMin;
+  const tDimMax = useOutsideArrows ? tMax + dv.arrowSize : tMax;
+  const dimMinPt = new THREE.Vector3(
+    anchorPoint.x + tDimMin * dirX,
+    anchorPoint.y + tDimMin * dirY,
+    0,
+  );
+  const dimMaxPt = new THREE.Vector3(
+    anchorPoint.x + tDimMax * dirX,
+    anchorPoint.y + tDimMax * dirY,
+    0,
+  );
+
+  // Split dimension line around text only when arrows fit inside —
+  // in outside-arrow mode the dim line stays continuous along the extended range.
+  if (textPos && !useOutsideArrows) {
     const tText = (textPos.x - anchorPoint.x) * dirX + (textPos.y - anchorPoint.y) * dirY;
     const perpDist = Math.abs(
       -(textPos.x - anchorPoint.x) * dirY + (textPos.y - anchorPoint.y) * dirX,
@@ -411,10 +443,10 @@ export const createRotatedDimensionLines = (p: RotatedDimensionLinesParams): THR
       const gapStart = tText - dv.textGap / 2;
       const gapEnd = tText + dv.textGap / 2;
 
-      if (tMin < gapStart) {
+      if (tDimMin < gapStart) {
         objects.push(
           createExtensionLine(
-            minPt,
+            dimMinPt,
             new THREE.Vector3(
               anchorPoint.x + gapStart * dirX,
               anchorPoint.y + gapStart * dirY,
@@ -424,7 +456,7 @@ export const createRotatedDimensionLines = (p: RotatedDimensionLinesParams): THR
           ),
         );
       }
-      if (tMax > gapEnd) {
+      if (tDimMax > gapEnd) {
         objects.push(
           createExtensionLine(
             new THREE.Vector3(
@@ -432,16 +464,16 @@ export const createRotatedDimensionLines = (p: RotatedDimensionLinesParams): THR
               anchorPoint.y + gapEnd * dirY,
               0,
             ),
-            maxPt,
+            dimMaxPt,
             dimLineMaterial,
           ),
         );
       }
     } else {
-      objects.push(createExtensionLine(minPt, maxPt, dimLineMaterial));
+      objects.push(createExtensionLine(dimMinPt, dimMaxPt, dimLineMaterial));
     }
   } else {
-    objects.push(createExtensionLine(minPt, maxPt, dimLineMaterial));
+    objects.push(createExtensionLine(dimMinPt, dimMaxPt, dimLineMaterial));
   }
 
   const p1 = new THREE.Vector3(point1.x, point1.y, 0);
@@ -457,6 +489,10 @@ export const createRotatedDimensionLines = (p: RotatedDimensionLinesParams): THR
   if (dv.useTicks) {
     objects.push(createTick(new THREE.Vector3(minPt.x, minPt.y, 0.1), dv.tickSize, angleRad, dimLineMaterial));
     objects.push(createTick(new THREE.Vector3(maxPt.x, maxPt.y, 0.1), dv.tickSize, angleRad, dimLineMaterial));
+  } else if (useOutsideArrows) {
+    // Flipped: tips at minPt/maxPt pointing inward, bases at dimMinPt/dimMaxPt (outside)
+    objects.push(createArrow(new THREE.Vector3(dimMinPt.x, dimMinPt.y, 0.1), new THREE.Vector3(minPt.x, minPt.y, 0.1), dv.arrowSize, arrowMaterial));
+    objects.push(createArrow(new THREE.Vector3(dimMaxPt.x, dimMaxPt.y, 0.1), new THREE.Vector3(maxPt.x, maxPt.y, 0.1), dv.arrowSize, arrowMaterial));
   } else {
     objects.push(createArrow(new THREE.Vector3(maxPt.x, maxPt.y, 0.1), new THREE.Vector3(minPt.x, minPt.y, 0.1), dv.arrowSize, arrowMaterial));
     objects.push(createArrow(new THREE.Vector3(minPt.x, minPt.y, 0.1), new THREE.Vector3(maxPt.x, maxPt.y, 0.1), dv.arrowSize, arrowMaterial));

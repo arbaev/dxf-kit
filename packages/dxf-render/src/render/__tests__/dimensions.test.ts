@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import * as THREE from "three";
 import {
   formatDimNumber,
   formatArchitectural,
@@ -10,6 +11,8 @@ import {
   resolveDimVarsFromHeader,
   applyDimStyleVars,
   mergeEntityDimVars,
+  createLinearDimensionLines,
+  createRotatedDimensionLines,
   DEFAULT_DIM_VARS,
 } from "../dimensions";
 import type { DxfDimensionEntity, DxfDimStyle } from "@/types/dxf";
@@ -118,6 +121,145 @@ describe("extractDimensionData — formatting", () => {
   it("falls back to 4 decimals when DIMDEC is not provided", () => {
     const data = extractDimensionData(baseEntity as any, undefined, undefined);
     expect(data?.dimensionText).toBe("60.4975");
+  });
+});
+
+// =====================================================================
+// createLinearDimensionLines / createRotatedDimensionLines — outside arrows
+// =====================================================================
+
+describe("dimension lines — outside-arrow auto-flip", () => {
+  // Read the tip of an arrow Mesh (first 3 floats of position buffer).
+  const arrowTip = (obj: THREE.Object3D): [number, number] => {
+    const mesh = obj as THREE.Mesh;
+    const pos = (mesh.geometry as THREE.BufferGeometry).getAttribute("position");
+    const arr = pos.array as Float32Array;
+    return [arr[0], arr[1]];
+  };
+
+  // Read the two endpoints of a Line.
+  const lineEnds = (obj: THREE.Object3D): { x: number[]; y: number[] } => {
+    const line = obj as THREE.Line;
+    const pos = (line.geometry as THREE.BufferGeometry).getAttribute("position");
+    const arr = pos.array as Float32Array;
+    return { x: [arr[0], arr[3]], y: [arr[1], arr[4]] };
+  };
+
+  const lineMat = new THREE.LineBasicMaterial();
+  const extMat = new THREE.LineDashedMaterial();
+  const arrowMat = new THREE.MeshBasicMaterial();
+  const dv = { ...DEFAULT_DIM_VARS, arrowSize: 2 };
+  const baseParams = {
+    dimLineMaterial: lineMat,
+    extensionLineMaterial: extMat,
+    arrowMaterial: arrowMat,
+    dv,
+  };
+
+  it("keeps arrows inward when dim length is well above the threshold", () => {
+    // 10 > 2.5 * 2 = 5 → no flip
+    const objs = createLinearDimensionLines({
+      ...baseParams,
+      point1: { x: 0, y: 0 },
+      point2: { x: 10, y: 0 },
+      anchorPoint: { x: 5, y: 0 },
+      isHorizontal: true,
+    });
+    const arrows = objs.filter((o) => o instanceof THREE.Mesh) as THREE.Mesh[];
+    expect(arrows).toHaveLength(2);
+    // Arrow tips at min/max (0 and 10), the original (inside) layout
+    const tipXs = arrows.map((a) => arrowTip(a)[0]).sort((a, b) => a - b);
+    expect(tipXs[0]).toBeCloseTo(0, 5);
+    expect(tipXs[1]).toBeCloseTo(10, 5);
+    // Dim line stays between min/max
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    const dimLine = lines[0];
+    const { x } = lineEnds(dimLine);
+    expect(Math.min(...x)).toBeCloseTo(0, 5);
+    expect(Math.max(...x)).toBeCloseTo(10, 5);
+  });
+
+  it("flips arrows outward when dim length is below 2.5 × arrowSize", () => {
+    // 4 < 2.5 * 2 = 5 → flip; dim line extended by arrowSize=2 on each side
+    const objs = createLinearDimensionLines({
+      ...baseParams,
+      point1: { x: 0, y: 0 },
+      point2: { x: 4, y: 0 },
+      anchorPoint: { x: 2, y: 0 },
+      isHorizontal: true,
+    });
+    const arrows = objs.filter((o) => o instanceof THREE.Mesh) as THREE.Mesh[];
+    expect(arrows).toHaveLength(2);
+    // Tips still at measurement endpoints (0 and 4); the difference is direction.
+    const tipXs = arrows.map((a) => arrowTip(a)[0]).sort((a, b) => a - b);
+    expect(tipXs[0]).toBeCloseTo(0, 5);
+    expect(tipXs[1]).toBeCloseTo(4, 5);
+    // Dim line extends from -2 to 6 (extended by arrowSize on each side)
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    const dimLine = lines[0];
+    const { x } = lineEnds(dimLine);
+    expect(Math.min(...x)).toBeCloseTo(-2, 5);
+    expect(Math.max(...x)).toBeCloseTo(6, 5);
+  });
+
+  it("flips arrows for a vertical rotated dimension below the threshold", () => {
+    // Vertical dim, length 4 < 5 → flip
+    const objs = createRotatedDimensionLines({
+      ...baseParams,
+      point1: { x: -5, y: 0 },
+      point2: { x: -5, y: 4 },
+      anchorPoint: { x: 0, y: 2 },
+      angleRad: Math.PI / 2,
+    });
+    const arrows = objs.filter((o) => o instanceof THREE.Mesh) as THREE.Mesh[];
+    expect(arrows).toHaveLength(2);
+    // Tips at y=0 and y=4 (the foot points along the vertical dim line at x=0)
+    const tipYs = arrows.map((a) => arrowTip(a)[1]).sort((a, b) => a - b);
+    expect(tipYs[0]).toBeCloseTo(0, 5);
+    expect(tipYs[1]).toBeCloseTo(4, 5);
+    // Dim line extends from y=-2 to y=6
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    // Find the dim line (the one along x=0; extension lines are perpendicular)
+    const dimLine = lines.find((l) => {
+      const { x } = lineEnds(l);
+      return Math.abs(x[0]) < 0.1 && Math.abs(x[1]) < 0.1;
+    });
+    expect(dimLine).toBeDefined();
+    const { y } = lineEnds(dimLine!);
+    expect(Math.min(...y)).toBeCloseTo(-2, 5);
+    expect(Math.max(...y)).toBeCloseTo(6, 5);
+  });
+
+  it("flips arrows at the boundary case (just below the threshold)", () => {
+    // 4.99 < 5 → flip
+    const objs = createLinearDimensionLines({
+      ...baseParams,
+      point1: { x: 0, y: 0 },
+      point2: { x: 4.99, y: 0 },
+      anchorPoint: { x: 2.5, y: 0 },
+      isHorizontal: true,
+    });
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    const { x } = lineEnds(lines[0]);
+    // Extended by 2 on each side
+    expect(Math.min(...x)).toBeCloseTo(-2, 5);
+    expect(Math.max(...x)).toBeCloseTo(6.99, 5);
+  });
+
+  it("does not flip when ticks are enabled (ticks do not collide)", () => {
+    const objs = createLinearDimensionLines({
+      ...baseParams,
+      point1: { x: 0, y: 0 },
+      point2: { x: 4, y: 0 },
+      anchorPoint: { x: 2, y: 0 },
+      isHorizontal: true,
+      dv: { ...dv, useTicks: true, tickSize: 2 },
+    });
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    // Dim line stays between min/max (no extension)
+    const { x } = lineEnds(lines[0]);
+    expect(Math.min(...x)).toBeCloseTo(0, 5);
+    expect(Math.max(...x)).toBeCloseTo(4, 5);
   });
 });
 

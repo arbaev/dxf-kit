@@ -19,6 +19,14 @@ export const DIM_TEXT_GAP = DIM_TEXT_HEIGHT * DIM_TEXT_GAP_MULTIPLIER;
 export const DIM_TEXT_DECIMAL_PLACES = 4;
 export const ARROW_SIZE = 3;
 export const ARROW_BASE_WIDTH_DIVISOR = 4;
+/**
+ * When the dimension line length is below this multiple of arrow size,
+ * arrows are flipped to point inward from outside the extension lines —
+ * otherwise their bases overlap in the middle and form a "diamond". The
+ * dimension line is also extended outward by one arrow length on each side
+ * so the arrow bases have visual support.
+ */
+export const OUTSIDE_ARROW_THRESHOLD_RATIO = 2.5;
 export const CIRCLE_SEGMENTS = 64;
 export const EXTENSION_LINE_DASH_SIZE = 2;
 export const EXTENSION_LINE_GAP_SIZE = 1;
