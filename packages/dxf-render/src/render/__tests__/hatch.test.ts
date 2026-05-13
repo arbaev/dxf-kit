@@ -12,6 +12,7 @@ import {
   filterPolygonsByStyle,
   hatchArcSweep,
   hatchArcRadians,
+  hatchEllipseRadians,
 } from "../hatch";
 import type { Point2D } from "../hatch";
 import type { HatchPatternLine, HatchBoundaryPath } from "@/types/dxf";
@@ -742,6 +743,86 @@ describe("hatchArcRadians", () => {
     const [start, end] = hatchArcRadians(360, 540, false);
     const sweep = hatchArcSweep(start, end, false);
     expect(sweep).toBeCloseTo(deg(-180), 1);
+  });
+});
+
+// ── hatchEllipseRadians ────────────────────────────────────────────────
+
+describe("hatchEllipseRadians", () => {
+  const deg = (d: number) => (d * Math.PI) / 180;
+
+  it("converts CCW elliptic-arc edge angles from degrees to radians", () => {
+    // DXF code 50/51 for HATCH edge type 3 (ellipse) stores DEGREES,
+    // unlike the ELLIPSE entity (codes 41/42) which stores radians.
+    const [start, end] = hatchEllipseRadians(343.18, 368.77, true);
+    expect(start).toBeCloseTo(deg(343.18), 5);
+    expect(end).toBeCloseTo(deg(368.77), 5);
+  });
+
+  it("negates angles for CW ellipses (mirror of hatchArcRadians)", () => {
+    const [start, end] = hatchEllipseRadians(60, 120, false);
+    expect(start).toBeCloseTo(deg(-60), 5);
+    expect(end).toBeCloseTo(deg(-120), 5);
+  });
+});
+
+// ── boundaryPathToPoint2DArray - ellipse edges (degrees) ───────────────
+
+describe("boundaryPathToPoint2DArray - ellipse edges (degrees)", () => {
+  it("produces the correct start point for a CCW circle-like ellipse edge", () => {
+    // axisRatio=1, major axis along +X (length 10) → effectively a circle r=10.
+    // Start angle 0°, end angle 90°, ccw=true.
+    // Expected: starts at (10, 0), ends at (0, 10).
+    const bp: HatchBoundaryPath = {
+      edges: [
+        {
+          type: "ellipse" as const,
+          center: { x: 0, y: 0 },
+          majorAxisEndPoint: { x: 10, y: 0 },
+          axisRatio: 1,
+          startAngle: 0,
+          endAngle: 90,
+          ccw: true,
+        },
+      ],
+    };
+    const pts = boundaryPathToPoint2DArray(bp);
+    expect(pts.length).toBeGreaterThan(2);
+
+    // Start at angle 0°: (10, 0)
+    expect(pts[0].x).toBeCloseTo(10, 1);
+    expect(pts[0].y).toBeCloseTo(0, 1);
+
+    // End at angle 90°: (0, 10)
+    const last = pts[pts.length - 1];
+    expect(last.x).toBeCloseTo(0, 1);
+    expect(last.y).toBeCloseTo(10, 1);
+  });
+
+  it("treats angles as degrees, not radians (regression for tree_part.dxf)", () => {
+    // Before the fix, an angle of 343.18 was treated as ~54 revolutions
+    // (343.18 rad mod 2π ≈ 3.71 rad ≈ 213°), so the start point landed
+    // at the wrong position on the ellipse and the boundary was broken.
+    // After the fix, 343.18° → 5.99 rad → (cos≈0.96, sin≈-0.29).
+    const bp: HatchBoundaryPath = {
+      edges: [
+        {
+          type: "ellipse" as const,
+          center: { x: 0, y: 0 },
+          majorAxisEndPoint: { x: 10, y: 0 },
+          axisRatio: 1,
+          startAngle: 343.18,
+          endAngle: 368.77,
+          ccw: true,
+        },
+      ],
+    };
+    const pts = boundaryPathToPoint2DArray(bp);
+    expect(pts.length).toBeGreaterThan(1);
+
+    // Start at angle 343.18°: cos ≈ 0.957, sin ≈ -0.288
+    expect(pts[0].x).toBeCloseTo(9.57, 1);
+    expect(pts[0].y).toBeCloseTo(-2.88, 1);
   });
 });
 
