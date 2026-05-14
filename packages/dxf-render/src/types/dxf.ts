@@ -453,6 +453,10 @@ export interface DxfStyle {
   bigFont?: string;
   fixedHeight?: number;
   widthFactor?: number;
+  /** True if the style references a bold TTF (parsed from ACAD XDATA 1071, bit 25). */
+  bold?: boolean;
+  /** True if the style references an italic TTF (parsed from ACAD XDATA 1071, bit 24). */
+  italic?: boolean;
 }
 
 export interface DxfLayer {

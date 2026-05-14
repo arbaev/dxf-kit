@@ -25,6 +25,10 @@ export interface IStyle {
   bigFont?: string;
   fixedHeight?: number;
   widthFactor?: number;
+  /** True if the style references a bold TTF (parsed from ACAD XDATA 1071, bit 25). */
+  bold?: boolean;
+  /** True if the style references an italic TTF (parsed from ACAD XDATA 1071, bit 24). */
+  italic?: boolean;
 }
 
 export interface IBlockRecord {
@@ -299,6 +303,21 @@ function parseStyles(scanner: DxfScanner): Record<string, IStyle> {
         style.widthFactor = curr.value as number;
         curr = scanner.next();
         break;
+      case 1071: {
+        // ACAD XDATA TrueType font flags. Packed 32-bit value with the same
+        // layout as MTEXT inline \f...|b<n>|i<n>|c<n>|p<n>;
+        //   bits 0-7  : pitchAndFamily
+        //   bits 8-15 : charset
+        //   bit 24    : italic
+        //   bit 25    : bold
+        // Empirical from the AutoCAD writer: "Arial.ttf" → 34 (0x22);
+        // "Arial Bold.ttf" → 33554466 (0x02000022).
+        const flags = curr.value as number;
+        if ((flags >>> 25) & 1) style.bold = true;
+        if ((flags >>> 24) & 1) style.italic = true;
+        curr = scanner.next();
+        break;
+      }
       case 0:
         if (curr.value === "STYLE") {
           if (styleName) styles[styleName] = style;

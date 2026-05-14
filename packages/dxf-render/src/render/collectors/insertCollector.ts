@@ -13,7 +13,7 @@ import {
   instantiateBlockTemplate,
   addSharedBlockInstance,
 } from "../blockTemplateCache";
-import { resolveEntityFont } from "../text/fontClassifier";
+import { resolveEntityFont, resolveStyleFlags } from "../text/fontClassifier";
 import { replaceSpecialChars } from "../text/mtextParser";
 import {
   addTextToCollector,
@@ -100,6 +100,7 @@ function renderAttribs(
 
     const rotation = attrib.rotation ? degreesToRadians(attrib.rotation) : 0;
     const attribFont = resolveEntityFont(attrib.textStyle, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
+    const attribStyleFlags = resolveStyleFlags(attrib.textStyle, colorCtx.styles);
     addTextToCollector({
       collector, layer: insertLayer, color: attribColor, font: attribFont,
       text: replaceSpecialChars(text), height: textHeight,
@@ -108,6 +109,8 @@ function renderAttribs(
       vAlign: attrib.verticalJustification ?? VAlign.BASELINE,
       widthFactor: attrib.scale,
       obliqueAngle: attrib.obliqueAngle,
+      bold: attribStyleFlags.bold,
+      italic: attribStyleFlags.italic,
     });
   }
 }

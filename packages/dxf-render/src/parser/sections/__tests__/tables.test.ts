@@ -416,6 +416,58 @@ describe("parseTables", () => {
       expect(styles.Heading.fixedHeight).toBe(5.0);
       expect(styles.Heading.widthFactor).toBe(0.8);
     });
+
+    it("extracts bold/italic flags from ACAD XDATA 1071 (bits 25/24)", () => {
+      // Mirrors the encoding produced by AutoCAD:
+      //   "Arial Bold.ttf"        → 1071 = 33554466 = 0x02000022 (bold)
+      //   "Arial Italic.ttf"      → 1071 = 16777250 = 0x01000022 (italic)
+      //   "Arial Bold Italic.ttf" → 1071 = 50331682 = 0x03000022 (bold+italic)
+      //   "Arial.ttf"             → 1071 = 34       = 0x00000022 (neither)
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "STYLE",
+        "70", "4",
+        "0", "STYLE",
+        "2", "arial",
+        "3", "Arial.ttf",
+        "1001", "ACAD",
+        "1000", "Arial",
+        "1071", "34",
+        "0", "STYLE",
+        "2", "arial b",
+        "3", "Arial Bold.ttf",
+        "1001", "ACAD",
+        "1000", "Arial",
+        "1071", "33554466",
+        "0", "STYLE",
+        "2", "arial i",
+        "3", "Arial Italic.ttf",
+        "1001", "ACAD",
+        "1000", "Arial",
+        "1071", "16777250",
+        "0", "STYLE",
+        "2", "arial bi",
+        "3", "Arial Bold Italic.ttf",
+        "1001", "ACAD",
+        "1000", "Arial",
+        "1071", "50331682",
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+      const styles = tables.style.styles as Record<string, IStyle>;
+
+      expect(styles["arial"].bold).toBeUndefined();
+      expect(styles["arial"].italic).toBeUndefined();
+      expect(styles["arial b"].bold).toBe(true);
+      expect(styles["arial b"].italic).toBeUndefined();
+      expect(styles["arial i"].bold).toBeUndefined();
+      expect(styles["arial i"].italic).toBe(true);
+      expect(styles["arial bi"].bold).toBe(true);
+      expect(styles["arial bi"].italic).toBe(true);
+    });
   });
 
   // ── STYLE alongside other tables ──────────────────────────────────

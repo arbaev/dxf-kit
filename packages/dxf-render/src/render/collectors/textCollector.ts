@@ -4,7 +4,7 @@ import { resolveEntityColor } from "@/utils/colorResolver";
 import { buildOcsMatrix, transformOcsPoint } from "@/utils/ocsTransform";
 import { type RenderContext, degreesToRadians } from "../primitives";
 import type { GeometryCollector } from "../mergeCollectors";
-import { resolveEntityFont } from "../text/fontClassifier";
+import { resolveEntityFont, resolveStyleFlags } from "../text/fontClassifier";
 import { replaceSpecialChars, parseTextWithUnderline, parseMTextContent } from "../text/mtextParser";
 import {
   addTextToCollector,
@@ -25,6 +25,7 @@ export function collectTextOrMText(
   worldMatrix?: THREE.Matrix4,
 ): void {
   const font = resolveEntityFont(entity.textStyle, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
+  const styleFlags = resolveStyleFlags(entity.textStyle, colorCtx.styles);
   const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
   const textContent = entity.text;
   if (!textContent) return;
@@ -100,6 +101,8 @@ export function collectTextOrMText(
       widthFactor: (entity.xScale ?? 1) * mirrorWidthFactor,
       endPosX: endX, endPosY: endY,
       underline: parsed.underline,
+      bold: styleFlags.bold,
+      italic: styleFlags.italic,
     });
 
   } else {
@@ -141,6 +144,8 @@ export function collectTextOrMText(
       width: entity.width && entity.width >= height * 0.05 ? entity.width : undefined,
       serifFont: colorCtx.serifFont,
       lineSpacingFactor: entity.lineSpacingFactor,
+      bold: styleFlags.bold,
+      italic: styleFlags.italic,
     });
 
   }
@@ -171,6 +176,7 @@ export function collectAttdefEntity(
   );
   const rotation = entity.rotation ? degreesToRadians(entity.rotation) : 0;
   const font = resolveEntityFont(entity.textStyle, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
+  const styleFlags = resolveStyleFlags(entity.textStyle, colorCtx.styles);
 
   addTextToCollector({
     collector, layer, color: entityColor, font,
@@ -180,5 +186,7 @@ export function collectAttdefEntity(
     vAlign: entity.verticalJustification ?? VAlign.BASELINE,
     widthFactor: entity.scale,
     obliqueAngle: entity.obliqueAngle,
+    bold: styleFlags.bold,
+    italic: styleFlags.italic,
   });
 }

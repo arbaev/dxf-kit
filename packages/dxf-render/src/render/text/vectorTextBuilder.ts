@@ -155,6 +155,10 @@ export interface MTextParams {
   width?: number;
   serifFont?: Font;
   lineSpacingFactor?: number;
+  /** Entity-level bold default — used when an MTextRun does not specify its own bold flag. */
+  bold?: boolean;
+  /** Entity-level italic default — used when an MTextRun does not specify its own italic flag. */
+  italic?: boolean;
 }
 
 export interface DimensionTextParams {
@@ -757,6 +761,8 @@ function emitMTextLine(
   sin: number,
   hAlign: "left" | "center" | "right",
   vAlign: number,
+  entityBold?: boolean,
+  entityItalic?: boolean,
 ): void {
   if (runs.length === 0) return;
 
@@ -785,8 +791,10 @@ function emitMTextLine(
       rotation,
       hAlign: HAlign.LEFT,
       vAlign,
-      bold: run.bold,
-      italic: run.italic,
+      // Entity-level bold/italic is the default; an inline \f...|b0|i0; override
+      // can still turn it off (or on) on a per-run basis.
+      bold: run.bold ?? entityBold,
+      italic: run.italic ?? entityItalic,
       underline: run.underline,
       overline: run.overline,
       strikethrough: run.strikethrough,
@@ -827,6 +835,7 @@ export function addMTextToCollector(p: MTextParams): void {
     rotation = 0,
     attachmentPoint = 1,
     width, serifFont, lineSpacingFactor,
+    bold: entityBold, italic: entityItalic,
   } = p;
   if (lines.length === 0 || defaultHeight <= 0) return;
   const lineSpacing = (lineSpacingFactor || 1) * DXF_LINE_SPACING_BASE;
@@ -924,7 +933,7 @@ export function addMTextToCollector(p: MTextParams): void {
         collector, layer, color: stackedColor, font: stackedFont,
         mainText, stackedTop: line.stackedTop || "", stackedBottom: line.stackedBottom || "",
         height: lineHeight, posX: worldX, posY: worldY, posZ, rotation, hAlign,
-        bold: firstRun?.bold, italic: firstRun?.italic,
+        bold: firstRun?.bold ?? entityBold, italic: firstRun?.italic ?? entityItalic,
       });
     } else if (line.runs.some((r) => r.text.includes("\t"))) {
       // Render tab-separated segments at exact tab stop positions.
@@ -940,6 +949,7 @@ export function addMTextToCollector(p: MTextParams): void {
             seg, color, font, serifFont, defaultHeight,
             collector, layer, segWX, segWY, posZ, rotation, cos, sin,
             "left", rowVAlign,
+            entityBold, entityItalic,
           );
           segLocalX += measureRunsWidth(seg, font, serifFont, defaultHeight);
         }
@@ -953,6 +963,7 @@ export function addMTextToCollector(p: MTextParams): void {
         line.runs, color, font, serifFont, defaultHeight,
         collector, layer, worldX, worldY, posZ, rotation, cos, sin,
         hAlign, rowVAlign,
+        entityBold, entityItalic,
       );
     }
 
