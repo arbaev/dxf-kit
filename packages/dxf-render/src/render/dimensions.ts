@@ -12,6 +12,7 @@ import {
   EXTENSION_LINE_GAP_SIZE,
   EXTENSION_LINE_EXTENSION,
   OUTSIDE_ARROW_THRESHOLD_RATIO,
+  OUTSIDE_ARROW_TAIL_RATIO,
   DEGREES_TO_RADIANS_DIVISOR,
   EPSILON,
   CIRCLE_SEGMENTS,
@@ -291,11 +292,13 @@ export const createLinearDimensionLines = (p: LinearDimensionLinesParams): THREE
   const anchorFixed = getFixedCoord(anchorPoint);
 
   // When the dim line is too short to fit two inward-pointing arrows, flip them
-  // to point inward from outside and extend the dim line by arrowSize on each side
-  // so the arrow bases land on the extended segment instead of overlapping in the middle.
+  // to point inward from outside. Arrow bases sit at min - arrowSize / max + arrowSize;
+  // the dim line extends one extra `tail` past each base so the arrows read as
+  // arrows (shaft + head) rather than two opposing triangles.
   const useOutsideArrows = !dv.useTicks && (max - min) < OUTSIDE_ARROW_THRESHOLD_RATIO * dv.arrowSize;
-  const dimMin = useOutsideArrows ? min - dv.arrowSize : min;
-  const dimMax = useOutsideArrows ? max + dv.arrowSize : max;
+  const outsideOffset = dv.arrowSize * (1 + OUTSIDE_ARROW_TAIL_RATIO);
+  const dimMin = useOutsideArrows ? min - outsideOffset : min;
+  const dimMax = useOutsideArrows ? max + outsideOffset : max;
 
   // Split dimension line around text only when arrows fit inside —
   // outside-arrow mode keeps a continuous extended line; the text usually sits
@@ -415,11 +418,13 @@ export const createRotatedDimensionLines = (p: RotatedDimensionLinesParams): THR
   );
 
   // When the dim line is too short to fit two inward-pointing arrows, flip them
-  // to point inward from outside and extend the dim line by arrowSize on each side
-  // so the arrow bases land on the extended segment instead of overlapping in the middle.
+  // to point inward from outside. Arrow bases sit at tMin - arrowSize / tMax + arrowSize;
+  // the dim line extends one extra `tail` past each base so the arrows read as
+  // arrows (shaft + head) rather than two opposing triangles.
   const useOutsideArrows = !dv.useTicks && (tMax - tMin) < OUTSIDE_ARROW_THRESHOLD_RATIO * dv.arrowSize;
-  const tDimMin = useOutsideArrows ? tMin - dv.arrowSize : tMin;
-  const tDimMax = useOutsideArrows ? tMax + dv.arrowSize : tMax;
+  const outsideOffset = dv.arrowSize * (1 + OUTSIDE_ARROW_TAIL_RATIO);
+  const tDimMin = useOutsideArrows ? tMin - outsideOffset : tMin;
+  const tDimMax = useOutsideArrows ? tMax + outsideOffset : tMax;
   const dimMinPt = new THREE.Vector3(
     anchorPoint.x + tDimMin * dirX,
     anchorPoint.y + tDimMin * dirY,

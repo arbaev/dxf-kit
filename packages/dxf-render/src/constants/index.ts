@@ -23,10 +23,18 @@ export const ARROW_BASE_WIDTH_DIVISOR = 4;
  * When the dimension line length is below this multiple of arrow size,
  * arrows are flipped to point inward from outside the extension lines —
  * otherwise their bases overlap in the middle and form a "diamond". The
- * dimension line is also extended outward by one arrow length on each side
- * so the arrow bases have visual support.
+ * dimension line is also extended outward past each arrow base by a tail
+ * (see OUTSIDE_ARROW_TAIL_RATIO) so each side reads as an arrow with a
+ * shaft instead of a bare triangle.
  */
 export const OUTSIDE_ARROW_THRESHOLD_RATIO = 2.5;
+/**
+ * Length of the tail (shaft) extending past the arrow base outward in
+ * outside-arrow mode, as a fraction of `arrowSize`. Without it, the dim
+ * line ends right at the arrow base and the result reads as two opposing
+ * triangles rather than two arrows.
+ */
+export const OUTSIDE_ARROW_TAIL_RATIO = 1.0;
 export const CIRCLE_SEGMENTS = 64;
 export const EXTENSION_LINE_DASH_SIZE = 2;
 export const EXTENSION_LINE_GAP_SIZE = 1;

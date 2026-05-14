@@ -180,7 +180,7 @@ describe("dimension lines — outside-arrow auto-flip", () => {
   });
 
   it("flips arrows outward when dim length is below 2.5 × arrowSize", () => {
-    // 4 < 2.5 * 2 = 5 → flip; dim line extended by arrowSize=2 on each side
+    // 4 < 2.5 * 2 = 5 → flip; dim line extended by arrowSize + tail (= 2 + 2 = 4) per side
     const objs = createLinearDimensionLines({
       ...baseParams,
       point1: { x: 0, y: 0 },
@@ -194,12 +194,12 @@ describe("dimension lines — outside-arrow auto-flip", () => {
     const tipXs = arrows.map((a) => arrowTip(a)[0]).sort((a, b) => a - b);
     expect(tipXs[0]).toBeCloseTo(0, 5);
     expect(tipXs[1]).toBeCloseTo(4, 5);
-    // Dim line extends from -2 to 6 (extended by arrowSize on each side)
+    // Dim line extends from -4 to 8 (arrowSize + tail on each side)
     const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
     const dimLine = lines[0];
     const { x } = lineEnds(dimLine);
-    expect(Math.min(...x)).toBeCloseTo(-2, 5);
-    expect(Math.max(...x)).toBeCloseTo(6, 5);
+    expect(Math.min(...x)).toBeCloseTo(-4, 5);
+    expect(Math.max(...x)).toBeCloseTo(8, 5);
   });
 
   it("flips arrows for a vertical rotated dimension below the threshold", () => {
@@ -217,7 +217,7 @@ describe("dimension lines — outside-arrow auto-flip", () => {
     const tipYs = arrows.map((a) => arrowTip(a)[1]).sort((a, b) => a - b);
     expect(tipYs[0]).toBeCloseTo(0, 5);
     expect(tipYs[1]).toBeCloseTo(4, 5);
-    // Dim line extends from y=-2 to y=6
+    // Dim line extends from y=-4 to y=8 (arrowSize=2 + tail=2 per side)
     const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
     // Find the dim line (the one along x=0; extension lines are perpendicular)
     const dimLine = lines.find((l) => {
@@ -226,8 +226,8 @@ describe("dimension lines — outside-arrow auto-flip", () => {
     });
     expect(dimLine).toBeDefined();
     const { y } = lineEnds(dimLine!);
-    expect(Math.min(...y)).toBeCloseTo(-2, 5);
-    expect(Math.max(...y)).toBeCloseTo(6, 5);
+    expect(Math.min(...y)).toBeCloseTo(-4, 5);
+    expect(Math.max(...y)).toBeCloseTo(8, 5);
   });
 
   it("flips arrows at the boundary case (just below the threshold)", () => {
@@ -241,9 +241,38 @@ describe("dimension lines — outside-arrow auto-flip", () => {
     });
     const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
     const { x } = lineEnds(lines[0]);
-    // Extended by 2 on each side
-    expect(Math.min(...x)).toBeCloseTo(-2, 5);
-    expect(Math.max(...x)).toBeCloseTo(6.99, 5);
+    // Extended by arrowSize + tail = 4 on each side
+    expect(Math.min(...x)).toBeCloseTo(-4, 5);
+    expect(Math.max(...x)).toBeCloseTo(8.99, 5);
+  });
+
+  it("dim line extends past the arrow base by tail = arrowSize", () => {
+    // arrowSize=2 → arrow base sits at min-2 / max+2; dim line ends at min-4 / max+4.
+    // The tail is the segment between base and dim-line end (length = arrowSize).
+    const objs = createLinearDimensionLines({
+      ...baseParams,
+      point1: { x: 0, y: 0 },
+      point2: { x: 4, y: 0 },
+      anchorPoint: { x: 2, y: 0 },
+      isHorizontal: true,
+    });
+    const arrows = objs.filter((o) => o instanceof THREE.Mesh) as THREE.Mesh[];
+    // Read each arrow's two base vertices (positions 1 and 2 in the buffer)
+    const baseXs: number[] = [];
+    for (const m of arrows) {
+      const arr = (m.geometry as THREE.BufferGeometry).getAttribute("position").array as Float32Array;
+      // arrow has 3 vertices: tip (0..2), base1 (3..5), base2 (6..8). Both base xs are equal.
+      baseXs.push(arr[3]);
+    }
+    baseXs.sort((a, b) => a - b);
+    expect(baseXs[0]).toBeCloseTo(-2, 5); // min - arrowSize
+    expect(baseXs[1]).toBeCloseTo(6, 5); // max + arrowSize
+
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    const { x } = lineEnds(lines[0]);
+    // Tail of length arrowSize=2 past each base: min-4 .. max+4
+    expect(Math.min(...x) - baseXs[0]).toBeCloseTo(-2, 5);
+    expect(Math.max(...x) - baseXs[1]).toBeCloseTo(2, 5);
   });
 
   it("does not flip when ticks are enabled (ticks do not collide)", () => {
