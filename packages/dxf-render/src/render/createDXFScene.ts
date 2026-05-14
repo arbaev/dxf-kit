@@ -174,6 +174,11 @@ export async function createThreeObjectsFromDXF(
   const headerDimdec = dxf.header?.$DIMDEC;
   const headerDimadec = dxf.header?.$DIMADEC;
   const headerDimzin = dxf.header?.$DIMZIN;
+  const headerDimtad = dxf.header?.$DIMTAD;
+  const headerDimtih = dxf.header?.$DIMTIH;
+  const headerDimtoh = dxf.header?.$DIMTOH;
+  const headerDimgap = dxf.header?.$DIMGAP;
+  const headerDimtmove = dxf.header?.$DIMTMOVE;
 
   // Build handle -> name map from BLOCK_RECORD for DIMBLK resolution
   let blockHandleToName: Map<string, string> | undefined;
@@ -207,6 +212,11 @@ export async function createThreeObjectsFromDXF(
     headerDimdec,
     headerDimadec,
     headerDimzin,
+    headerDimtad,
+    headerDimtih,
+    headerDimtoh,
+    headerDimgap,
+    headerDimtmove,
     blockHandleToName,
   };
 

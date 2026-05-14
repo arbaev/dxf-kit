@@ -192,6 +192,19 @@ export interface DimensionTypeParams {
   dv?: DimVars;
   /** Dimension formatting options (DIMDEC, DIMZIN, DIMADEC, DIMLUNIT). */
   fmt?: DimFormatOptions;
+  /** DIMTOH (DIMSTYLE code 73): text outside arc/dim — 0=aligned, 1=horizontal. Undefined treated as 0. */
+  dimtoh?: number;
+  /** DIMTIH (DIMSTYLE code 74): text inside arc/dim — 0=aligned, 1=horizontal. Undefined treated as 0. */
+  dimtih?: number;
+  /** DIMTAD (DIMSTYLE code 77): text vertical position (0=centered, 1=above, 2=outside, 3=JIS, 4=below).
+   *  When undefined the ISO default (1, above line) is assumed. */
+  dimtad?: number;
+  /** DIMGAP (DIMSTYLE code 147): gap from the dim line to the text bounding box,
+   *  and the radius used to break the dim line around centered text. Already scaled by DIMSCALE. */
+  dimgap?: number;
+  /** DIMTMOVE (DIMSTYLE code 279): how to draw text the user repositioned —
+   *  0=move dim line, 1=add leader, 2=move text only. Default 0. */
+  dimtmove?: number;
 }
 
 /** Params for createLinearDimensionLines */
@@ -950,7 +963,50 @@ export const createOrdinateDimension = (p: DimensionTypeParams): THREE.Object3D[
 
 /**
  * Create a radial dimension (type 4).
- * Line from text edge to the point on the arc, arrow pointing outward at the arc.
+ *
+ * Layout state-machine driven by DIMSTYLE variables:
+ *   DIMTIH/DIMTOH (codes 74/73): aligned vs horizontal text
+ *   DIMTAD        (code 77):     vertical position of text relative to dim line
+ *   DIMGAP        (code 147):    gap between dim line and text (and break-radius
+ *                                around centered text)
+ *   DIMTMOVE      (code 279):    behaviour when user repositions the text
+ *
+ * Entity-level signals:
+ *   bit 5 of dimensionType (=32): default text position (auto-placed by CAD)
+ *
+ * Geometry:
+ *   1. Project textPos onto the radius direction → (along, perp) coords.
+ *   2. textInside  = (along ≤ radius)
+ *      aligned    = textInside ? DIMTIH≠1 : DIMTOH≠1
+ *      breakLine  = aligned ∧ DIMTAD=0           (text crosses the dim line)
+ *      perpOffset = |perp|                       (how far text sits off the line)
+ *   3. Pick aligned text rotation (radius angle, flipped to [-π/2, π/2]).
+ *   4. Build dim line(s):
+ *      • aligned, !breakLine
+ *          – text outside arc:  no line from centre; short leader from arrow base
+ *            outward to (near-arc edge of text along radius), only when room
+ *          – text inside arc:   single line from centre to (radius − arrowSize),
+ *            i.e. up to the arrow base on the centre side
+ *      • aligned, breakLine
+ *          two segments around the text projection on the radius line
+ *          (gap = halfTextWidth + DIMGAP each side)
+ *      • !aligned (horizontal text)
+ *          existing leader + horizontal-text + underline path
+ *   5. Arrow at arcPt:
+ *      • text outside / aligned:  body OUTSIDE arc, tip points inward
+ *      • text inside / aligned:   body INSIDE arc, tip points outward
+ *      • horizontal:              body follows the leader (from tailEndPoint)
+ *   6. Place text at textPos with the chosen rotation.
+ *   7. If the user moved the text (defaultPosition bit clear) AND DIMTMOVE=1,
+ *      add an extra leader from the projection of textPos on the radius line
+ *      down to textPos itself — the "moved with leader" style.
+ *
+ * Caveats / not yet implemented:
+ *   • Text positions OFF the radius line are handled (we honour textPos as-is)
+ *     but only DIMTMOVE=1 adds a connector — DIMTMOVE=2 ("move text only")
+ *     still draws the radius without a connector, which differs from AutoCAD.
+ *   • DIMUPT, DIMATFIT — parsed but not used here yet.
+ *   • ACAD_DSTYLE_DIMRADIAL_EXTENSION XDATA on the entity is ignored.
  */
 export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] | null => {
   const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS, fmt } = p;
@@ -962,7 +1018,6 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
   if (!center || !arcPt) return null;
 
   let dimensionText = entity.text;
-  // Fallback: compute radius from coordinates if actualMeasurement is absent
   const measurement = entity.actualMeasurement ??
     Math.sqrt((center.x - arcPt.x) ** 2 + (center.y - arcPt.y) ** 2);
 
@@ -970,7 +1025,6 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
     const measStr = "R" + formatDimNumber(measurement, fmt?.dimdec, fmt?.dimzin);
     dimensionText = dimensionText.replace(/<>/g, measStr);
   }
-
   if (!dimensionText) {
     dimensionText = "R" + formatDimNumber(measurement, fmt?.dimdec, fmt?.dimzin);
   }
@@ -980,67 +1034,203 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
   const lineMat = new THREE.LineBasicMaterial({ color });
   const arrowMat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
 
-  const arcVec = new THREE.Vector3(arcPt.x, arcPt.y, 0);
+  // Radius direction (centre → arcPt) and its perpendicular (CCW 90°).
+  const radius = measurement;
+  const rdx = arcPt.x - center.x;
+  const rdy = arcPt.y - center.y;
+  const rlen = Math.sqrt(rdx * rdx + rdy * rdy);
+  if (rlen < EPSILON) return null;
+  const outDirX = rdx / rlen;
+  const outDirY = rdy / rlen;
+  const perpDirX = -outDirY;
+  const perpDirY = outDirX;
 
-  // Direction from arcPt toward center (inward)
-  const dx = center.x - arcPt.x;
-  const dy = center.y - arcPt.y;
-  const len = Math.sqrt(dx * dx + dy * dy);
-  const dirX = len > EPSILON ? dx / len : 1;
-  const dirY = len > EPSILON ? dy / len : 0;
+  // Resolved DIMSTYLE variables with ISO defaults.
+  const dimtih = p.dimtih ?? 0;
+  const dimtoh = p.dimtoh ?? 0;
+  const dimtad = p.dimtad ?? 1; // 1 = text above line (ISO default)
+  // Default DIMGAP follows the historical 0.4 × textHeight that the previous
+  // implementation used; replaced when DIMSTYLE actually sets it.
+  const dimgap = p.dimgap ?? textHeight * 0.4;
+  const dimtmove = p.dimtmove ?? 0;
+  // Bit 5 (=32) of code 70 = "default position", per DXF spec.
+  const defaultPosition = ((entity.dimensionType ?? 0) & 32) !== 0;
 
-  // tailEndPoint determines arrow direction (from tail toward arc point)
-  let tailEndPoint: THREE.Vector3 | null = null;
+  if (!textPos) {
+    // No text: full radius line + outward-pointing arrow. Acts as a sane fallback.
+    const lineGeom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(center.x, center.y, 0),
+      new THREE.Vector3(arcPt.x, arcPt.y, 0),
+    ]);
+    objects.push(new THREE.Line(lineGeom, lineMat));
+    objects.push(createArrow(
+      new THREE.Vector3(center.x, center.y, 0.1),
+      new THREE.Vector3(arcPt.x, arcPt.y, 0.1),
+      dv.arrowSize, arrowMat,
+    ));
+    tagDimParts(objects);
+    return objects;
+  }
 
-  if (textPos) {
-    // textPos is the middle of text per DXF spec ("middle point of dimension text")
-    // Underline Y for leader geometry: bottom of text area
+  // Decompose textPos relative to centre into (along radius, perpendicular).
+  const trx = textPos.x - center.x;
+  const tryy = textPos.y - center.y;
+  const textAlong = trx * outDirX + tryy * outDirY;
+  const textPerp = trx * perpDirX + tryy * perpDirY;
+  const textInside = textAlong <= radius;
+  const aligned = textInside ? dimtih !== 1 : dimtoh !== 1;
+
+  if (!aligned) {
+    // ── Horizontal mode (DIMTIH=1 or DIMTOH=1, ANSI-style) ─────────────────
+    // Leader + horizontal text + underline (existing behaviour preserved).
+    const arcVec = new THREE.Vector3(arcPt.x, arcPt.y, 0);
     const underlineY = textPos.y - textHeight / 2;
-
-    // Compute where the leader line intersects the text underline horizontal
+    const leaderDx = center.x - arcPt.x;
+    const leaderDy = center.y - arcPt.y;
+    const leaderLen = Math.sqrt(leaderDx * leaderDx + leaderDy * leaderDy);
+    const leaderDirX = leaderLen > EPSILON ? leaderDx / leaderLen : 1;
+    const leaderDirY = leaderLen > EPSILON ? leaderDy / leaderLen : 0;
     let intersectX = textPos.x;
-    if (Math.abs(dirY) > EPSILON) {
-      const t = (underlineY - arcPt.y) / dirY;
-      intersectX = arcPt.x + t * dirX;
+    if (Math.abs(leaderDirY) > EPSILON) {
+      const t = (underlineY - arcPt.y) / leaderDirY;
+      intersectX = arcPt.x + t * leaderDirX;
     }
-
     const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
     addDimensionTextToCollector({
       collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
       posX: textPos.x, posY: textPos.y, posZ: 0.2, transform,
     });
-
+    const tailEndPoint = new THREE.Vector3(intersectX, underlineY, 0);
+    objects.push(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([arcVec, tailEndPoint]),
+      lineMat,
+    ));
     const textLeft = textPos.x - textWidth / 2;
     const textRight = textPos.x + textWidth / 2;
-
-    // Leader line from arc point to text underline
-    tailEndPoint = new THREE.Vector3(intersectX, underlineY, 0);
-    const tailGeom = new THREE.BufferGeometry().setFromPoints([arcVec, tailEndPoint]);
-    objects.push(new THREE.Line(tailGeom, lineMat));
-
-    // Underline extends from leader intersection to far text edge
     const underlineLeft = intersectX <= textPos.x ? intersectX : textLeft;
     const underlineRight = intersectX <= textPos.x ? textRight : intersectX;
-    const underlineGeom = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(underlineLeft, underlineY, 0),
-      new THREE.Vector3(underlineRight, underlineY, 0),
-    ]);
-    objects.push(new THREE.Line(underlineGeom, lineMat));
+    objects.push(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(underlineLeft, underlineY, 0),
+        new THREE.Vector3(underlineRight, underlineY, 0),
+      ]),
+      lineMat,
+    ));
+    objects.push(createArrow(
+      new THREE.Vector3(tailEndPoint.x, tailEndPoint.y, 0.1),
+      new THREE.Vector3(arcPt.x, arcPt.y, 0.1),
+      dv.arrowSize, arrowMat,
+    ));
+    tagDimParts(objects);
+    return objects;
   }
 
-  // Arrow at arc point, directed from the line origin (tail or center) toward the arc
-  const arrowFrom = tailEndPoint
-    ? new THREE.Vector3(tailEndPoint.x, tailEndPoint.y, 0.1)
-    : new THREE.Vector3(center.x, center.y, 0.1);
-  const arrow = createArrow(
-    arrowFrom,
-    new THREE.Vector3(arcPt.x, arcPt.y, 0.1),
-    dv.arrowSize,
-    arrowMat,
-  );
-  objects.push(arrow);
+  // ── Aligned mode ───────────────────────────────────────────────────────
+  // Text rotation: radius angle flipped into [-π/2, π/2] for readability.
+  let textAngle = Math.atan2(outDirY, outDirX);
+  if (textAngle > Math.PI / 2) textAngle -= Math.PI;
+  if (textAngle < -Math.PI / 2) textAngle += Math.PI;
 
-  if (objects.length === 0) return null;
+  const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
+  const halfWidth = textWidth / 2;
+  // The line breaks around the text only when DIMTAD=0 (text centred on line)
+  // — DIMTAD≥1 keeps the line continuous because the text is offset
+  // perpendicular by `dimgap + textHeight/2`.
+  const breakLine = dimtad === 0;
+
+  if (textInside) {
+    // Text projects inside the arc. The dim line runs from centre up to the
+    // arrow base; the arrow sits at arcPt pointing OUTWARD (body inside arc).
+    const arrowBaseDist = Math.max(0, radius - dv.arrowSize);
+    if (breakLine && textAlong > EPSILON) {
+      const nearDist = Math.max(0, textAlong - halfWidth - dimgap);
+      const farDist = textAlong + halfWidth + dimgap;
+      if (nearDist > EPSILON) {
+        objects.push(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(center.x, center.y, 0),
+            new THREE.Vector3(center.x + outDirX * nearDist, center.y + outDirY * nearDist, 0),
+          ]),
+          lineMat,
+        ));
+      }
+      if (farDist < arrowBaseDist) {
+        objects.push(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(center.x + outDirX * farDist, center.y + outDirY * farDist, 0),
+            new THREE.Vector3(center.x + outDirX * arrowBaseDist, center.y + outDirY * arrowBaseDist, 0),
+          ]),
+          lineMat,
+        ));
+      }
+    } else if (arrowBaseDist > EPSILON) {
+      objects.push(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(center.x, center.y, 0),
+          new THREE.Vector3(center.x + outDirX * arrowBaseDist, center.y + outDirY * arrowBaseDist, 0),
+        ]),
+        lineMat,
+      ));
+    }
+    objects.push(createArrow(
+      new THREE.Vector3(center.x, center.y, 0.1),
+      new THREE.Vector3(arcPt.x, arcPt.y, 0.1),
+      dv.arrowSize, arrowMat,
+    ));
+  } else {
+    // Text outside the arc. ISO convention: NO line from the centre — just
+    // an arrow at arcPt pointing inward (body outside the arc on the text side)
+    // and a leader extending OUTWARD along the radius:
+    //   – DIMTAD=0: leader stops at the near-arc edge of the text (text breaks line)
+    //   – DIMTAD≥1: leader runs UNDER the text up to its far (outer) edge
+    const arrowSizeLen = dv.arrowSize;
+    const arrowBaseAlong = radius + arrowSizeLen;
+    const leaderEndAlong = breakLine
+      ? textAlong - halfWidth - dimgap
+      : textAlong + halfWidth;
+    if (leaderEndAlong > arrowBaseAlong) {
+      objects.push(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(center.x + outDirX * arrowBaseAlong, center.y + outDirY * arrowBaseAlong, 0),
+          new THREE.Vector3(center.x + outDirX * leaderEndAlong, center.y + outDirY * leaderEndAlong, 0),
+        ]),
+        lineMat,
+      ));
+    }
+    // Arrow `from` lies further out so createArrow places the tip-side base
+    // OUTSIDE the arc — arrow points inward toward the arc.
+    objects.push(createArrow(
+      new THREE.Vector3(center.x + outDirX * arrowBaseAlong, center.y + outDirY * arrowBaseAlong, 0.1),
+      new THREE.Vector3(arcPt.x, arcPt.y, 0.1),
+      dv.arrowSize, arrowMat,
+    ));
+  }
+
+  // DIMTMOVE=1 (user moved text + leader): drop a connector from the projected
+  // foot of textPos on the radius line down to textPos itself. defaultPosition
+  // means CAD placed the text, so this connector is skipped in that case.
+  // The threshold is generous — we only draw if perpendicular offset is well
+  // beyond the natural DIMTAD vertical gap.
+  if (!defaultPosition && dimtmove === 1) {
+    const naturalPerp = dimtad >= 1 ? dimgap + textHeight / 2 : 0;
+    if (Math.abs(textPerp) > naturalPerp + textHeight) {
+      const footX = center.x + outDirX * textAlong;
+      const footY = center.y + outDirY * textAlong;
+      objects.push(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(footX, footY, 0),
+          new THREE.Vector3(textPos.x, textPos.y, 0),
+        ]),
+        lineMat,
+      ));
+    }
+  }
+
+  addDimensionTextToCollector({
+    collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
+    posX: textPos.x, posY: textPos.y, posZ: 0.2, rotation: textAngle, hAlign: "center", transform,
+  });
+
   tagDimParts(objects);
   return objects;
 };
@@ -1126,10 +1316,15 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
   objects.push(new THREE.Line(diamLineGeom, lineMat));
 
   if (textPos && textOnLine) {
-    // Text along diameter line -- rotated to match line angle
-    let angle = Math.atan2(p10.y - p15.y, p10.x - p15.x);
-    if (angle > Math.PI / 2) angle -= Math.PI;
-    if (angle < -Math.PI / 2) angle += Math.PI;
+    // Text along diameter line. DIMTIH=1 (horizontal) overrides the aligned default
+    // and keeps the text axis-aligned — used in ANSI-style stylesheets.
+    const aligned = p.dimtih !== 1;
+    let angle = 0;
+    if (aligned) {
+      angle = Math.atan2(p10.y - p15.y, p10.x - p15.x);
+      if (angle > Math.PI / 2) angle -= Math.PI;
+      if (angle < -Math.PI / 2) angle += Math.PI;
+    }
     addDimensionTextToCollector({
       collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
       posX: textPos.x, posY: textPos.y, posZ: 0.2, rotation: angle, transform,

@@ -45,6 +45,11 @@ export interface DimensionContext {
   headerDimdec?: number;
   headerDimadec?: number;
   headerDimzin?: number;
+  headerDimtad?: number;
+  headerDimtih?: number;
+  headerDimtoh?: number;
+  headerDimgap?: number;
+  headerDimtmove?: number;
   blockHandleToName?: Map<string, string>;
 }
 
@@ -64,6 +69,11 @@ export interface RenderContext extends ColorContext, LinetypeContext {
   headerDimdec?: number; // $DIMDEC from header (fallback for decimal places / architectural fraction precision)
   headerDimadec?: number; // $DIMADEC from header (fallback for angular dimension decimal places)
   headerDimzin?: number; // $DIMZIN from header (fallback for zero-suppression flags)
+  headerDimtad?: number; // $DIMTAD from header (text vertical position relative to dim line)
+  headerDimtih?: number; // $DIMTIH from header (text inside arc/dim — aligned or horizontal)
+  headerDimtoh?: number; // $DIMTOH from header (text outside arc/dim — aligned or horizontal)
+  headerDimgap?: number; // $DIMGAP from header (gap between dim line and text, break-radius around text)
+  headerDimtmove?: number; // $DIMTMOVE from header (text movement strategy when user moves text)
   blockHandleToName?: Map<string, string>; // BLOCK_RECORD handle → name (for DIMBLK resolution)
   xlineClipSize?: number; // Half-length for clipping XLINE/RAY to drawing extents
   originOffset?: { x: number; y: number; z: number }; // Subtracted from coords for Float32 precision

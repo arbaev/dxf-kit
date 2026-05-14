@@ -56,6 +56,15 @@ export interface DxfHeader {
   /** Zero-suppression flags for dimension text. For decimal mode:
    * bit 2 (4) suppresses leading zeros, bit 3 (8) suppresses trailing zeros. */
   $DIMZIN?: number;
+  /** Text vertical position: 0=centered on line, 1=above line, 2=outside, 3=JIS, 4=below. */
+  $DIMTAD?: number;
+  /** Text inside arc/extension lines: 0=aligned with dim line, 1=force horizontal. */
+  $DIMTIH?: number;
+  /** Text outside arc/extension lines: 0=aligned with dim line, 1=force horizontal. */
+  $DIMTOH?: number;
+  /** Text movement strategy when user moves text:
+   * 0=move dim line with text, 1=add leader, 2=move text only. */
+  $DIMTMOVE?: number;
 
   // ── Point display ──────────────────────────────────────────────────
   /** Point display mode (0 = dot, 1 = none, 2 = plus, 3 = cross, ...). */

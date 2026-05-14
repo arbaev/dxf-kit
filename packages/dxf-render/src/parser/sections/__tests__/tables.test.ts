@@ -633,6 +633,54 @@ describe("parseTables", () => {
       expect(dimStyles.stil1.dimclrt).toBe(7);
     });
 
+    it("parses DIMSTYLE with dimtoh (code 73) and dimtih (code 74)", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "DIMSTYLE",
+        "70", "1",
+        "0", "DIMSTYLE",
+        "2", "stil1",
+        "73", "0",  // DIMTOH — text outside is aligned with line
+        "74", "0",  // DIMTIH — text inside is aligned with line
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const dimStyles = tables.dimStyle.dimStyles as Record<string, IDimStyle>;
+      expect(dimStyles.stil1.dimtoh).toBe(0);
+      expect(dimStyles.stil1.dimtih).toBe(0);
+    });
+
+    it("parses DIMSTYLE DIMTAD (77), DIMGAP (147), DIMTMOVE (279), DIMUPT (288), DIMATFIT (289)", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "DIMSTYLE",
+        "70", "1",
+        "0", "DIMSTYLE",
+        "2", "stil1",
+        "77", "1",        // DIMTAD — text above line
+        "147", "0.7",     // DIMGAP — gap between dim line and text
+        "279", "1",       // DIMTMOVE — add leader when text moved
+        "288", "0",       // DIMUPT — default text position
+        "289", "3",       // DIMATFIT — auto-fit (best)
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const dimStyles = tables.dimStyle.dimStyles as Record<string, IDimStyle>;
+      expect(dimStyles.stil1.dimtad).toBe(1);
+      expect(dimStyles.stil1.dimgap).toBe(0.7);
+      expect(dimStyles.stil1.dimtmove).toBe(1);
+      expect(dimStyles.stil1.dimupt).toBe(0);
+      expect(dimStyles.stil1.dimatfit).toBe(3);
+    });
+
     it("parses DIMSTYLE with dimadec (code 179) for angular precision", () => {
       const scanner = createScanner(
         "0", "TABLE",

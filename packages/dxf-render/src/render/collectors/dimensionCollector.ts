@@ -109,11 +109,25 @@ export function collectDimensionEntity(
   // Resolve sentinel for Three.js material creation in dimension helpers
   const resolvedColor = colorCtx.materials.resolveColor(entityColor);
 
+  // DIMTIH/DIMTOH/DIMTAD/DIMGAP/DIMTMOVE control radial & diametric text layout.
+  // Pulled from DIMSTYLE → header. Entity XDATA overrides aren't standardized for these.
+  // DIMSCALE is applied to DIMGAP (length value); the rest are flags.
+  const headerDimScale = _dxf.header?.$DIMSCALE ?? 1;
+  const styleDimScale = dimStyleEntry?.dimscale;
+  const effectiveDimScale = (entity.dimScale ?? styleDimScale ?? headerDimScale) || 1;
+
+  const dimtih = dimStyleEntry?.dimtih ?? colorCtx.headerDimtih;
+  const dimtoh = dimStyleEntry?.dimtoh ?? colorCtx.headerDimtoh;
+  const dimtad = dimStyleEntry?.dimtad ?? colorCtx.headerDimtad;
+  const dimgapRaw = dimStyleEntry?.dimgap ?? colorCtx.headerDimgap;
+  const dimgap = dimgapRaw !== undefined ? dimgapRaw * effectiveDimScale : undefined;
+  const dimtmove = dimStyleEntry?.dimtmove ?? colorCtx.headerDimtmove;
+
   // Ordinate dimension (type 6 = Y-ordinate, type 7 = X-ordinate)
   // textColor is the un-resolved sentinel (e.g. ACI7_COLOR) so the
   // collector can keep DIMCLRT theme-adaptive — materials.resolveColor()
   // happens later inside GeometryCollector.flush().
-  const dimParams = { entity, color: resolvedColor, textColor, font, collector, layer, transform, dv, fmt: dimFmt };
+  const dimParams = { entity, color: resolvedColor, textColor, font, collector, layer, transform, dv, fmt: dimFmt, dimtih, dimtoh, dimtad, dimgap, dimtmove };
   if ((baseDimType & 0x0e) === 6) {
     result = createOrdinateDimension(dimParams);
   } else if (baseDimType === 2) {

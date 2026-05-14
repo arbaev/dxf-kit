@@ -44,6 +44,13 @@ export interface IDimStyle {
   dimtxt?: number;   // code 140: text height (unscaled)
   dimtsz?: number;   // code 142: tick size (>0 = use ticks instead of arrows)
   dimexe?: number;   // code 44: extension line extension past dimension line
+  dimtoh?: number;   // code 73: text outside arc/dim line — 0=aligned, 1=horizontal
+  dimtih?: number;   // code 74: text inside arc/dim line — 0=aligned, 1=horizontal
+  dimtad?: number;   // code 77: text vertical position (0=centered, 1=above, 2=outside, 3=JIS, 4=below)
+  dimgap?: number;   // code 147: distance from dim line to text (and break-radius around text)
+  dimtmove?: number; // code 279: text movement (0=move dim line, 1=add leader, 2=move text only)
+  dimupt?: number;   // code 288: 0=default text position, 1=allow user-positioned text
+  dimatfit?: number; // code 289: arrow/text auto-fit strategy (linear dims)
   dimclrd?: number;  // code 176: dimension line color (ACI index, 0=BYBLOCK, 256=BYLAYER)
   dimclre?: number;  // code 177: extension line color (ACI index, 0=BYBLOCK, 256=BYLAYER)
   dimclrt?: number;  // code 178: dimension text color (ACI index)
@@ -445,6 +452,21 @@ function parseDimStyles(scanner: DxfScanner): Record<string, IDimStyle> {
         ds.dimexe = curr.value as number;
         curr = scanner.next();
         break;
+      case 73:
+        // DIMTOH — text outside dimension lines: 0=aligned with line, 1=horizontal.
+        ds.dimtoh = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 74:
+        // DIMTIH — text inside dimension lines: 0=aligned with line, 1=horizontal.
+        ds.dimtih = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 77:
+        // DIMTAD — text vertical position relative to the dim line.
+        ds.dimtad = curr.value as number;
+        curr = scanner.next();
+        break;
       case 78:
         ds.dimzin = curr.value as number;
         curr = scanner.next();
@@ -455,6 +477,11 @@ function parseDimStyles(scanner: DxfScanner): Record<string, IDimStyle> {
         break;
       case 142:
         ds.dimtsz = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 147:
+        // DIMGAP — distance between dim line and text (and break-radius around text).
+        ds.dimgap = curr.value as number;
         curr = scanner.next();
         break;
       case 176:
@@ -482,6 +509,21 @@ function parseDimStyles(scanner: DxfScanner): Record<string, IDimStyle> {
         break;
       case 277:
         ds.dimlunit = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 279:
+        // DIMTMOVE — text movement strategy when user moves text.
+        ds.dimtmove = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 288:
+        // DIMUPT — allow user-positioned text.
+        ds.dimupt = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 289:
+        // DIMATFIT — arrow/text auto-fit strategy (mostly linear dims).
+        ds.dimatfit = curr.value as number;
         curr = scanner.next();
         break;
       case 341:
