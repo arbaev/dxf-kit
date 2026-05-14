@@ -1214,9 +1214,14 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
     //   – DIMTAD≥1: leader runs UNDER the text up to its far (outer) edge
     const arrowSizeLen = dv.arrowSize;
     const arrowBaseAlong = radius + arrowSizeLen;
-    const leaderEndAlong = breakLine
+    // Minimum tail past the arrow base, so the arrow always reads as
+    // "tip + shaft" rather than a bare triangle (same logic as short
+    // linear dims, see OUTSIDE_ARROW_TAIL_RATIO).
+    const arrowTail = arrowSizeLen * OUTSIDE_ARROW_TAIL_RATIO;
+    const naturalLeaderEnd = breakLine
       ? textAlong - halfWidth - dimgap
       : textAlong + halfWidth;
+    const leaderEndAlong = Math.max(naturalLeaderEnd, arrowBaseAlong + arrowTail);
     if (leaderEndAlong > arrowBaseAlong) {
       objects.push(new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([
@@ -1422,20 +1427,34 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
       const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
       const halfWidth = textWidth / 2;
       const dimgap = p.dimgap ?? textHeight * 0.4;
+      const arrowTail = dv.arrowSize * OUTSIDE_ARROW_TAIL_RATIO;
 
-      // Extension length: from nearPt out to the far text edge along the diameter.
-      const extensionEnd = Math.max(0, projAlong + halfWidth + dimgap);
+      // Extension length on the near-text side: from nearPt out to the far text
+      // edge along the diameter, but at least past the arrow base + tail so the
+      // arrow reads as "tip + shaft" rather than a bare triangle.
+      const extensionEnd = Math.max(projAlong + halfWidth + dimgap, dv.arrowSize + arrowTail);
       if (extensionEnd > EPSILON) {
-        const extEndX = nearPt.x + outDirX * extensionEnd;
-        const extEndY = nearPt.y + outDirY * extensionEnd;
         objects.push(new THREE.Line(
           new THREE.BufferGeometry().setFromPoints([
             new THREE.Vector3(nearPt.x, nearPt.y, 0),
-            new THREE.Vector3(extEndX, extEndY, 0),
+            new THREE.Vector3(nearPt.x + outDirX * extensionEnd, nearPt.y + outDirY * extensionEnd, 0),
           ]),
           lineMat,
         ));
       }
+
+      // The OTHER endpoint also needs a tail — same shaft-effect, no text there.
+      const farPt = nearPt === p10 ? p15 : p10;
+      const farOutDirX = (farPt.x - cx) / (fullDiamLen / 2);
+      const farOutDirY = (farPt.y - cy) / (fullDiamLen / 2);
+      const farTailLen = dv.arrowSize + arrowTail;
+      objects.push(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(farPt.x, farPt.y, 0),
+          new THREE.Vector3(farPt.x + farOutDirX * farTailLen, farPt.y + farOutDirY * farTailLen, 0),
+        ]),
+        lineMat,
+      ));
 
       // Rotation: same readable flip as the on-segment aligned path.
       let angle = Math.atan2(p10.y - p15.y, p10.x - p15.x);
