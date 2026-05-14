@@ -1400,46 +1400,90 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
       posX: renderX, posY: renderY, posZ: 0.2, rotation: angle, transform,
     });
   } else if (textPos) {
-    // Text offset outside -- leader from nearest line end toward text
+    // Text projects OFF the diameter segment (t < 0 or t > 1).
+    //
+    // DIMTOH=1 (ANSI horizontal): old leader + horizontal text + underline shelf.
+    // DIMTOH=0/undefined (ISO aligned, default): extend the diameter line past the
+    //   nearest endpoint to under the text, render text rotated to match the
+    //   diameter angle. No horizontal shelf.
     const dist10 = (textPos.x - p10.x) ** 2 + (textPos.y - p10.y) ** 2;
     const dist15 = (textPos.x - p15.x) ** 2 + (textPos.y - p15.y) ** 2;
     const nearPt = dist10 <= dist15 ? p10 : p15;
-    const dxN = cx - nearPt.x;
-    const dyN = cy - nearPt.y;
-    const lenN = Math.sqrt(dxN * dxN + dyN * dyN);
-    const dirNx = lenN > EPSILON ? dxN / lenN : 1;
-    const dirNy = lenN > EPSILON ? dyN / lenN : 0;
 
-    // Underline Y for leader geometry: bottom of text area
-    const underlineY = textPos.y - textHeight / 2;
+    if (p.dimtoh !== 1 && fullDiamLen > EPSILON) {
+      // ── ISO aligned-with-extension ──────────────────────────────────────
+      // Pick outDir = unit vector pointing FROM the center OUTWARD through nearPt.
+      // The extension continues past nearPt in that same outward direction.
+      const outDirX = (nearPt.x - cx) / (fullDiamLen / 2);
+      const outDirY = (nearPt.y - cy) / (fullDiamLen / 2);
+      // Distance from nearPt to textPos projected onto outDir (always ≥ 0 here
+      // because textPos is past nearPt along outDir).
+      const projAlong = (textPos.x - nearPt.x) * outDirX + (textPos.y - nearPt.y) * outDirY;
+      const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
+      const halfWidth = textWidth / 2;
+      const dimgap = p.dimgap ?? textHeight * 0.4;
 
-    let intersectX = textPos.x;
-    if (Math.abs(dirNy) > EPSILON) {
-      const t = (underlineY - nearPt.y) / dirNy;
-      intersectX = nearPt.x + t * dirNx;
+      // Extension length: from nearPt out to the far text edge along the diameter.
+      const extensionEnd = Math.max(0, projAlong + halfWidth + dimgap);
+      if (extensionEnd > EPSILON) {
+        const extEndX = nearPt.x + outDirX * extensionEnd;
+        const extEndY = nearPt.y + outDirY * extensionEnd;
+        objects.push(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(nearPt.x, nearPt.y, 0),
+            new THREE.Vector3(extEndX, extEndY, 0),
+          ]),
+          lineMat,
+        ));
+      }
+
+      // Rotation: same readable flip as the on-segment aligned path.
+      let angle = Math.atan2(p10.y - p15.y, p10.x - p15.x);
+      if (angle > Math.PI / 2) angle -= Math.PI;
+      if (angle < -Math.PI / 2) angle += Math.PI;
+      addDimensionTextToCollector({
+        collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
+        posX: textPos.x, posY: textPos.y, posZ: 0.2, rotation: angle, transform,
+      });
+    } else {
+      // ── ANSI horizontal-with-shelf ─────────────────────────────────────
+      const dxN = cx - nearPt.x;
+      const dyN = cy - nearPt.y;
+      const lenN = Math.sqrt(dxN * dxN + dyN * dyN);
+      const dirNx = lenN > EPSILON ? dxN / lenN : 1;
+      const dirNy = lenN > EPSILON ? dyN / lenN : 0;
+
+      // Underline Y for leader geometry: bottom of text area
+      const underlineY = textPos.y - textHeight / 2;
+
+      let intersectX = textPos.x;
+      if (Math.abs(dirNy) > EPSILON) {
+        const t = (underlineY - nearPt.y) / dirNy;
+        intersectX = nearPt.x + t * dirNx;
+      }
+
+      const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
+      addDimensionTextToCollector({
+        collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
+        posX: textPos.x, posY: textPos.y, posZ: 0.2, transform,
+      });
+
+      const textLeft = textPos.x - textWidth / 2;
+      const textRight = textPos.x + textWidth / 2;
+
+      const nearVec = new THREE.Vector3(nearPt.x, nearPt.y, 0);
+      const tailEnd = new THREE.Vector3(intersectX, underlineY, 0);
+      const tailGeom = new THREE.BufferGeometry().setFromPoints([nearVec, tailEnd]);
+      objects.push(new THREE.Line(tailGeom, lineMat));
+
+      const underlineLeft = intersectX <= textPos.x ? intersectX : textLeft;
+      const underlineRight = intersectX <= textPos.x ? textRight : intersectX;
+      const underlineGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(underlineLeft, underlineY, 0),
+        new THREE.Vector3(underlineRight, underlineY, 0),
+      ]);
+      objects.push(new THREE.Line(underlineGeom, lineMat));
     }
-
-    const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
-    addDimensionTextToCollector({
-      collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
-      posX: textPos.x, posY: textPos.y, posZ: 0.2, transform,
-    });
-
-    const textLeft = textPos.x - textWidth / 2;
-    const textRight = textPos.x + textWidth / 2;
-
-    const nearVec = new THREE.Vector3(nearPt.x, nearPt.y, 0);
-    const tailEnd = new THREE.Vector3(intersectX, underlineY, 0);
-    const tailGeom = new THREE.BufferGeometry().setFromPoints([nearVec, tailEnd]);
-    objects.push(new THREE.Line(tailGeom, lineMat));
-
-    const underlineLeft = intersectX <= textPos.x ? intersectX : textLeft;
-    const underlineRight = intersectX <= textPos.x ? textRight : intersectX;
-    const underlineGeom = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(underlineLeft, underlineY, 0),
-      new THREE.Vector3(underlineRight, underlineY, 0),
-    ]);
-    objects.push(new THREE.Line(underlineGeom, lineMat));
   } else {
     const diamLineGeom2 = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(p15.x, p15.y, 0),
