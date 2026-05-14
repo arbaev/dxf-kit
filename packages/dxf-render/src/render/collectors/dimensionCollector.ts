@@ -116,8 +116,18 @@ export function collectDimensionEntity(
   const styleDimScale = dimStyleEntry?.dimscale;
   const effectiveDimScale = (entity.dimScale ?? styleDimScale ?? headerDimScale) || 1;
 
-  const dimtih = dimStyleEntry?.dimtih ?? colorCtx.headerDimtih;
-  const dimtoh = dimStyleEntry?.dimtoh ?? colorCtx.headerDimtoh;
+  // DIMTIH/DIMTOH are looked up on the DIMSTYLE record only — `$DIMTIH`/`$DIMTOH`
+  // in the header are system-wide current values used when AutoCAD creates new
+  // dimensions, not for rendering existing ones (DXF reference for the HEADER
+  // block: those vars track the editor's current setting, while the per-dim
+  // record is the source of truth). Falling back to header here used to make
+  // diametric/radial dims whose dimstyle set DIMTOH=0 but omitted DIMTIH render
+  // text horizontally — e.g. QCAD's QCADDimStyle writes only DIMTOH, leaving
+  // DIMTIH unspecified, and the header's $DIMTIH=1 leaked into the "text inside"
+  // path. Now an unspecified DIMSTYLE field means undefined here, which the
+  // diametric/radial helpers interpret as 0 (aligned — the ISO default).
+  const dimtih = dimStyleEntry?.dimtih;
+  const dimtoh = dimStyleEntry?.dimtoh;
   const dimtad = dimStyleEntry?.dimtad ?? colorCtx.headerDimtad;
   const dimgapRaw = dimStyleEntry?.dimgap ?? colorCtx.headerDimgap;
   const dimgap = dimgapRaw !== undefined ? dimgapRaw * effectiveDimScale : undefined;

@@ -1126,10 +1126,39 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
   }
 
   // ── Aligned mode ───────────────────────────────────────────────────────
-  // Text rotation: radius angle flipped into [-π/2, π/2] for readability.
+  // Use the "readable" radius angle in [-π/2, π/2]. With that rotation the text
+  // ascender direction lands on the perpendicular side opposite to the readable
+  // flip (CCW 90° from the readable baseline).
   let textAngle = Math.atan2(outDirY, outDirX);
   if (textAngle > Math.PI / 2) textAngle -= Math.PI;
   if (textAngle < -Math.PI / 2) textAngle += Math.PI;
+  const aboveDirX = -Math.sin(textAngle);
+  const aboveDirY = Math.cos(textAngle);
+  // Project "above" onto our perpDir to know which perp side is "above" for the
+  // readable rotation.
+  const abovePerpSign = aboveDirX * perpDirX + aboveDirY * perpDirY; // +1 or -1
+
+  // For default-position dims (CAD chose textPos automatically), if textPos sits
+  // on the opposite perp side from "above" of the readable rotation we mirror
+  // its perpendicular offset so the glyphs end up on the correct side. This
+  // matches how AutoCAD would auto-lay-out the same dim and avoids upside-down
+  // text. User-positioned dims (defaultPosition bit clear) are respected as-is.
+  let renderTextX = textPos.x;
+  let renderTextY = textPos.y;
+  const onLine = Math.abs(textPerp) < textHeight * 0.1;
+  if (defaultPosition && !onLine) {
+    // Desired perp side = sign(abovePerpSign). Current textPos.perp side = sign(textPerp).
+    const currentSign = textPerp >= 0 ? 1 : -1;
+    if (currentSign * abovePerpSign < 0) {
+      // Reflect textPos perpendicularly through the radius axis so it lands on
+      // the "above" side of the readable rotation.
+      const newPerp = -textPerp;
+      const footX = center.x + outDirX * textAlong;
+      const footY = center.y + outDirY * textAlong;
+      renderTextX = footX + perpDirX * newPerp;
+      renderTextY = footY + perpDirY * newPerp;
+    }
+  }
 
   const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
   const halfWidth = textWidth / 2;
@@ -1219,7 +1248,7 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
       objects.push(new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([
           new THREE.Vector3(footX, footY, 0),
-          new THREE.Vector3(textPos.x, textPos.y, 0),
+          new THREE.Vector3(renderTextX, renderTextY, 0),
         ]),
         lineMat,
       ));
@@ -1228,7 +1257,7 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
 
   addDimensionTextToCollector({
     collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
-    posX: textPos.x, posY: textPos.y, posZ: 0.2, rotation: textAngle, hAlign: "center", transform,
+    posX: renderTextX, posY: renderTextY, posZ: 0.2, rotation: textAngle, hAlign: "center", transform,
   });
 
   tagDimParts(objects);
@@ -1275,18 +1304,27 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
   const dir10x = len10 > EPSILON ? dx10 / len10 : 1;
   const dir10y = len10 > EPSILON ? dy10 / len10 : 0;
 
-  // Determine if text sits on the diameter line (within textHeight perpendicular distance
-  // and between endpoints). This controls arrow direction: outward when text is inside,
-  // inward when text is offset outside.
+  // Determine if text projects onto the diameter segment (t ∈ [0,1]). When it
+  // does we render aligned text along the diameter — the previous perpendicular
+  // distance constraint (perpDist < textHeight) used to also require text to sit
+  // right on the line, but that excluded perfectly normal cases where the source
+  // CAD placed the text slightly offset perpendicular (DIMTAD=1 + DIMGAP). On-segment
+  // text deserves the aligned treatment regardless of perpendicular offset; only
+  // text whose projection falls OUTSIDE the segment is treated as "leader + shelf".
   let textOnLine = false;
+  let textT = 0;
+  let textPerpDiam = 0;
+  let fullDiamLen = 0;
   if (textPos) {
-    const fullLen = len10 * 2;
-    if (fullLen > EPSILON) {
-      const ldx = (p10.x - p15.x) / fullLen;
-      const ldy = (p10.y - p15.y) / fullLen;
-      const t = ((textPos.x - p15.x) * ldx + (textPos.y - p15.y) * ldy) / fullLen;
-      const perpDist = Math.abs(-(textPos.x - p15.x) * ldy + (textPos.y - p15.y) * ldx);
-      textOnLine = perpDist < textHeight && t >= 0 && t <= 1;
+    fullDiamLen = len10 * 2;
+    if (fullDiamLen > EPSILON) {
+      // Unit vector p15 → p10 (so t=0 at p15 and t=1 at p10).
+      const ux = (p10.x - p15.x) / fullDiamLen;
+      const uy = (p10.y - p15.y) / fullDiamLen;
+      textT = ((textPos.x - p15.x) * ux + (textPos.y - p15.y) * uy) / fullDiamLen;
+      // Signed perpendicular (CCW 90° from baseline). Used for DIMTAD mirroring.
+      textPerpDiam = -(textPos.x - p15.x) * uy + (textPos.y - p15.y) * ux;
+      textOnLine = textT >= 0 && textT <= 1;
     }
   }
 
@@ -1316,18 +1354,50 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
   objects.push(new THREE.Line(diamLineGeom, lineMat));
 
   if (textPos && textOnLine) {
-    // Text along diameter line. DIMTIH=1 (horizontal) overrides the aligned default
-    // and keeps the text axis-aligned — used in ANSI-style stylesheets.
+    // Text projects onto the diameter segment. DIMTIH=1 (horizontal) overrides
+    // the aligned default — ANSI-style sheets use that. Otherwise we render
+    // aligned text along the diameter direction with a readability flip.
     const aligned = p.dimtih !== 1;
     let angle = 0;
+    let renderX = textPos.x;
+    let renderY = textPos.y;
     if (aligned) {
       angle = Math.atan2(p10.y - p15.y, p10.x - p15.x);
       if (angle > Math.PI / 2) angle -= Math.PI;
       if (angle < -Math.PI / 2) angle += Math.PI;
+
+      // Mirror textPos across the diameter axis for default-position dims when
+      // the source CAD placed it on the perp side opposite to the readable
+      // rotation's "above" — same trick as radial. Without this the readable
+      // flip can put glyph ascenders pointing at the diameter line.
+      const defaultPosition = ((entity.dimensionType ?? 0) & 32) !== 0;
+      const onLineExact = Math.abs(textPerpDiam) < textHeight * 0.1;
+      if (defaultPosition && !onLineExact && fullDiamLen > EPSILON) {
+        const ux = (p10.x - p15.x) / fullDiamLen;
+        const uy = (p10.y - p15.y) / fullDiamLen;
+        // perpDir = CCW 90° from u (which is the readable "above" of `angle`
+        // before the flip — after flipping into the readable half-turn, the
+        // sign relationship still holds: text's "above" lies on the +perpDiam
+        // side after any single flip).
+        const perpDirX = -uy;
+        const perpDirY = ux;
+        const aboveDirX = -Math.sin(angle);
+        const aboveDirY = Math.cos(angle);
+        const abovePerpSign = aboveDirX * perpDirX + aboveDirY * perpDirY;
+        const currentSign = textPerpDiam >= 0 ? 1 : -1;
+        if (currentSign * abovePerpSign < 0) {
+          // Reflect textPos perpendicularly across the diameter axis.
+          const footT = textT;
+          const footX = p15.x + ux * (footT * fullDiamLen);
+          const footY = p15.y + uy * (footT * fullDiamLen);
+          renderX = footX - perpDirX * textPerpDiam;
+          renderY = footY - perpDirY * textPerpDiam;
+        }
+      }
     }
     addDimensionTextToCollector({
       collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
-      posX: textPos.x, posY: textPos.y, posZ: 0.2, rotation: angle, transform,
+      posX: renderX, posY: renderY, posZ: 0.2, rotation: angle, transform,
     });
   } else if (textPos) {
     // Text offset outside -- leader from nearest line end toward text

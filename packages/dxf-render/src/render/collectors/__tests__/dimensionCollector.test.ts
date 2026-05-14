@@ -12,25 +12,27 @@ import type { RenderContext } from "../../primitives";
 let font: Font;
 
 class MockCollector {
-  meshes: { layer: string; color: string }[] = [];
-  lines: { layer: string; color: string }[] = [];
+  meshes: { layer: string; color: string; vertices?: number[] }[] = [];
+  lines: { layer: string; color: string; data?: number[] }[] = [];
 
   addMesh(layer: string, color: string, vertices: number[], indices: number[]): void {
     if (vertices.length < 9 || indices.length < 3) return;
-    this.meshes.push({ layer, color });
+    this.meshes.push({ layer, color, vertices });
   }
   addOverlayMesh(layer: string, color: string, vertices: number[], indices: number[]): void {
     if (vertices.length < 9 || indices.length < 3) return;
-    this.meshes.push({ layer, color });
+    this.meshes.push({ layer, color, vertices });
   }
-  addLineSegments(layer: string, color: string, _data: number[]): void {
-    this.lines.push({ layer, color });
+  addLineSegments(layer: string, color: string, data: number[]): void {
+    this.lines.push({ layer, color, data });
   }
 }
 
 function makeContext(opts: {
   layers?: Record<string, DxfLayer>;
   dimStyles?: Record<string, DxfDimStyle>;
+  headerDimtih?: number;
+  headerDimtoh?: number;
 } = {}): RenderContext {
   return {
     layers: opts.layers ?? {},
@@ -42,6 +44,8 @@ function makeContext(opts: {
     defaultTextHeight: 2.5,
     dimVars: DEFAULT_DIM_VARS,
     dimStyles: opts.dimStyles,
+    headerDimtih: opts.headerDimtih,
+    headerDimtoh: opts.headerDimtoh,
   } as RenderContext;
 }
 
@@ -226,6 +230,73 @@ describe("collectDimensionEntity — DIMCLRT for angular dimensions", () => {
     // DIMCLRD override the dim lines/arrows follow the entity color.)
     expect(collector.meshes.length).toBeGreaterThan(0);
     expect(collector.meshes.some((m) => m.color === ACI7_COLOR)).toBe(true);
+  });
+});
+
+describe("collectDimensionEntity — diametric on-segment text", () => {
+  it("rotates aligned text to match diameter direction (entity 130: p10=(36.24,23.34), p15=(63.76,76.66))", () => {
+    const collector = new MockCollector();
+    const ctx = makeContext({
+      layers: { "0": { name: "0", visible: true, frozen: false, colorIndex: 7, color: 0 } as DxfLayer },
+      dimStyles: {
+        QCADDimStyle: {
+          name: "QCADDimStyle",
+          dimtoh: 0,    // aligned (explicit)
+          dimtad: 1,    // above line
+          dimgap: 0.625,
+          // DIMTIH (code 74) intentionally omitted — matches the real QCAD file
+        } as DxfDimStyle,
+      },
+      // Simulate the file's header: $DIMTIH=1 must NOT leak into rendering of
+      // existing dims. Falling back to header would force horizontal text for
+      // every dimstyle that omits DIMTIH (DXF reference: $DIM* in HEADER are
+      // current values for new dims, not the source of truth for existing ones).
+      headerDimtih: 1,
+      headerDimtoh: 1,
+    });
+
+    const entity: DxfDimensionEntity = {
+      type: "DIMENSION",
+      handle: "130",
+      layer: "0",
+      // 163 = bit 7 (assoc-block) + bit 5 (default position) + 3 (diameter)
+      dimensionType: 163,
+      actualMeasurement: 60,
+      anchorPoint: { x: 36.24, y: 23.34, z: 0 },
+      diameterOrRadiusPoint: { x: 63.76, y: 76.66, z: 0 },
+      middleOfText: { x: 37.17, y: 32.05, z: 0 },
+      text: "60",
+      textHeight: 2.5,
+      styleName: "QCADDimStyle",
+    } as DxfDimensionEntity;
+
+    collectDimensionEntity(entity, {} as DxfData, ctx, collector as any, "0");
+
+    // Verify the text glyphs were emitted and that their bounding box is rotated
+    // (not axis-aligned). For axis-aligned text, all glyph vertices for one row of
+    // characters lie at the same Y. For rotated text, X and Y both vary.
+    const textMeshes = collector.meshes.filter((m) => m.vertices && m.vertices.length >= 9);
+    expect(textMeshes.length).toBeGreaterThan(0);
+
+    // Compute the spread along X and Y of all text vertices. If text is horizontal,
+    // X spread >> Y spread. For a 62.7° rotated text the spread along both should
+    // be roughly comparable (off-axis), with Y spread well above zero.
+    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+    for (const m of textMeshes) {
+      const v = m.vertices!;
+      for (let i = 0; i < v.length; i += 3) {
+        if (v[i] < xMin) xMin = v[i];
+        if (v[i] > xMax) xMax = v[i];
+        if (v[i + 1] < yMin) yMin = v[i + 1];
+        if (v[i + 1] > yMax) yMax = v[i + 1];
+      }
+    }
+    const xSpread = xMax - xMin;
+    const ySpread = yMax - yMin;
+    // For 62.7° rotated "60" (2.5 height ~ 4 wide): X spread ≈ 4×cos+2.5×sin ≈ 4, Y spread ≈ 4×sin+2.5×cos ≈ 4.
+    // If horizontal: X spread ≈ 4, Y spread ≈ 2.5.
+    // The discriminator: Y spread > X spread × 0.6 means definitely rotated.
+    expect(ySpread).toBeGreaterThan(xSpread * 0.6);
   });
 });
 
