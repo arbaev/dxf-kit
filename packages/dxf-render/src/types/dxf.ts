@@ -124,6 +124,8 @@ export interface DxfDimensionEntity extends DxfEntityBase {
   arcPoint?: DxfVertex; // code 16
   arrowSize?: number; // DIMASZ from XDATA DSTYLE override
   dimScale?: number; // DIMSCALE from XDATA DSTYLE override
+  dimdec?: number; // DIMDEC from XDATA DSTYLE override (code 271): decimal places for primary units
+  dimadec?: number; // DIMADEC from XDATA DSTYLE override (code 179): decimal places for angular
 }
 
 export interface DxfAttribEntity extends DxfEntityBase {
@@ -483,6 +485,8 @@ export interface DxfDimStyle {
   dimtxt?: number;   // code 140: text height (unscaled)
   dimtsz?: number;   // code 142: tick size (>0 = use ticks instead of arrows)
   dimexe?: number;   // code 44: extension line extension past dimension line
+  dimclrd?: number;  // code 176: dimension line color (ACI index, 0=BYBLOCK, 256=BYLAYER)
+  dimclre?: number;  // code 177: extension line color (ACI index, 0=BYBLOCK, 256=BYLAYER)
   dimclrt?: number;  // code 178: dimension text color (ACI index)
   dimlunit?: number; // code 277: 2=Decimal, 4=Architectural
   dimdec?: number;   // code 271: decimal places for primary units (arch: 2^dimdec is fraction denominator)

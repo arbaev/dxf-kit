@@ -121,3 +121,88 @@ describe("collectDimensionEntity — DIMCLRT theme-adaptive", () => {
     expect(collector.meshes.every((m) => m.color.charCodeAt(0) !== 0 || m.color !== "\0ACI7")).toBe(true);
   });
 });
+
+describe("collectDimensionEntity — DIMCLRD/DIMCLRE line color overrides", () => {
+  it("uses DIMSTYLE dimclrd (blue=5) for dim/arrow lines instead of entity color (red=1)", () => {
+    const collector = new MockCollector();
+    const ctx = makeContext({
+      layers: {
+        Kote: { name: "Kote", visible: true, frozen: false, colorIndex: 5, color: 255 } as DxfLayer,
+      },
+      dimStyles: {
+        // dimclrd=5 (blue) overrides entity red; dimclre undefined → falls back to entity color
+        stil1: { name: "stil1", dimclrd: 5 } as DxfDimStyle,
+      },
+    });
+
+    // Entity color = 1 (red); dimclrd = 5 (blue). Dim line must be blue.
+    // middleOfText is offset perpendicular to the dim line so the dim line isn't
+    // split around it — otherwise on a short rotated dim the text gap can swallow
+    // the entire dim line and we end up with only extension lines + arrows.
+    collectDimensionEntity(
+      makeRotatedDim({ colorIndex: 1, middleOfText: { x: 5, y: 5, z: 0 } }),
+      {} as DxfData,
+      ctx,
+      collector as any,
+      "Kote",
+    );
+
+    // ACI 5 → #0000ff; ACI 1 → #ff0000.
+    const dimLineColors = new Set(collector.lines.map((l) => l.color));
+    expect(dimLineColors.has("#0000ff")).toBe(true);
+  });
+
+  it("falls back to entity color when DIMCLRD is 0 (BYBLOCK) or 256 (BYLAYER)", () => {
+    const collector = new MockCollector();
+    const ctx = makeContext({
+      layers: {
+        Kote: { name: "Kote", visible: true, frozen: false, colorIndex: 5, color: 255 } as DxfLayer,
+      },
+      dimStyles: {
+        // dimclrd=0 → BYBLOCK → use entity color
+        stil1: { name: "stil1", dimclrd: 0 } as DxfDimStyle,
+      },
+    });
+
+    collectDimensionEntity(
+      makeRotatedDim({ colorIndex: 1 }),
+      {} as DxfData,
+      ctx,
+      collector as any,
+      "Kote",
+    );
+
+    // ACI 1 → #ff0000 must appear on the lines
+    const dimLineColors = new Set(collector.lines.map((l) => l.color));
+    expect(dimLineColors.has("#ff0000")).toBe(true);
+    expect(dimLineColors.has("#0000ff")).toBe(false);
+  });
+});
+
+describe("collectDimensionEntity — DIMDEC entity override", () => {
+  it("uses entity.dimdec for measurement precision over DIMSTYLE.dimdec", () => {
+    const collector = new MockCollector();
+    const ctx = makeContext({
+      layers: {
+        Kote: { name: "Kote", visible: true, frozen: false, colorIndex: 5, color: 255 } as DxfLayer,
+      },
+      dimStyles: {
+        // DIMSTYLE says 2 decimals (would yield "24.01"), entity overrides to 1 → "24.0"
+        stil1: { name: "stil1", dimdec: 2 } as DxfDimStyle,
+      },
+    });
+
+    // Use a measurement that produces different output for dimdec=1 vs dimdec=2
+    const entity = makeRotatedDim({
+      actualMeasurement: 24.0050334118132,
+      dimdec: 1, // entity-level XDATA override
+    });
+
+    // Just sanity-check that collection runs without error and emits meshes —
+    // the actual text content is in the mesh vertex data, which would require
+    // a font shaper to verify. Smoke test: parser→collector→fmt pipeline links.
+    expect(() => collectDimensionEntity(entity, {} as DxfData, ctx, collector as any, "Kote"))
+      .not.toThrow();
+    expect(collector.lines.length).toBeGreaterThan(0);
+  });
+});

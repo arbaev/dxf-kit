@@ -24,6 +24,10 @@ export interface IDimensionEntity extends IEntityBase {
   arrowSize?: number;
   /** DIMSCALE — overall dimension scale from XDATA DSTYLE override */
   dimScale?: number;
+  /** DIMDEC — decimal places for primary units, from XDATA DSTYLE override (code 271) */
+  dimdec?: number;
+  /** DIMADEC — decimal places for angular dimensions, from XDATA DSTYLE override (code 179) */
+  dimadec?: number;
 }
 
 /**
@@ -58,6 +62,12 @@ function applyDimStyleXData(entity: IDimensionEntity, scanner: DxfScanner): void
           break;
         case 40: // DIMSCALE — overall scale
           entity.dimScale = varValue;
+          break;
+        case 271: // DIMDEC — decimal places for primary units
+          entity.dimdec = varValue;
+          break;
+        case 179: // DIMADEC — decimal places for angular dimensions
+          entity.dimadec = varValue;
           break;
       }
     }

@@ -234,6 +234,25 @@ export interface DimensionGroupParams {
 
 /** Params for emitStackedText (vectorTextBuilder.ts) */
 
+/**
+ * Tag userData.dimPart on dimension geometry so the collector can resolve
+ * separate colors for dimension line + arrows ("dim") vs extension lines ("ext").
+ * Walks the provided objects (and their descendants). Any object whose material
+ * matches `extMaterial` is tagged "ext"; everything else is tagged "dim".
+ */
+export const tagDimParts = (
+  objects: THREE.Object3D[],
+  extMaterial?: THREE.Material,
+): void => {
+  for (const obj of objects) {
+    obj.traverse((child) => {
+      const mat = (child as THREE.Mesh).material as THREE.Material | undefined;
+      if (!mat) return;
+      child.userData.dimPart = (extMaterial && mat === extMaterial) ? "ext" : "dim";
+    });
+  }
+};
+
 /** Line defined by two points for intersectLines2D */
 export interface Line2D {
   x1: number;
@@ -618,6 +637,8 @@ export const createDimensionGroup = (p: DimensionGroupParams): THREE.Group => {
     );
     dimGroup.add(arrow);
 
+    // No extension lines in this radial branch — everything is "dim".
+    tagDimParts([dimGroup]);
     return dimGroup;
   }
 
@@ -644,6 +665,9 @@ export const createDimensionGroup = (p: DimensionGroupParams): THREE.Group => {
   }
 
   dimensionObjects.forEach((obj) => dimGroup.add(obj));
+
+  // Tag children so the collector can split into dim/ext colors per DIMCLRD/DIMCLRE.
+  tagDimParts([dimGroup], extensionLineMaterial);
 
   return dimGroup;
 };
@@ -915,7 +939,9 @@ export const createOrdinateDimension = (p: DimensionTypeParams): THREE.Object3D[
     }
   }
 
-  return objects.length > 0 ? objects : null;
+  if (objects.length === 0) return null;
+  tagDimParts(objects);
+  return objects;
 };
 
 /**
@@ -1009,7 +1035,9 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
   );
   objects.push(arrow);
 
-  return objects.length > 0 ? objects : null;
+  if (objects.length === 0) return null;
+  tagDimParts(objects);
+  return objects;
 };
 
 /**
@@ -1153,7 +1181,9 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
     });
   }
 
-  return objects.length > 0 ? objects : null;
+  if (objects.length === 0) return null;
+  tagDimParts(objects);
+  return objects;
 };
 
 /**
@@ -1443,5 +1473,7 @@ export const createAngularDimension = (p: DimensionTypeParams): THREE.Object3D[]
     });
   }
 
-  return objects.length > 0 ? objects : null;
+  if (objects.length === 0) return null;
+  tagDimParts(objects, dashedMat);
+  return objects;
 };

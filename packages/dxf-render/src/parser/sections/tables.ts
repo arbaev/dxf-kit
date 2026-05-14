@@ -40,6 +40,8 @@ export interface IDimStyle {
   dimtxt?: number;   // code 140: text height (unscaled)
   dimtsz?: number;   // code 142: tick size (>0 = use ticks instead of arrows)
   dimexe?: number;   // code 44: extension line extension past dimension line
+  dimclrd?: number;  // code 176: dimension line color (ACI index, 0=BYBLOCK, 256=BYLAYER)
+  dimclre?: number;  // code 177: extension line color (ACI index, 0=BYBLOCK, 256=BYLAYER)
   dimclrt?: number;  // code 178: dimension text color (ACI index)
   dimlunit?: number; // code 277: 2=Decimal, 4=Architectural
   dimdec?: number;   // code 271: decimal places for primary units (arch: 2^dimdec is fraction denominator)
@@ -434,6 +436,14 @@ function parseDimStyles(scanner: DxfScanner): Record<string, IDimStyle> {
         break;
       case 142:
         ds.dimtsz = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 176:
+        ds.dimclrd = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 177:
+        ds.dimclre = curr.value as number;
         curr = scanner.next();
         break;
       case 178:

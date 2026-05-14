@@ -558,6 +558,29 @@ describe("parseTables", () => {
       expect(dimStyles.ARCHARR.dimclrt).toBe(1);
     });
 
+    it("parses DIMSTYLE with dimclrd (code 176) and dimclre (code 177) for line colors", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "DIMSTYLE",
+        "70", "1",
+        "0", "DIMSTYLE",
+        "2", "stil1",
+        "176", "5",            // DIMCLRD — dimension line color (blue)
+        "177", "5",            // DIMCLRE — extension line color (blue)
+        "178", "7",            // DIMCLRT — text color
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const dimStyles = tables.dimStyle.dimStyles as Record<string, IDimStyle>;
+      expect(dimStyles.stil1.dimclrd).toBe(5);
+      expect(dimStyles.stil1.dimclre).toBe(5);
+      expect(dimStyles.stil1.dimclrt).toBe(7);
+    });
+
     it("parses DIMSTYLE with dimadec (code 179) for angular precision", () => {
       const scanner = createScanner(
         "0", "TABLE",

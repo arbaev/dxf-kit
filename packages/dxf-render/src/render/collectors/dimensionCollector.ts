@@ -53,24 +53,26 @@ export function collectDimensionEntity(
   }
   const dv = mergeEntityDimVars(baseDv, entity);
 
-  // Resolve formatting variables: DIMSTYLE → header → undefined (defaults).
+  // Resolve formatting variables: entity XDATA override → DIMSTYLE → header → undefined.
   const dimlunit = dimStyleEntry?.dimlunit ?? colorCtx.headerDimlunit;
   const dimzin = dimStyleEntry?.dimzin ?? colorCtx.headerDimzin;
-  const dimdec = dimStyleEntry?.dimdec ?? colorCtx.headerDimdec;
-  const dimadec = dimStyleEntry?.dimadec ?? colorCtx.headerDimadec;
+  const dimdec = entity.dimdec ?? dimStyleEntry?.dimdec ?? colorCtx.headerDimdec;
+  const dimadec = entity.dimadec ?? dimStyleEntry?.dimadec ?? colorCtx.headerDimadec;
   // Build dimFmt whenever any of these is defined so DIMDEC alone (without DIMLUNIT) is enough.
   const dimFmt: DimFormatOptions | undefined =
     dimlunit !== undefined || dimzin !== undefined || dimdec !== undefined || dimadec !== undefined
       ? { dimlunit, dimzin, dimdec, dimadec }
       : undefined;
 
-  // DIMCLRT: dimension text color from DIMSTYLE (ACI index).
+  // DIMCLRD/DIMCLRE/DIMCLRT: dimension component colors from DIMSTYLE (ACI index).
   // Route through aciToColor so ACI 7/255 stay theme-adaptive — otherwise
   // a DIMSTYLE with DIMCLRT=7 renders white text invisible on a light background.
-  let textColor = entityColor;
-  if (dimStyleEntry && dimStyleEntry.dimclrt !== undefined && dimStyleEntry.dimclrt > 0 && dimStyleEntry.dimclrt <= 255) {
-    textColor = aciToColor(dimStyleEntry.dimclrt);
-  }
+  // Values 0 (BYBLOCK) and 256 (BYLAYER) fall back to entity color.
+  const resolveDimStyleColor = (aci: number | undefined): string =>
+    aci !== undefined && aci > 0 && aci <= 255 ? aciToColor(aci) : entityColor;
+  const dimColor = resolveDimStyleColor(dimStyleEntry?.dimclrd);
+  const extColor = resolveDimStyleColor(dimStyleEntry?.dimclre);
+  const textColor = resolveDimStyleColor(dimStyleEntry?.dimclrt);
 
   // DIMTSZ / DIMBLK from DIMSTYLE overrides header values
   if (dimStyleEntry) {
@@ -158,7 +160,11 @@ export function collectDimensionEntity(
   }
 
   // Decompose geometry objects (lines, arrows) into collector.
-  // Use entityColor (sentinel) for collector calls so theme-switching works.
+  // Color per object is selected by userData.dimPart ("ext" = extension line,
+  // anything else = dimension line / arrows / ticks). Uses sentinel colors so
+  // theme-switching keeps working.
+  const colorFor = (obj: THREE.Object3D): string =>
+    obj.userData?.dimPart === "ext" ? extColor : dimColor;
   if (result) {
     for (const obj of result) {
       if (obj instanceof THREE.Group) {
@@ -170,6 +176,7 @@ export function collectDimensionEntity(
           const posAttr = geo.getAttribute("position") as THREE.BufferAttribute | undefined;
           if (!posAttr) return;
           const v = new THREE.Vector3();
+          const partColor = colorFor(child);
 
           if (child instanceof THREE.LineSegments || child instanceof THREE.Line) {
             const count = posAttr.count;
@@ -177,7 +184,7 @@ export function collectDimensionEntity(
               v.fromBufferAttribute(posAttr, i).applyMatrix4(child.matrixWorld).applyMatrix4(matrix);
               const x1 = v.x, y1 = v.y, z1 = v.z;
               v.fromBufferAttribute(posAttr, i + 1).applyMatrix4(child.matrixWorld).applyMatrix4(matrix);
-              collector.addLineSegments(layer, entityColor, [x1, y1, z1, v.x, v.y, v.z]);
+              collector.addLineSegments(layer, partColor, [x1, y1, z1, v.x, v.y, v.z]);
             }
           } else if (child instanceof THREE.Mesh) {
             const count = posAttr.count;
@@ -191,7 +198,7 @@ export function collectDimensionEntity(
             if (indices.length === 0) {
               for (let i = 0; i < count; i++) indices.push(i);
             }
-            collector.addOverlayMesh(layer, entityColor, positions, indices);
+            collector.addOverlayMesh(layer, partColor, positions, indices);
           }
         });
       } else {
@@ -201,6 +208,7 @@ export function collectDimensionEntity(
         const posAttr = geo.getAttribute("position") as THREE.BufferAttribute | undefined;
         if (!posAttr) continue;
         const v = new THREE.Vector3();
+        const partColor = colorFor(obj);
 
         if (obj instanceof THREE.LineSegments || obj instanceof THREE.Line) {
           const count = posAttr.count;
@@ -208,7 +216,7 @@ export function collectDimensionEntity(
             v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
             const x1 = v.x, y1 = v.y, z1 = v.z;
             v.fromBufferAttribute(posAttr, i + 1).applyMatrix4(matrix);
-            collector.addLineSegments(layer, entityColor, [x1, y1, z1, v.x, v.y, v.z]);
+            collector.addLineSegments(layer, partColor, [x1, y1, z1, v.x, v.y, v.z]);
           }
         } else if (obj instanceof THREE.Mesh) {
           const count = posAttr.count;
@@ -222,7 +230,7 @@ export function collectDimensionEntity(
           if (indices.length === 0) {
             for (let i = 0; i < count; i++) indices.push(i);
           }
-          collector.addOverlayMesh(layer, entityColor, positions, indices);
+          collector.addOverlayMesh(layer, partColor, positions, indices);
         }
       }
     }
