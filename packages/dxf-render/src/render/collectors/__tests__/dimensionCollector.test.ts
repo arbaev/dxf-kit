@@ -179,6 +179,56 @@ describe("collectDimensionEntity — DIMCLRD/DIMCLRE line color overrides", () =
   });
 });
 
+describe("collectDimensionEntity — DIMCLRT for angular dimensions", () => {
+  function makeAngularDim(overrides: Partial<DxfDimensionEntity> = {}): DxfDimensionEntity {
+    return {
+      type: "DIMENSION",
+      handle: "C0DECAFE",
+      layer: "Kote",
+      // dimensionType 34 = 2 (angular) + 32 (default-text-position flag) — matches
+      // real-world AutoCAD angular dimensions in test fixtures.
+      dimensionType: 34,
+      actualMeasurement: 90,
+      anchorPoint: { x: 0, y: 0, z: 0 },
+      middleOfText: { x: 5, y: 5, z: 0 },
+      linearOrAngularPoint1: { x: 10, y: 0, z: 0 },
+      linearOrAngularPoint2: { x: 0, y: 0, z: 0 },
+      diameterOrRadiusPoint: { x: 0, y: 0, z: 0 },
+      arcPoint: { x: 7, y: 7, z: 0 },
+      text: "80°",
+      styleName: "stil1",
+      ...overrides,
+    } as DxfDimensionEntity;
+  }
+
+  it("uses DIMCLRT theme-adaptive sentinel for angular dim text (not entity color)", () => {
+    const collector = new MockCollector();
+    const ctx = makeContext({
+      layers: {
+        Kote: { name: "Kote", visible: true, frozen: false, colorIndex: 5, color: 255 } as DxfLayer,
+      },
+      dimStyles: {
+        // entity = red (ACI 1); DIMCLRT = 7 → theme-adaptive sentinel
+        stil1: { name: "stil1", dimclrt: 7 } as DxfDimStyle,
+      },
+    });
+
+    collectDimensionEntity(
+      makeAngularDim({ colorIndex: 1 }),
+      {} as DxfData,
+      ctx,
+      collector as any,
+      "Kote",
+    );
+
+    // Text glyph meshes must carry the ACI7 sentinel. (Arrow meshes are still
+    // emitted as #ff0000 from the entity color, which is correct — without a
+    // DIMCLRD override the dim lines/arrows follow the entity color.)
+    expect(collector.meshes.length).toBeGreaterThan(0);
+    expect(collector.meshes.some((m) => m.color === ACI7_COLOR)).toBe(true);
+  });
+});
+
 describe("collectDimensionEntity — DIMDEC entity override", () => {
   it("uses entity.dimdec for measurement precision over DIMSTYLE.dimdec", () => {
     const collector = new MockCollector();

@@ -110,7 +110,10 @@ export function collectDimensionEntity(
   const resolvedColor = colorCtx.materials.resolveColor(entityColor);
 
   // Ordinate dimension (type 6 = Y-ordinate, type 7 = X-ordinate)
-  const dimParams = { entity, color: resolvedColor, font, collector, layer, transform, dv, fmt: dimFmt };
+  // textColor is the un-resolved sentinel (e.g. ACI7_COLOR) so the
+  // collector can keep DIMCLRT theme-adaptive — materials.resolveColor()
+  // happens later inside GeometryCollector.flush().
+  const dimParams = { entity, color: resolvedColor, textColor, font, collector, layer, transform, dv, fmt: dimFmt };
   if ((baseDimType & 0x0e) === 6) {
     result = createOrdinateDimension(dimParams);
   } else if (baseDimType === 2) {
