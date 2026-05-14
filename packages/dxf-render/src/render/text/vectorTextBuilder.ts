@@ -1,7 +1,7 @@
 import type { Font, Glyph } from "opentype.js";
 import { getTriangulatedGlyph, type GlyphData } from "./glyphCache";
 import type { GeometryCollector } from "../mergeCollectors";
-import type { MTextLine } from "./mtextParser";
+import type { MTextLine, MTextRun } from "./mtextParser";
 import { cleanDimensionMText } from "../dimensions";
 import { classifyFont } from "./fontClassifier";
 
@@ -136,6 +136,8 @@ export interface TextParams {
   italic?: boolean;
   obliqueAngle?: number;
   underline?: boolean;
+  overline?: boolean;
+  strikethrough?: boolean;
 }
 
 export interface MTextParams {
@@ -357,32 +359,69 @@ export function addTextToCollector(p: TextParams): void {
     collector.addOverlayMesh(layer, color, allPositions, allIndices);
   }
 
-  // Emit underline line segment below text
-  if (p.underline && m.totalAdvance > 0) {
-    const ulX1 = (m.bounds.xMin - originX) * scaleX;
-    const ulX2 = (m.bounds.xMax - originX) * scaleX;
-    const ulLocalY = (-UNDERLINE_OFFSET - originY) * scaleY;
-
-    let wx1 = posX + ulX1 * cos - ulLocalY * sin;
-    let wy1 = posY + ulX1 * sin + ulLocalY * cos;
-    let wz1 = posZ;
-    let wx2 = posX + ulX2 * cos - ulLocalY * sin;
-    let wy2 = posY + ulX2 * sin + ulLocalY * cos;
-    let wz2 = posZ;
-
-    if (transform) {
-      const t1x = transform[0] * wx1 + transform[4] * wy1 + transform[8] * wz1 + transform[12];
-      const t1y = transform[1] * wx1 + transform[5] * wy1 + transform[9] * wz1 + transform[13];
-      const t1z = transform[2] * wx1 + transform[6] * wy1 + transform[10] * wz1 + transform[14];
-      wx1 = t1x; wy1 = t1y; wz1 = t1z;
-      const t2x = transform[0] * wx2 + transform[4] * wy2 + transform[8] * wz2 + transform[12];
-      const t2y = transform[1] * wx2 + transform[5] * wy2 + transform[9] * wz2 + transform[13];
-      const t2z = transform[2] * wx2 + transform[6] * wy2 + transform[10] * wz2 + transform[14];
-      wx2 = t2x; wy2 = t2y; wz2 = t2z;
+  // Emit underline / strikethrough / overline segments
+  if (m.totalAdvance > 0) {
+    const capRatio = getCapHeightRatio(font);
+    if (p.underline) {
+      emitTextDecoration(collector, layer, color, m, originX, originY,
+        scaleX, scaleY, -UNDERLINE_OFFSET, posX, posY, posZ, cos, sin, transform);
     }
-
-    collector.addLineSegments(layer, color, [wx1, wy1, wz1, wx2, wy2, wz2]);
+    if (p.strikethrough) {
+      emitTextDecoration(collector, layer, color, m, originX, originY,
+        scaleX, scaleY, capRatio * STRIKETHROUGH_RATIO, posX, posY, posZ, cos, sin, transform);
+    }
+    if (p.overline) {
+      emitTextDecoration(collector, layer, color, m, originX, originY,
+        scaleX, scaleY, capRatio + OVERLINE_OFFSET, posX, posY, posZ, cos, sin, transform);
+    }
   }
+}
+
+/**
+ * Emit a horizontal decoration line spanning the text bounds at the given
+ * Y position in normalized font units (baseline = 0, cap height = capRatio).
+ * Applies the same scaling, rotation and transform as the parent text run.
+ */
+function emitTextDecoration(
+  collector: GeometryCollector,
+  layer: string,
+  color: string,
+  m: TextMetrics,
+  originX: number,
+  originY: number,
+  scaleX: number,
+  scaleY: number,
+  yFontUnits: number,
+  posX: number,
+  posY: number,
+  posZ: number,
+  cos: number,
+  sin: number,
+  transform?: readonly number[],
+): void {
+  const x1 = (m.bounds.xMin - originX) * scaleX;
+  const x2 = (m.bounds.xMax - originX) * scaleX;
+  const localY = (yFontUnits - originY) * scaleY;
+
+  let wx1 = posX + x1 * cos - localY * sin;
+  let wy1 = posY + x1 * sin + localY * cos;
+  let wz1 = posZ;
+  let wx2 = posX + x2 * cos - localY * sin;
+  let wy2 = posY + x2 * sin + localY * cos;
+  let wz2 = posZ;
+
+  if (transform) {
+    const t1x = transform[0] * wx1 + transform[4] * wy1 + transform[8] * wz1 + transform[12];
+    const t1y = transform[1] * wx1 + transform[5] * wy1 + transform[9] * wz1 + transform[13];
+    const t1z = transform[2] * wx1 + transform[6] * wy1 + transform[10] * wz1 + transform[14];
+    wx1 = t1x; wy1 = t1y; wz1 = t1z;
+    const t2x = transform[0] * wx2 + transform[4] * wy2 + transform[8] * wz2 + transform[12];
+    const t2y = transform[1] * wx2 + transform[5] * wy2 + transform[9] * wz2 + transform[13];
+    const t2z = transform[2] * wx2 + transform[6] * wy2 + transform[10] * wz2 + transform[14];
+    wx2 = t2x; wy2 = t2y; wz2 = t2z;
+  }
+
+  collector.addLineSegments(layer, color, [wx1, wy1, wz1, wx2, wy2, wz2]);
 }
 
 // ── Faux bold/italic constants ─────────────────────────────────────────
@@ -416,6 +455,10 @@ const ITALIC_SLANT = Math.tan((12 * Math.PI) / 180);
 const BOLD_OFFSET = 0.02;
 /** Underline position below baseline as fraction of height (normalized units) */
 const UNDERLINE_OFFSET = 0.15;
+/** Overline position above cap height as fraction of height (normalized units) */
+const OVERLINE_OFFSET = 0.1;
+/** Strikethrough position as fraction of cap height (0.5 = center of cap) */
+const STRIKETHROUGH_RATIO = 0.5;
 
 // ── MTEXT support ──────────────────────────────────────────────────────
 
@@ -440,38 +483,132 @@ function mtextHAlignToEnum(hAlign: "left" | "center" | "right"): number {
 }
 
 /**
- * Word wrap text to fit within a maximum width (in world units).
- * Splits by spaces; single words wider than maxWidth stay on their own line.
- * Uses incremental advance accumulation O(n) instead of re-measuring the full line O(n²).
+ * Resolve the effective font for a run, applying serif/sans classification
+ * when a serif fallback font is supplied and the run carries a fontFamily.
  */
-function wrapTextToWidth(font: Font, text: string, height: number, maxWidth: number): string[] {
-  if (!text) return [text];
-  const words = text.split(" ");
-  if (words.length <= 1) return [text];
+function resolveRunFont(run: MTextRun, font: Font, serifFont: Font | undefined): Font {
+  if (serifFont && run.fontFamily) {
+    return classifyFont(run.fontFamily) === "serif" ? serifFont : font;
+  }
+  return font;
+}
 
-  const emScale = height / getCapHeightRatio(font);
-  const spaceAdv = measureText(font, " ").totalAdvance;
+/** Measure a run's advance width in world units, given its effective font/height. */
+function measureRunWidth(
+  run: MTextRun,
+  font: Font,
+  serifFont: Font | undefined,
+  defaultHeight: number,
+): number {
+  if (!run.text) return 0;
+  const f = resolveRunFont(run, font, serifFont);
+  const h = run.height ?? defaultHeight;
+  const emScale = h / getCapHeightRatio(f);
+  return measureText(f, run.text).totalAdvance * emScale;
+}
 
-  const lines: string[] = [];
-  let currentLine = words[0];
-  let lineAdv = measureText(font, words[0]).totalAdvance;
+/** Build runs by slicing a base run with a new text value (preserves all formatting). */
+const sliceRun = (run: MTextRun, text: string): MTextRun => ({ ...run, text });
 
-  for (let i = 1; i < words.length; i++) {
-    const wordAdv = measureText(font, words[i]).totalAdvance;
-    const testAdv = lineAdv + spaceAdv + wordAdv;
-    // 2% tolerance: font metric rounding (sCapHeight override, advance precision)
-    // can make text slightly wider than the original AutoCAD measurement
-    if (testAdv * emScale > maxWidth * 1.02 && currentLine.length > 0) {
-      lines.push(currentLine);
-      currentLine = words[i];
-      lineAdv = wordAdv;
-    } else {
-      currentLine += " " + words[i];
-      lineAdv = testAdv;
+/**
+ * Word-wrap a line's runs to fit within maxWidth (world units). Splits each
+ * run's text on spaces, measures each token with the run's own font/height,
+ * and greedily packs tokens into wrapped lines. Format boundaries are
+ * preserved: contiguous tokens from the same run on the same wrapped line
+ * are coalesced back into a single MTextRun.
+ */
+function wrapLineRunsToWidth(
+  line: MTextLine,
+  font: Font,
+  serifFont: Font | undefined,
+  defaultHeight: number,
+  maxWidth: number,
+): MTextLine[] {
+  type Token = { runIdx: number; text: string; isSpace: boolean; adv: number };
+  const tokens: Token[] = [];
+  for (let r = 0; r < line.runs.length; r++) {
+    const run = line.runs[r];
+    if (!run.text) continue;
+    const f = resolveRunFont(run, font, serifFont);
+    const h = run.height ?? defaultHeight;
+    const emScale = h / getCapHeightRatio(f);
+    // Split keeping space groups: " word1  word2 " -> ["", " ", "word1", "  ", "word2", " "]
+    const parts = run.text.split(/( +)/);
+    for (const part of parts) {
+      if (part === "") continue;
+      tokens.push({
+        runIdx: r,
+        text: part,
+        isSpace: part.charAt(0) === " ",
+        adv: measureText(f, part).totalAdvance * emScale,
+      });
     }
   }
-  lines.push(currentLine);
-  return lines;
+  if (tokens.length === 0) return [line];
+
+  // Greedy wrap. 2% tolerance matches sCapHeight rounding (see legacy comment).
+  const wrapped: Token[][] = [[]];
+  let currentAdv = 0;
+  for (const tok of tokens) {
+    const isFirstOnLine = wrapped[wrapped.length - 1].length === 0;
+    if (
+      !tok.isSpace &&
+      !isFirstOnLine &&
+      currentAdv + tok.adv > maxWidth * 1.02
+    ) {
+      wrapped.push([tok]);
+      currentAdv = tok.adv;
+    } else if (tok.isSpace && isFirstOnLine) {
+      // Skip leading spaces on a wrapped continuation line
+      continue;
+    } else {
+      wrapped[wrapped.length - 1].push(tok);
+      currentAdv += tok.adv;
+    }
+  }
+
+  return wrapped
+    .filter((toks) => toks.length > 0)
+    .map((toks, wi) => {
+      const runs: MTextRun[] = [];
+      let bufRunIdx = -1;
+      let buf = "";
+      for (const tok of toks) {
+        if (tok.runIdx !== bufRunIdx) {
+          if (buf) runs.push(sliceRun(line.runs[bufRunIdx], buf));
+          bufRunIdx = tok.runIdx;
+          buf = tok.text;
+        } else {
+          buf += tok.text;
+        }
+      }
+      if (buf) runs.push(sliceRun(line.runs[bufRunIdx], buf));
+      return {
+        runs,
+        leftMargin: line.leftMargin,
+        // Only the first wrapped line keeps the first-line indent
+        firstIndent: wi === 0 ? line.firstIndent : undefined,
+      };
+    });
+}
+
+/** Split a line's runs at every '\t' boundary. Returns an array of segments,
+ * each segment being a list of (run-sliced) runs that render between two
+ * consecutive tab stops. Trailing empty segments (from trailing tabs) are
+ * preserved so the caller can drop them as column-width padding.
+ */
+function splitRunsByTab(runs: MTextRun[]): MTextRun[][] {
+  const segments: MTextRun[][] = [[]];
+  for (const run of runs) {
+    if (!run.text) continue;
+    const parts = run.text.split("\t");
+    if (parts[0]) segments[segments.length - 1].push(sliceRun(run, parts[0]));
+    for (let p = 1; p < parts.length; p++) {
+      segments.push([]);
+      if (parts[p]) segments[segments.length - 1].push(sliceRun(run, parts[p]));
+    }
+  }
+  return segments;
 }
 
 interface StackedTextParams {
@@ -580,10 +717,104 @@ function emitStackedText(p: StackedTextParams): void {
   }
 }
 
+/** Effective height of a run, falling back to defaultHeight. */
+const runHeight = (run: MTextRun, defaultHeight: number): number =>
+  run.height ?? defaultHeight;
+
+/** Total advance of a list of runs in world units. */
+function measureRunsWidth(
+  runs: MTextRun[],
+  font: Font,
+  serifFont: Font | undefined,
+  defaultHeight: number,
+): number {
+  let total = 0;
+  for (const r of runs) total += measureRunWidth(r, font, serifFont, defaultHeight);
+  return total;
+}
+
+/**
+ * Emit a single MTEXT line composed of one or more formatted runs.
+ * Total line width is measured across all runs so the alignment offset
+ * positions the whole line correctly; runs are then placed left-to-right
+ * with accumulated xCursor.
+ */
+function emitMTextLine(
+  runs: MTextRun[],
+  fallbackColor: string,
+  font: Font,
+  serifFont: Font | undefined,
+  defaultHeight: number,
+  collector: GeometryCollector,
+  layer: string,
+  posX: number,
+  posY: number,
+  posZ: number,
+  rotation: number,
+  cos: number,
+  sin: number,
+  hAlign: "left" | "center" | "right",
+  vAlign: number,
+): void {
+  if (runs.length === 0) return;
+
+  const totalWidth = measureRunsWidth(runs, font, serifFont, defaultHeight);
+  let startOffset = 0;
+  if (hAlign === "center") startOffset = -totalWidth / 2;
+  else if (hAlign === "right") startOffset = -totalWidth;
+
+  let xCursor = startOffset;
+  for (const run of runs) {
+    if (!run.text) continue;
+    const f = resolveRunFont(run, font, serifFont);
+    const h = runHeight(run, defaultHeight);
+    const wx = posX + xCursor * cos;
+    const wy = posY + xCursor * sin;
+    addTextToCollector({
+      collector,
+      layer,
+      color: run.color ?? fallbackColor,
+      font: f,
+      text: run.text,
+      height: h,
+      posX: wx,
+      posY: wy,
+      posZ,
+      rotation,
+      hAlign: HAlign.LEFT,
+      vAlign,
+      bold: run.bold,
+      italic: run.italic,
+      underline: run.underline,
+      overline: run.overline,
+      strikethrough: run.strikethrough,
+    });
+    xCursor += measureRunWidth(run, font, serifFont, defaultHeight);
+  }
+}
+
+/**
+ * Strip trailing runs whose text is only whitespace tabs and runs that become
+ * empty after rstrip — trailing tabs in MTEXT are column-width padding, not
+ * visible content. Returns a new array; original runs are not mutated.
+ */
+function stripTrailingTabs(runs: MTextRun[]): MTextRun[] {
+  if (runs.length === 0) return runs;
+  const out = runs.slice();
+  while (out.length > 0) {
+    const last = out[out.length - 1];
+    const stripped = last.text.replace(/\t+$/, "");
+    if (stripped === last.text) break;
+    if (stripped === "") out.pop();
+    else { out[out.length - 1] = sliceRun(last, stripped); break; }
+  }
+  return out;
+}
+
 /**
  * Add MTEXT entity lines to GeometryCollector as triangulated mesh.
  * Handles multiline text with word wrapping, 9 attachment points,
- * stacked text (fractions), and per-line color/height overrides.
+ * stacked text (fractions), and inline run-level formatting.
  */
 export function addMTextToCollector(p: MTextParams): void {
   const {
@@ -608,44 +839,42 @@ export function addMTextToCollector(p: MTextParams): void {
       continue;
     }
 
-    let processedText = line.text;
-    const hadTabs = processedText.includes("\t");
-
+    const hasTabs = line.runs.some((r) => r.text.includes("\t"));
+    let processedRuns = line.runs;
     // Tab-containing lines define columnar layout (tables, schedules).
-    // Keep \t characters — they will be rendered at exact tab stop positions.
-    // Strip trailing tabs — they are column-width padding, not visible content.
-    if (hadTabs) {
-      processedText = processedText.replace(/\t+$/, "");
-    }
+    // Strip trailing tabs as column-width padding.
+    if (hasTabs) processedRuns = stripTrailingTabs(processedRuns);
 
     // Word wrap (only when width constraint is set and line has no tabs)
-    if (!hadTabs && width && width > 0) {
-      const lineHeight = line.height || defaultHeight;
+    if (!hasTabs && width && width > 0) {
       const margin = line.leftMargin || 0;
       const effectiveWidth = width - margin;
-      const wrapped = wrapTextToWidth(font, processedText, lineHeight, effectiveWidth > 0 ? effectiveWidth : width);
-      for (let wi = 0; wi < wrapped.length; wi++) {
-        expandedLines.push({
-          ...line,
-          text: wrapped[wi],
-          // Only first wrapped line gets firstIndent
-          firstIndent: wi === 0 ? line.firstIndent : undefined,
-        });
-      }
+      const wrapped = wrapLineRunsToWidth(
+        line,
+        font,
+        serifFont,
+        defaultHeight,
+        effectiveWidth > 0 ? effectiveWidth : width,
+      );
+      for (const w of wrapped) expandedLines.push(w);
     } else {
-      expandedLines.push({ ...line, text: processedText });
+      expandedLines.push({ ...line, runs: processedRuns });
     }
   }
 
   if (expandedLines.length === 0) return;
 
-  // 2. Compute total block height
+  // 2. Compute total block height. Use the tallest run on each line as the
+  //    line's effective height (matters when a line mixes run heights).
+  const lineHeightFor = (line: MTextLine): number => {
+    let h = 0;
+    for (const r of line.runs) h = Math.max(h, runHeight(r, defaultHeight));
+    return h > 0 ? h : defaultHeight;
+  };
+
   let totalHeight = 0;
-  for (const line of expandedLines) {
-    totalHeight += (line.height || defaultHeight) * lineSpacing;
-  }
-  // Remove trailing spacing from last line
-  const lastLineHeight = expandedLines[expandedLines.length - 1].height || defaultHeight;
+  for (const line of expandedLines) totalHeight += lineHeightFor(line) * lineSpacing;
+  const lastLineHeight = lineHeightFor(expandedLines[expandedLines.length - 1]);
   totalHeight = totalHeight - lastLineHeight * lineSpacing + lastLineHeight;
 
   // 3. Determine alignment from attachment point (1-9)
@@ -665,57 +894,50 @@ export function addMTextToCollector(p: MTextParams): void {
   }
 
   // 4. Emit each line
-  const hAlignEnum = mtextHAlignToEnum(hAlign);
   const cos = Math.cos(rotation);
   const sin = Math.sin(rotation);
   let lineYOffset = 0; // accumulates downward (negative Y in local coords)
   for (const line of expandedLines) {
-    const lineHeight = line.height || defaultHeight;
-    const lineColor = line.color || color;
-
-    // Per-line font: use inline \f fontFamily to pick sans/serif
-    let lineFont = font;
-    if (serifFont && line.fontFamily) {
-      lineFont = classifyFont(line.fontFamily) === "serif" ? serifFont : font;
-    }
+    const lineHeight = lineHeightFor(line);
+    // Stacked lines (\S) currently use the first run's formatting for the
+    // main text and fraction. Mixing formatting around \S is rare and not
+    // representable in the legacy emitStackedText model.
+    const firstRun = line.runs[0];
 
     // Paragraph indentation: leftMargin + firstIndent (in drawing units)
     const indentX = (line.leftMargin || 0) + (line.firstIndent || 0);
-
     // Local offset from insertion point (in text-local coordinates)
     const localY = groupYOffset + lineYOffset;
-
     // Apply rotation to get world position, including paragraph indent
     const worldX = posX - localY * sin + indentX * cos;
     const worldY = posY + localY * cos + indentX * sin;
 
     if (line.stackedTop || line.stackedBottom) {
+      const mainText = line.runs.map((r) => r.text).join("");
+      const stackedFont = firstRun ? resolveRunFont(firstRun, font, serifFont) : font;
+      const stackedColor = firstRun?.color ?? color;
       emitStackedText({
-        collector, layer, color: lineColor, font: lineFont,
-        mainText: line.text, stackedTop: line.stackedTop || "", stackedBottom: line.stackedBottom || "",
+        collector, layer, color: stackedColor, font: stackedFont,
+        mainText, stackedTop: line.stackedTop || "", stackedBottom: line.stackedBottom || "",
         height: lineHeight, posX: worldX, posY: worldY, posZ, rotation, hAlign,
-        bold: line.bold, italic: line.italic,
+        bold: firstRun?.bold, italic: firstRun?.italic,
       });
-    } else if (line.text.includes("\t")) {
+    } else if (line.runs.some((r) => r.text.includes("\t"))) {
       // Render tab-separated segments at exact tab stop positions.
       // Tab grid = multiples of tabStopWidth (4 × defaultHeight).
-      // With sCapHeight overridden to match Arial, positions match AutoCAD exactly.
-      const segments = line.text.split("\t");
-      const emScale = lineHeight / getCapHeightRatio(lineFont);
+      const segments = splitRunsByTab(line.runs);
       let segLocalX = 0;
       for (let si = 0; si < segments.length; si++) {
-        if (segments[si]) {
+        const seg = segments[si];
+        if (seg.length > 0) {
           const segWX = worldX + segLocalX * cos;
           const segWY = worldY + segLocalX * sin;
-          addTextToCollector({
-            collector, layer, color: lineColor, font: lineFont,
-            text: segments[si], height: lineHeight,
-            posX: segWX, posY: segWY, posZ,
-            rotation, hAlign: HAlign.LEFT, vAlign: rowVAlign,
-            bold: line.bold, italic: line.italic,
-            underline: line.underline,
-          });
-          segLocalX += measureText(lineFont, segments[si]).totalAdvance * emScale;
+          emitMTextLine(
+            seg, color, font, serifFont, defaultHeight,
+            collector, layer, segWX, segWY, posZ, rotation, cos, sin,
+            "left", rowVAlign,
+          );
+          segLocalX += measureRunsWidth(seg, font, serifFont, defaultHeight);
         }
         // Advance to next tab stop after each segment except the last
         if (si < segments.length - 1) {
@@ -723,14 +945,11 @@ export function addMTextToCollector(p: MTextParams): void {
         }
       }
     } else {
-      addTextToCollector({
-        collector, layer, color: lineColor, font: lineFont,
-        text: line.text, height: lineHeight,
-        posX: worldX, posY: worldY, posZ,
-        rotation, hAlign: hAlignEnum, vAlign: rowVAlign,
-        bold: line.bold, italic: line.italic,
-        underline: line.underline,
-      });
+      emitMTextLine(
+        line.runs, color, font, serifFont, defaultHeight,
+        collector, layer, worldX, worldY, posZ, rotation, cos, sin,
+        hAlign, rowVAlign,
+      );
     }
 
     lineYOffset -= lineHeight * lineSpacing;

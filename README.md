@@ -82,7 +82,7 @@ async function loadFile(file) {
 - **Variable-width polylines** — per-vertex `startWidth`/`endWidth` tapering, constant-width, arrows, donuts rendered as mesh geometry with miter joins
 - **Linetype rendering** — DASHED, HIDDEN, CENTER, PHANTOM, DOT, DASHDOT with LTSCALE support
 - **Hatch patterns** — 25 built-in AutoCAD patterns with multi-boundary clipping
-- **Vector text** — crisp at any zoom; Liberation Sans/Serif fonts; bold, italic, underline, MTEXT formatting
+- **Vector text** — crisp at any zoom; Liberation Sans/Serif fonts; bold, italic, underline, overline, strikethrough; MTEXT inline scoped formatting (color/font/size/decoration inside `{…}` groups)
 - **Picking & associations** — bbox-based raycast, hover/click events, semantic links derived from DXF (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION)
 - **Search APIs** — `findEntitiesByText` / `findEntitiesByLayer` / `findEntitiesByType`, paired with `viewer.zoomToEntity` / `zoomToLayer` for find-and-focus UX
 - **Dark theme** — instant switching

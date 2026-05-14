@@ -3,11 +3,15 @@ import {
   replaceSpecialChars,
   parseTextWithUnderline,
   parseMTextContent,
+  getMTextLineText,
   getMTextHAlign,
   getTextHAlign,
   getMTextVAlign,
   getTextVAlign,
 } from "../mtextParser";
+
+/** Plain text of a parsed MTextLine — concatenation of all run texts. */
+const lineText = (line: { runs: { text: string }[] }) => getMTextLineText(line as never);
 
 // ── replaceSpecialChars ──────────────────────────────────────────────────
 
@@ -126,93 +130,94 @@ describe("parseTextWithUnderline", () => {
 // ── parseMTextContent ────────────────────────────────────────────────────
 
 describe("parseMTextContent", () => {
-  it("parses plain text into a single MTextLine", () => {
+  it("parses plain text into a single MTextLine with one run", () => {
     const result = parseMTextContent("Hello World");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("Hello World");
-    expect(result[0].color).toBeUndefined();
-    expect(result[0].height).toBeUndefined();
+    expect(result[0].runs).toHaveLength(1);
+    expect(result[0].runs[0].text).toBe("Hello World");
+    expect(result[0].runs[0].color).toBeUndefined();
+    expect(result[0].runs[0].height).toBeUndefined();
   });
 
   it("splits text by \\P into multiple lines", () => {
     const result = parseMTextContent("Line 1\\PLine 2\\PLine 3");
     expect(result).toHaveLength(3);
-    expect(result[0].text).toBe("Line 1");
-    expect(result[1].text).toBe("Line 2");
-    expect(result[2].text).toBe("Line 3");
+    expect(lineText(result[0])).toBe("Line 1");
+    expect(lineText(result[1])).toBe("Line 2");
+    expect(lineText(result[2])).toBe("Line 3");
   });
 
   it("sets ACI color with \\C<n>; (ACI 1 = red)", () => {
     const result = parseMTextContent("\\C1;Red text");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("Red text");
-    expect(result[0].color).toBe("#ff0000");
+    expect(lineText(result[0])).toBe("Red text");
+    expect(result[0].runs[0].color).toBe("#ff0000");
   });
 
   it("ACI color persists across lines", () => {
     const result = parseMTextContent("\\C5;Blue\\PStill blue");
     expect(result).toHaveLength(2);
     // ACI 5 = 255 = 0x0000FF = "#0000ff"
-    expect(result[0].color).toBe("#0000ff");
-    expect(result[1].color).toBe("#0000ff");
+    expect(result[0].runs[0].color).toBe("#0000ff");
+    expect(result[1].runs[0].color).toBe("#0000ff");
   });
 
   it("resets color to undefined with \\C0; (ByBlock)", () => {
     const result = parseMTextContent("\\C1;Red\\P\\C0;Default");
     expect(result).toHaveLength(2);
-    expect(result[0].color).toBe("#ff0000");
-    expect(result[1].color).toBeUndefined();
+    expect(result[0].runs[0].color).toBe("#ff0000");
+    expect(result[1].runs[0].color).toBeUndefined();
   });
 
   it("resets color to undefined with \\C256; (ByLayer)", () => {
     const result = parseMTextContent("\\C1;Red\\P\\C256;Default");
     expect(result).toHaveLength(2);
-    expect(result[0].color).toBe("#ff0000");
-    expect(result[1].color).toBeUndefined();
+    expect(result[0].runs[0].color).toBe("#ff0000");
+    expect(result[1].runs[0].color).toBeUndefined();
   });
 
   it("sets height with \\H<value>; (absolute)", () => {
     const result = parseMTextContent("\\H2.5;Big text");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("Big text");
-    expect(result[0].height).toBe(2.5);
+    expect(lineText(result[0])).toBe("Big text");
+    expect(result[0].runs[0].height).toBe(2.5);
   });
 
   it("sets height with \\H<value>x; (relative multiplier)", () => {
     const result = parseMTextContent("\\H1.5x;Title\\P\\H0.666667x;Body", 240);
     expect(result).toHaveLength(2);
-    expect(result[0].text).toBe("Title");
-    expect(result[0].height).toBeCloseTo(360, 1); // 240 * 1.5
-    expect(result[1].text).toBe("Body");
-    expect(result[1].height).toBeCloseTo(240, 0); // 360 * 0.666667
+    expect(lineText(result[0])).toBe("Title");
+    expect(result[0].runs[0].height).toBeCloseTo(360, 1); // 240 * 1.5
+    expect(lineText(result[1])).toBe("Body");
+    expect(result[1].runs[0].height).toBeCloseTo(240, 0); // 360 * 0.666667
   });
 
   it("relative \\Hx; without defaultHeight uses 1 as base", () => {
     const result = parseMTextContent("\\H2x;Double");
     expect(result).toHaveLength(1);
-    expect(result[0].height).toBe(2); // 1 * 2
+    expect(result[0].runs[0].height).toBe(2); // 1 * 2
   });
 
   it("sets font, bold, and italic with \\f...;", () => {
     const result = parseMTextContent("\\fArial|b1|i1|c0|p0;Styled");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("Styled");
-    expect(result[0].fontFamily).toBe("Arial");
-    expect(result[0].bold).toBe(true);
-    expect(result[0].italic).toBe(true);
+    expect(lineText(result[0])).toBe("Styled");
+    expect(result[0].runs[0].fontFamily).toBe("Arial");
+    expect(result[0].runs[0].bold).toBe(true);
+    expect(result[0].runs[0].italic).toBe(true);
   });
 
   it("converts literal escape sequences: \\\\ -> \\, \\{ -> {, \\} -> }", () => {
     const result = parseMTextContent("A\\\\B\\{C\\}D");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("A\\B{C}D");
+    expect(lineText(result[0])).toBe("A\\B{C}D");
   });
 
   it("converts Unicode escapes \\U+XXXX to characters", () => {
     // U+0041 = 'A', U+00E9 = 'e with acute'
     const result = parseMTextContent("\\U+0041\\U+00E9");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("A\u00E9");
+    expect(lineText(result[0])).toBe("A\u00E9");
   });
 
   it("parses stacked text \\Stop^bottom;", () => {
@@ -225,93 +230,110 @@ describe("parseMTextContent", () => {
   it("renders \\S3#8; as inline flat fraction text '3/8'", () => {
     const result = parseMTextContent("\\S3#8;");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("3/8");
+    expect(lineText(result[0])).toBe("3/8");
     expect(result[0].stackedTop).toBeUndefined();
     expect(result[0].stackedBottom).toBeUndefined();
   });
 
-  it("brace-scoped \\H does not affect subsequent lines", () => {
+  it("brace-scoped \\H reverts after closing }", () => {
     const result = parseMTextContent(
-      "\\H0.5x;Normal\\P{\\H0.7x;\\S3#8;}rest\\PStill normal",
+      "\\H0.5x;Normal\\P{\\H0.7x;inner}rest\\PStill normal",
       18,
     );
     expect(result).toHaveLength(3);
-    expect(result[0].height).toBeCloseTo(9); // 18 * 0.5
-    expect(result[1].text).toBe("3/8rest"); // \S3#8; rendered as inline fraction
-    expect(result[1].height).toBeCloseTo(9); // \H0.7x inside braces stripped (mixed content)
-    expect(result[2].height).toBeCloseTo(9); // height unchanged
+    // Line 0: height = 18 * 0.5 = 9
+    expect(result[0].runs[0].height).toBeCloseTo(9);
+    // Line 1: "inner" got scoped \H0.7x \u2014 9 * 0.7 = 6.3
+    //          "rest" reverts to the outer state (9)
+    expect(result[1].runs).toHaveLength(2);
+    expect(result[1].runs[0].text).toBe("inner");
+    expect(result[1].runs[0].height).toBeCloseTo(6.3);
+    expect(result[1].runs[1].text).toBe("rest");
+    expect(result[1].runs[1].height).toBeCloseTo(9);
+    // Line 2: outer state (9) carries over
+    expect(result[2].runs[0].height).toBeCloseTo(9);
   });
 
-  it("applies \\H inside braces when all content is braced (section marker)", () => {
+  it("applies \\H inside braces (section marker)", () => {
     // Section marker: {\H0.75x;A4.2} with base height 3.0
     const result = parseMTextContent("{\\H0.75x;A4.2}", 3.0);
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("A4.2");
-    expect(result[0].height).toBeCloseTo(2.25); // 3.0 * 0.75
+    expect(lineText(result[0])).toBe("A4.2");
+    expect(result[0].runs[0].height).toBeCloseTo(2.25); // 3.0 * 0.75
   });
 
-  it("applies absolute \\H inside braces when all content is braced", () => {
+  it("applies absolute \\H inside braces", () => {
     const result = parseMTextContent("{\\H1.5;Small text}", 5.0);
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("Small text");
-    expect(result[0].height).toBeCloseTo(1.5); // absolute height
+    expect(lineText(result[0])).toBe("Small text");
+    expect(result[0].runs[0].height).toBeCloseTo(1.5);
   });
 
   it("replaces \\~ (non-breaking space) with a regular space", () => {
     const result = parseMTextContent("Hello\\~World");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("Hello World");
+    expect(lineText(result[0])).toBe("Hello World");
   });
 
   it("replaces \\N (column break) with a space", () => {
     const result = parseMTextContent("Col1\\NCol2");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("Col1 Col2");
+    expect(lineText(result[0])).toBe("Col1 Col2");
   });
 
   it("removes grouping braces {}", () => {
     const result = parseMTextContent("{grouped text}");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("grouped text");
+    expect(lineText(result[0])).toBe("grouped text");
   });
 
-  it("sets underline with \\L and strips overline/strikethrough (\\O, \\K)", () => {
+  it("sets underline with \\L; \\O sets overline; \\K sets strikethrough", () => {
     const result = parseMTextContent("\\LUnderlined\\OOverlined\\KStrikethrough");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("UnderlinedOverlinedStrikethrough");
-    expect(result[0].underline).toBe(true);
+    // Each format toggle starts a new run
+    expect(result[0].runs).toHaveLength(3);
+    expect(result[0].runs[0].text).toBe("Underlined");
+    expect(result[0].runs[0].underline).toBe(true);
+    expect(result[0].runs[1].text).toBe("Overlined");
+    expect(result[0].runs[1].underline).toBe(true);
+    expect(result[0].runs[1].overline).toBe(true);
+    expect(result[0].runs[2].text).toBe("Strikethrough");
+    expect(result[0].runs[2].strikethrough).toBe(true);
   });
 
-  it("\\l turns off underline", () => {
+  it("\\l turns off underline mid-line, creating two runs", () => {
     const result = parseMTextContent("\\LUnderlined\\l Normal");
     expect(result).toHaveLength(1);
-    expect(result[0].underline).toBe(true);
-    expect(result[0].text).toBe("Underlined Normal");
+    expect(result[0].runs).toHaveLength(2);
+    expect(result[0].runs[0].text).toBe("Underlined");
+    expect(result[0].runs[0].underline).toBe(true);
+    expect(result[0].runs[1].text).toBe(" Normal");
+    expect(result[0].runs[1].underline).toBeUndefined();
   });
 
   it("underline persists across \\P line breaks", () => {
     const result = parseMTextContent("\\LLine 1\\PLine 2");
     expect(result).toHaveLength(2);
-    expect(result[0].underline).toBe(true);
-    expect(result[1].underline).toBe(true);
+    expect(result[0].runs[0].underline).toBe(true);
+    expect(result[1].runs[0].underline).toBe(true);
   });
 
   it("no underline by default", () => {
     const result = parseMTextContent("Normal text");
     expect(result).toHaveLength(1);
-    expect(result[0].underline).toBeUndefined();
+    expect(result[0].runs[0].underline).toBeUndefined();
   });
 
   it("removes \\W, \\T, \\Q, \\A formatting codes", () => {
     const result = parseMTextContent("\\W1.5;\\T0.1;\\Q15;\\A1;text");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("text");
+    expect(lineText(result[0])).toBe("text");
   });
 
   it("parses paragraph indent \\pi<value>,l<value>;", () => {
     const result = parseMTextContent("\\pi-13.5,l18,t18;indented text");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("indented text");
+    expect(lineText(result[0])).toBe("indented text");
     expect(result[0].firstIndent).toBe(-13.5);
     expect(result[0].leftMargin).toBe(18);
   });
@@ -319,7 +341,7 @@ describe("parseMTextContent", () => {
   it("parses paragraph indent \\pi<value>; without left margin", () => {
     const result = parseMTextContent("\\pi2;indented text");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("indented text");
+    expect(lineText(result[0])).toBe("indented text");
     expect(result[0].firstIndent).toBe(2);
     expect(result[0].leftMargin).toBeUndefined();
   });
@@ -327,28 +349,126 @@ describe("parseMTextContent", () => {
   it("strips \\pxqc; alignment code", () => {
     const result = parseMTextContent("\\pxqc;centered text");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("centered text");
+    expect(lineText(result[0])).toBe("centered text");
   });
 
   it("preserves empty lines from \\P\\P as paragraph spacing", () => {
     const result = parseMTextContent("First\\P\\PLast");
     expect(result).toHaveLength(3);
-    expect(result[0].text).toBe("First");
-    expect(result[1].text).toBe("");
-    expect(result[2].text).toBe("Last");
+    expect(lineText(result[0])).toBe("First");
+    expect(result[1].runs).toEqual([]); // empty middle line \u2014 no runs
+    expect(lineText(result[2])).toBe("Last");
   });
 
   it("applies DXF special chars (%%d, %%c, etc.) inside MTEXT", () => {
     const result = parseMTextContent("Angle: 45%%d, Dia: %%c20");
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("Angle: 45\u00B0, Dia: \u230020");
+    expect(lineText(result[0])).toBe("Angle: 45\u00B0, Dia: \u230020");
   });
 
   it("preserves ^I as tab character in MTEXT lines", () => {
     const result = parseMTextContent("X-00^IREFRIGERATOR^I^I\\PX-02^IKITCHEN SINK");
     expect(result).toHaveLength(2);
-    expect(result[0].text).toBe("X-00\tREFRIGERATOR\t\t");
-    expect(result[1].text).toBe("X-02\tKITCHEN SINK");
+    expect(lineText(result[0])).toBe("X-00\tREFRIGERATOR\t\t");
+    expect(lineText(result[1])).toBe("X-02\tKITCHEN SINK");
+  });
+
+  // \u2500\u2500 Inline run scoping \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+  it("brace-scoped \\C produces two runs with different colors", () => {
+    // Real-world case from 03.Profili.dxf MTEXT D4EC3:
+    //   "Profil rama{\C252; Profile frame}"
+    // \u2192 "Profil rama" inherits entity color, " Profile frame" uses ACI 252.
+    const result = parseMTextContent("Profil rama{\\C252; Profile frame}");
+    expect(result).toHaveLength(1);
+    expect(result[0].runs).toHaveLength(2);
+    expect(result[0].runs[0].text).toBe("Profil rama");
+    expect(result[0].runs[0].color).toBeUndefined();
+    expect(result[0].runs[1].text).toBe(" Profile frame");
+    // ACI 252 → fixed gray hex (sentinels apply only to ACI 7, 250, 251)
+    expect(result[0].runs[1].color).toBe("#848484");
+  });
+
+  it("scoped color reverts to outer color after closing }", () => {
+    const result = parseMTextContent("\\C1;red{\\C5;blue}red-again");
+    expect(result).toHaveLength(1);
+    expect(result[0].runs).toHaveLength(3);
+    expect(result[0].runs[0].text).toBe("red");
+    expect(result[0].runs[0].color).toBe("#ff0000");
+    expect(result[0].runs[1].text).toBe("blue");
+    expect(result[0].runs[1].color).toBe("#0000ff");
+    expect(result[0].runs[2].text).toBe("red-again");
+    expect(result[0].runs[2].color).toBe("#ff0000");
+  });
+
+  it("nested braces nest format scopes", () => {
+    const result = parseMTextContent("\\C1;a{\\C5;b{\\C3;c}b}a");
+    expect(result).toHaveLength(1);
+    const runs = result[0].runs;
+    expect(runs).toHaveLength(5);
+    expect(runs.map((r) => r.text)).toEqual(["a", "b", "c", "b", "a"]);
+    expect(runs.map((r) => r.color)).toEqual([
+      "#ff0000", // ACI 1 red
+      "#0000ff", // ACI 5 blue
+      "#00ff00", // ACI 3 green
+      "#0000ff", // back to blue
+      "#ff0000", // back to red
+    ]);
+  });
+
+  it("scoped \\f with bold creates a bold run, restoring after }", () => {
+    const result = parseMTextContent("plain{\\fArial|b1;BOLD}rest");
+    expect(result).toHaveLength(1);
+    const runs = result[0].runs;
+    expect(runs).toHaveLength(3);
+    expect(runs[0].text).toBe("plain");
+    expect(runs[0].bold).toBeUndefined();
+    expect(runs[1].text).toBe("BOLD");
+    expect(runs[1].bold).toBe(true);
+    expect(runs[1].fontFamily).toBe("Arial");
+    expect(runs[2].text).toBe("rest");
+    expect(runs[2].bold).toBeUndefined();
+  });
+
+  it("scoped \\O produces an overline run only inside braces", () => {
+    const result = parseMTextContent("a{\\Ob}c");
+    expect(result).toHaveLength(1);
+    const runs = result[0].runs;
+    expect(runs).toHaveLength(3);
+    expect(runs[1].text).toBe("b");
+    expect(runs[1].overline).toBe(true);
+    expect(runs[0].overline).toBeUndefined();
+    expect(runs[2].overline).toBeUndefined();
+  });
+
+  it("scoped \\K produces a strikethrough run only inside braces", () => {
+    const result = parseMTextContent("keep{\\Kgone}still");
+    expect(result).toHaveLength(1);
+    const runs = result[0].runs;
+    expect(runs).toHaveLength(3);
+    expect(runs[1].text).toBe("gone");
+    expect(runs[1].strikethrough).toBe(true);
+    expect(runs[0].strikethrough).toBeUndefined();
+    expect(runs[2].strikethrough).toBeUndefined();
+  });
+
+  it("inline \\L mid-line creates a second run with underline on", () => {
+    const result = parseMTextContent("plain\\Ltail");
+    expect(result).toHaveLength(1);
+    expect(result[0].runs).toHaveLength(2);
+    expect(result[0].runs[0].text).toBe("plain");
+    expect(result[0].runs[0].underline).toBeUndefined();
+    expect(result[0].runs[1].text).toBe("tail");
+    expect(result[0].runs[1].underline).toBe(true);
+  });
+
+  it("scoped color does not leak into next paragraph", () => {
+    // Closing brace at end of line \u2014 outer color was undefined,
+    // so the next line must not carry the inner color.
+    const result = parseMTextContent("{\\C1;red}\\Pnext");
+    expect(result).toHaveLength(2);
+    expect(result[0].runs[0].color).toBe("#ff0000");
+    expect(result[1].runs[0].color).toBeUndefined();
   });
 });
 
