@@ -312,6 +312,101 @@ describe("parseHatch", () => {
     expect(entity.patternAngle).toBe(30);
   });
 
+  it("captures sourceObjectHandles from edge boundary (codes 97 + 330)", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "HATCH",
+      "2", "ANSI31",
+      "70", "0",
+      "91", "1",
+      "92", "1",       // external boundary
+      "93", "1",
+      "72", "1",       // 1 line edge
+      "10", "0.0",
+      "20", "0.0",
+      "11", "10.0",
+      "21", "0.0",
+      "97", "2",
+      "330", "151",
+      "330", "1AB",
+      "0", "EOF",
+    );
+
+    const entity = parseHatch(scanner, group);
+
+    expect(entity.boundaryPaths).toHaveLength(1);
+    expect(entity.boundaryPaths[0].sourceObjectHandles).toEqual(["151", "1AB"]);
+  });
+
+  it("captures sourceObjectHandles from polyline boundary", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "HATCH",
+      "2", "SOLID",
+      "70", "1",
+      "91", "1",
+      "92", "3",       // polyline + external (bit 1 + bit 2)
+      "72", "0",
+      "73", "1",
+      "93", "3",
+      "10", "0.0",
+      "20", "0.0",
+      "10", "10.0",
+      "20", "0.0",
+      "10", "10.0",
+      "20", "10.0",
+      "97", "1",
+      "330", "ABCDEF",
+      "0", "EOF",
+    );
+
+    const entity = parseHatch(scanner, group);
+
+    expect(entity.boundaryPaths[0].sourceObjectHandles).toEqual(["ABCDEF"]);
+  });
+
+  it("normalizes sourceObjectHandles to uppercase", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "HATCH",
+      "2", "ANSI31",
+      "70", "0",
+      "91", "1",
+      "92", "0",
+      "93", "1",
+      "72", "1",
+      "10", "0.0",
+      "20", "0.0",
+      "11", "1.0",
+      "21", "0.0",
+      "97", "1",
+      "330", "abc123",
+      "0", "EOF",
+    );
+
+    const entity = parseHatch(scanner, group);
+
+    expect(entity.boundaryPaths[0].sourceObjectHandles).toEqual(["ABC123"]);
+  });
+
+  it("leaves sourceObjectHandles undefined when no code 97 present", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "HATCH",
+      "2", "ANSI31",
+      "70", "0",
+      "91", "1",
+      "92", "0",
+      "93", "1",
+      "72", "1",
+      "10", "0.0",
+      "20", "0.0",
+      "11", "1.0",
+      "21", "0.0",
+      "0", "EOF",
+    );
+
+    const entity = parseHatch(scanner, group);
+
+    expect(entity.boundaryPaths[0].sourceObjectHandles).toBeUndefined();
+  });
+
   it("parses hatch with extrusion direction", () => {
     const { scanner, group } = createScannerAt(
       "0", "HATCH",

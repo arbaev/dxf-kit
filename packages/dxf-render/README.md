@@ -15,7 +15,7 @@ For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer)
 
 ## Why dxf-render?
 
-- **Most entities** — 21 rendered types including all dimension variants, LEADER, MULTILEADER, MLINE
+- **Most entities** — 22 rendered types including all dimension variants, LEADER, MULTILEADER, MLINE, REGION (contour via HATCH boundary)
 - **Variable-width polylines** — per-vertex tapering, arrows, donuts rendered as mesh with miter joins
 - **Accurate rendering** — linetype patterns, OCS transforms, hatch patterns, proper color resolution
 - **Picking & associations** — bbox-based raycast index plus DXF-driven entity links (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION)
@@ -477,7 +477,9 @@ Full TypeScript types exported: `DxfData`, `DxfEntity`, `DxfLayer`, `DxfHeader`,
 
 ## Supported entities
 
-21 rendered entity types: LINE, CIRCLE, ARC, ELLIPSE, POINT, POLYLINE, LWPOLYLINE, SPLINE, TEXT, MTEXT, DIMENSION, INSERT, SOLID, 3DFACE, HATCH, LEADER, MULTILEADER, MLINE, XLINE, RAY, ATTDEF, plus ATTRIB within INSERT blocks and HELIX via SPLINE.
+22 rendered entity types: LINE, CIRCLE, ARC, ELLIPSE, POINT, POLYLINE, LWPOLYLINE, SPLINE, TEXT, MTEXT, DIMENSION, INSERT, SOLID, 3DFACE, HATCH, LEADER, MULTILEADER, MLINE, XLINE, RAY, ATTDEF, REGION, plus ATTRIB within INSERT blocks and HELIX via SPLINE.
+
+REGION entities are rendered without decoding their ACIS modeler data: when a HATCH lists the REGION as a source object via DXF codes 97/330, the REGION borrows that HATCH's already-parsed boundary edges (lines, arcs, ellipses, splines, polyline vertices) for its visible contour. Color, layer and linetype come from the REGION itself; OCS from the HATCH. REGIONs with no HATCH referencing them are silently skipped.
 
 POLYLINE/LWPOLYLINE support includes per-vertex variable width (tapering), constant-width segments, arrows, donuts, and bulge arcs — all rendered as triangle-strip mesh geometry with proper miter joins at corners.
 
@@ -487,7 +489,7 @@ POLYLINE/LWPOLYLINE support includes per-vertex variable width (tapering), const
 | ------------------------- | --------------------------- | ------------ | ---------- | --------- |
 | DXF parsing               | ✅                          | ✅           | ✅         | ✅        |
 | Three.js rendering        | ✅                          | ✅           | ❌         | ✅        |
-| Entity types              | 21 rendered                 | ~15          | ~15 parsed | ~8        |
+| Entity types              | 22 rendered                 | ~15          | ~15 parsed | ~8        |
 | Variable-width polylines  | ✅ tapering, arrows, donuts | ❌           | —          | ❌        |
 | Linetype patterns         | ✅ DASHED, CENTER, DOT...   | ❌ all solid | —          | ❌        |
 | All dimension types       | ✅ 7 types                  | linear only  | —          | ❌        |

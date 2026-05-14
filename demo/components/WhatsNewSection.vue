@@ -24,6 +24,11 @@ interface WhatsNewItem {
 
 const whatsNew: WhatsNewItem[] = [
   {
+    pkg: "dxf-render",
+    version: "1.6.0",
+    text: "REGION entities now render their contour by borrowing the boundary edges of any HATCH that references them as a source object (DXF codes 97/330) — no ACIS decoding needed. The REGION becomes pickable too, so hatched details with a REGION outline (common in AutoCAD-built profile drawings) finally show their visible boundary and fire entity-hover / entity-click events.",
+  },
+  {
     pkg: "dxf-vuer",
     version: "2.6.0",
     text: "Keyboard navigation — arrow keys pan, +/- zoom, 0 resets the view; canvas is now focusable and respects form fields",

@@ -26,6 +26,7 @@ import { parseWipeout } from "../entities/wipeout";
 import { parseMline } from "../entities/mline";
 import { parseXline } from "../entities/xline";
 import { parse3DSolid } from "../entities/3dsolid";
+import { parseRegion } from "../entities/region";
 
 type EntityHandler = (scanner: DxfScanner, curr: IGroup) => IEntityBase;
 
@@ -73,6 +74,7 @@ const entityHandlers: Record<string, EntityHandler> = {
   XLINE: parseXline,
   RAY: parseXline,
   "3DSOLID": parse3DSolid,
+  REGION: parseRegion,
 };
 
 /**

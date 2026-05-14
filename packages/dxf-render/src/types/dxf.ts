@@ -236,6 +236,8 @@ export type HatchEdge = HatchLineEdge | HatchArcEdge | HatchEllipseEdge | HatchS
 export interface HatchBoundaryPath {
   edges?: HatchEdge[];
   polylineVertices?: DxfVertex[];
+  /** Handles of source entities this boundary path was generated from (DXF codes 97/330). */
+  sourceObjectHandles?: string[];
 }
 
 export interface HatchPatternLine {
@@ -344,6 +346,15 @@ export interface DxfXlineEntity extends DxfEntityBase {
   direction: DxfVertex;
 }
 
+export interface DxfRegionEntity extends DxfEntityBase {
+  type: "REGION";
+  /** Boundary edges borrowed from a HATCH whose source object handle points to this REGION.
+   *  Populated post-parsing by linkRegionsToHatchBoundaries(); empty when no HATCH references this REGION. */
+  contourBoundary?: HatchBoundaryPath[];
+  /** Extrusion direction (normal) of the HATCH that owns the borrowed boundary — used to apply the same OCS. */
+  contourExtrusionDirection?: DxfVertex;
+}
+
 export interface DxfUnknownEntity extends DxfEntityBase {
   type: string;
   [key: string]: unknown;
@@ -369,6 +380,7 @@ export type DxfEntity =
   | DxfAttribEntity
   | DxfMlineEntity
   | DxfXlineEntity
+  | DxfRegionEntity
   | DxfUnknownEntity;
 
 export function isLineEntity(entity: DxfEntity): entity is DxfLineEntity {
@@ -445,6 +457,10 @@ export function isMlineEntity(entity: DxfEntity): entity is DxfMlineEntity {
 
 export function isXlineEntity(entity: DxfEntity): entity is DxfXlineEntity {
   return entity.type === "XLINE" || entity.type === "RAY";
+}
+
+export function isRegionEntity(entity: DxfEntity): entity is DxfRegionEntity {
+  return entity.type === "REGION";
 }
 
 export interface DxfStyle {

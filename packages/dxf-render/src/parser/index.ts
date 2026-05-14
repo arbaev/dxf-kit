@@ -4,6 +4,7 @@ import { parseHeader } from "./sections/header";
 import { parseTables } from "./sections/tables";
 import { parseBlocks } from "./sections/blocks";
 import { parseEntities } from "./sections/entities";
+import { linkRegionsToHatchBoundaries } from "./linkRegions";
 
 export function parseDxf(dxfText: string): DxfData {
   const dxf = {} as DxfData;
@@ -42,6 +43,13 @@ export function parseDxf(dxfText: string): DxfData {
   }
 
   if (!dxf.entities) dxf.entities = [];
+
+  linkRegionsToHatchBoundaries(dxf.entities);
+  if (dxf.blocks) {
+    for (const blockName in dxf.blocks) {
+      linkRegionsToHatchBoundaries(dxf.blocks[blockName].entities);
+    }
+  }
 
   return dxf;
 }

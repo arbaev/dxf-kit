@@ -52,12 +52,14 @@ const COLLECTABLE_TYPES = new Set([
   "LINE", "CIRCLE", "ARC", "ELLIPSE",
   "LWPOLYLINE", "POLYLINE", "SPLINE",
   "POINT", "SOLID", "3DFACE", "HATCH",
-  "MLINE", "XLINE", "RAY",
+  "MLINE", "XLINE", "RAY", "REGION",
 ]);
 
-/** Recognized but non-renderable entity types — silently skipped */
+/** Recognized but non-renderable entity types — silently skipped.
+ *  REGION is here too: it goes through `collectEntity` first (drawn via a HATCH-borrowed
+ *  boundary when available); REGIONs without an associated HATCH fall back here. */
 const NON_RENDERABLE_TYPES = new Set([
-  "VIEWPORT", "IMAGE", "WIPEOUT", "3DSOLID",
+  "VIEWPORT", "IMAGE", "WIPEOUT", "3DSOLID", "REGION",
 ]);
 
 /** Yield control to the browser so the UI stays responsive */
