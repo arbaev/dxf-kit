@@ -15,6 +15,10 @@ export interface MTextRun {
   underline?: boolean;
   overline?: boolean;
   strikethrough?: boolean;
+  /** Horizontal stretch factor (DXF `\W<n>;`, analogous to TEXT code 41). */
+  widthFactor?: number;
+  /** Glyph slant in degrees (DXF `\Q<n>;`, analogous to TEXT code 51). */
+  obliqueAngle?: number;
 }
 
 /**
@@ -73,6 +77,8 @@ interface FormatState {
   underline: boolean;
   overline: boolean;
   strikethrough: boolean;
+  widthFactor: number | undefined;
+  obliqueAngle: number | undefined;
 }
 
 const initialState = (): FormatState => ({
@@ -84,6 +90,8 @@ const initialState = (): FormatState => ({
   underline: false,
   overline: false,
   strikethrough: false,
+  widthFactor: undefined,
+  obliqueAngle: undefined,
 });
 
 const cloneState = (s: FormatState): FormatState => ({ ...s });
@@ -98,6 +106,8 @@ const snapshotRun = (text: string, s: FormatState): MTextRun => {
   if (s.underline) run.underline = true;
   if (s.overline) run.overline = true;
   if (s.strikethrough) run.strikethrough = true;
+  if (s.widthFactor !== undefined) run.widthFactor = s.widthFactor;
+  if (s.obliqueAngle !== undefined) run.obliqueAngle = s.obliqueAngle;
   return run;
 };
 
@@ -114,9 +124,11 @@ const restorePlaceholders = (s: string): string =>
  * (font + bold/italic flags), \L/\l (underline on/off),
  * \O/\o (overline on/off), \K/\k (strikethrough on/off),
  * \S<top><sep><bot>; (stacked fraction; `#` separator becomes inline "a/b"),
+ * \W<n>; (width factor, horizontal stretch),
+ * \Q<n>; (obliquing angle in degrees),
  * \p…; (paragraph indent/left margin), \~ (NBSP), \N (column break -> space),
  * \U+XXXX (Unicode), %%d/%%p/%%c/%%nnn (special chars), ^I (tab), ^^ (caret).
- * Codes \W, \T, \Q, \A are accepted and skipped (renderer doesn't apply them yet).
+ * Codes \T (tracking) and \A (per-run baseline shift) are accepted and skipped.
  */
 export const parseMTextContent = (rawText: string, defaultHeight?: number): MTextLine[] => {
   // Protect literal \\, \{, \} from formatting parser via placeholders.
@@ -303,8 +315,28 @@ export const parseMTextContent = (rawText: string, defaultHeight?: number): MTex
       continue;
     }
 
-    // \W / \T / \Q / \A — width/tracking/oblique/alignment (renderer skips)
-    const skipMatch = rest.match(/^\\[WTQA][^;]*;/i);
+    // \W<num>; — width factor (horizontal stretch). Positive values only.
+    const widthMatch = rest.match(/^\\W([\d.]+);/);
+    if (widthMatch) {
+      flushRun();
+      const v = parseFloat(widthMatch[1]);
+      if (Number.isFinite(v) && v > 0) state.widthFactor = v;
+      i += widthMatch[0].length;
+      continue;
+    }
+
+    // \Q<num>; — obliquing angle in degrees (glyph slant).
+    const obliqueMatch = rest.match(/^\\Q(-?[\d.]+);/);
+    if (obliqueMatch) {
+      flushRun();
+      const v = parseFloat(obliqueMatch[1]);
+      if (Number.isFinite(v)) state.obliqueAngle = v;
+      i += obliqueMatch[0].length;
+      continue;
+    }
+
+    // \T / \A — tracking / per-run baseline shift (not yet implemented, skip).
+    const skipMatch = rest.match(/^\\[TA][^;]*;/i);
     if (skipMatch) {
       i += skipMatch[0].length;
       continue;

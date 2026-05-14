@@ -542,6 +542,46 @@ describe("vectorTextBuilder", () => {
       addMTextToCollector(mp({ collector: c as any, font, lines }));
       expect(c.lineCalls.length).toBe(1);
     });
+
+    it("run-level widthFactor stretches the horizontal extent", () => {
+      const c1 = new MockCollector();
+      const c2 = new MockCollector();
+      addMTextToCollector(mp({ collector: c1 as any, font, lines: [{ runs: [{ text: "MM" }] }] }));
+      addMTextToCollector(mp({ collector: c2 as any, font, lines: [{ runs: [{ text: "MM", widthFactor: 2 }] }] }));
+      const w1 = c1.getBounds().xMax - c1.getBounds().xMin;
+      const w2 = c2.getBounds().xMax - c2.getBounds().xMin;
+      expect(w2).toBeGreaterThan(w1 * 1.8);
+    });
+
+    it("run-level widthFactor pushes the next run further along X", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{
+        runs: [
+          { text: "MM", color: "#ff0000", widthFactor: 2 },
+          { text: "MM", color: "#00ff00" },
+        ],
+      }];
+      addMTextToCollector(mp({ collector: c as any, font, lines, posX: 0, attachmentPoint: 1 }));
+      const red = c.meshCalls.find((call) => call.color === "#ff0000")!;
+      const green = c.meshCalls.find((call) => call.color === "#00ff00")!;
+      // The green run starts after the stretched red run, so its xMin must be
+      // noticeably larger than for an unstretched two-glyph string.
+      const xMinGreen = Math.min(...green.vertices.filter((_, i) => i % 3 === 0));
+      const xMaxRed = Math.max(...red.vertices.filter((_, i) => i % 3 === 0));
+      expect(xMinGreen).toBeGreaterThan(xMaxRed - 0.5);
+    });
+
+    it("run-level obliqueAngle shears glyph X by Y", () => {
+      const c0 = new MockCollector();
+      const cSlant = new MockCollector();
+      addMTextToCollector(mp({ collector: c0 as any, font, lines: [{ runs: [{ text: "I" }] }] }));
+      addMTextToCollector(mp({ collector: cSlant as any, font, lines: [{ runs: [{ text: "I", obliqueAngle: 30 }] }] }));
+      // Sheared text has a wider xMax than upright text (since top of glyph
+      // shifts right by tan(30°) × glyphHeight ≈ 0.577 × h).
+      const w0 = c0.getBounds().xMax - c0.getBounds().xMin;
+      const wSlant = cSlant.getBounds().xMax - cSlant.getBounds().xMin;
+      expect(wSlant).toBeGreaterThan(w0);
+    });
   });
 
   describe("addMTextToCollector — per-line height", () => {

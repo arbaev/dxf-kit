@@ -504,7 +504,8 @@ function measureRunWidth(
   const f = resolveRunFont(run, font, serifFont);
   const h = run.height ?? defaultHeight;
   const emScale = h / getCapHeightRatio(f);
-  return measureText(f, run.text).totalAdvance * emScale;
+  const widthFactor = run.widthFactor ?? 1;
+  return measureText(f, run.text).totalAdvance * emScale * widthFactor;
 }
 
 /** Build runs by slicing a base run with a new text value (preserves all formatting). */
@@ -532,6 +533,7 @@ function wrapLineRunsToWidth(
     const f = resolveRunFont(run, font, serifFont);
     const h = run.height ?? defaultHeight;
     const emScale = h / getCapHeightRatio(f);
+    const widthFactor = run.widthFactor ?? 1;
     // Split keeping space groups: " word1  word2 " -> ["", " ", "word1", "  ", "word2", " "]
     const parts = run.text.split(/( +)/);
     for (const part of parts) {
@@ -540,7 +542,7 @@ function wrapLineRunsToWidth(
         runIdx: r,
         text: part,
         isSpace: part.charAt(0) === " ",
-        adv: measureText(f, part).totalAdvance * emScale,
+        adv: measureText(f, part).totalAdvance * emScale * widthFactor,
       });
     }
   }
@@ -788,6 +790,8 @@ function emitMTextLine(
       underline: run.underline,
       overline: run.overline,
       strikethrough: run.strikethrough,
+      widthFactor: run.widthFactor,
+      obliqueAngle: run.obliqueAngle,
     });
     xCursor += measureRunWidth(run, font, serifFont, defaultHeight);
   }

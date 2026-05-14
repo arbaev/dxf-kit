@@ -324,10 +324,12 @@ describe("parseMTextContent", () => {
     expect(result[0].runs[0].underline).toBeUndefined();
   });
 
-  it("removes \\W, \\T, \\Q, \\A formatting codes", () => {
+  it("parses \\W width factor and \\Q oblique angle; skips \\T and \\A", () => {
     const result = parseMTextContent("\\W1.5;\\T0.1;\\Q15;\\A1;text");
     expect(result).toHaveLength(1);
     expect(lineText(result[0])).toBe("text");
+    expect(result[0].runs[0].widthFactor).toBe(1.5);
+    expect(result[0].runs[0].obliqueAngle).toBe(15);
   });
 
   it("parses paragraph indent \\pi<value>,l<value>;", () => {
@@ -469,6 +471,52 @@ describe("parseMTextContent", () => {
     expect(result).toHaveLength(2);
     expect(result[0].runs[0].color).toBe("#ff0000");
     expect(result[1].runs[0].color).toBeUndefined();
+  });
+
+  it("inline \\W mid-line flushes run and stretches following text", () => {
+    const result = parseMTextContent("plain\\W2;wide");
+    expect(result).toHaveLength(1);
+    expect(result[0].runs).toHaveLength(2);
+    expect(result[0].runs[0].text).toBe("plain");
+    expect(result[0].runs[0].widthFactor).toBeUndefined();
+    expect(result[0].runs[1].text).toBe("wide");
+    expect(result[0].runs[1].widthFactor).toBe(2);
+  });
+
+  it("scoped \\W reverts to outer width after closing }", () => {
+    const result = parseMTextContent("a{\\W1.5;b}c");
+    expect(result).toHaveLength(1);
+    const runs = result[0].runs;
+    expect(runs).toHaveLength(3);
+    expect(runs[0].widthFactor).toBeUndefined();
+    expect(runs[1].widthFactor).toBe(1.5);
+    expect(runs[2].widthFactor).toBeUndefined();
+  });
+
+  it("rejects non-positive \\W values", () => {
+    const result = parseMTextContent("\\W0;text");
+    expect(result[0].runs[0].widthFactor).toBeUndefined();
+  });
+
+  it("\\Q accepts negative oblique angles", () => {
+    const result = parseMTextContent("\\Q-12.5;slanted");
+    expect(result[0].runs[0].obliqueAngle).toBe(-12.5);
+  });
+
+  it("scoped \\Q reverts after closing }", () => {
+    const result = parseMTextContent("a{\\Q20;b}c");
+    const runs = result[0].runs;
+    expect(runs).toHaveLength(3);
+    expect(runs[0].obliqueAngle).toBeUndefined();
+    expect(runs[1].obliqueAngle).toBe(20);
+    expect(runs[2].obliqueAngle).toBeUndefined();
+  });
+
+  it("combines \\W and \\Q on the same run", () => {
+    const result = parseMTextContent("\\W2;\\Q15;wq");
+    expect(result[0].runs).toHaveLength(1);
+    expect(result[0].runs[0].widthFactor).toBe(2);
+    expect(result[0].runs[0].obliqueAngle).toBe(15);
   });
 });
 
