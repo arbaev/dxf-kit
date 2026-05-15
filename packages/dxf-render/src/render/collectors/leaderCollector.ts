@@ -52,6 +52,59 @@ export const catmullRomSpline = (points: THREE.Vector3[], segmentsPerSpan = 12):
 };
 
 /**
+ * Cubic Bezier through two endpoints with the curve tangent to `endTangent`
+ * at the END point (the dogleg landing). The arrow-side tangent is taken as
+ * the chord direction so the curve only bends near the landing — this matches
+ * the look AutoCAD draws for a spline MLEADER with a single line vertex
+ * (vertex = arrow tip, lastLeaderPoint = landing, doglegVector = shelf direction).
+ *
+ * The end-tangent vector points OUTWARD from the curve (along the shelf away
+ * from the leader); the control point is placed in the OPPOSITE direction so
+ * the curve approaches the landing tangent to the shelf.
+ */
+const sampleBezierLeader = (
+  arrowTip: THREE.Vector3,
+  landing: THREE.Vector3,
+  endTangent: THREE.Vector3,
+  segments = 24,
+): THREE.Vector3[] => {
+  const dx = landing.x - arrowTip.x;
+  const dy = landing.y - arrowTip.y;
+  const dz = landing.z - arrowTip.z;
+  const dist = Math.hypot(dx, dy, dz);
+  if (dist === 0) return [arrowTip.clone(), landing.clone()];
+
+  const handle = dist / 3;
+  // Arrow-side: aim toward landing along the chord (no extra bend at the tip).
+  const c1 = new THREE.Vector3(
+    arrowTip.x + (dx / dist) * handle,
+    arrowTip.y + (dy / dist) * handle,
+    arrowTip.z + (dz / dist) * handle,
+  );
+  // Landing-side: tangent to the shelf — control point sits OPPOSITE
+  // the dogleg direction so the curve flows into the shelf direction.
+  const tLen = Math.hypot(endTangent.x, endTangent.y, endTangent.z) || 1;
+  const c2 = new THREE.Vector3(
+    landing.x - (endTangent.x / tLen) * handle,
+    landing.y - (endTangent.y / tLen) * handle,
+    landing.z - (endTangent.z / tLen) * handle,
+  );
+
+  const result: THREE.Vector3[] = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const u = 1 - t;
+    const u2 = u * u, u3 = u2 * u, t2 = t * t, t3 = t2 * t;
+    result.push(new THREE.Vector3(
+      u3 * arrowTip.x + 3 * u2 * t * c1.x + 3 * u * t2 * c2.x + t3 * landing.x,
+      u3 * arrowTip.y + 3 * u2 * t * c1.y + 3 * u * t2 * c2.y + t3 * landing.y,
+      u3 * arrowTip.z + 3 * u2 * t * c1.z + 3 * u * t2 * c2.z + t3 * landing.z,
+    ));
+  }
+  return result;
+};
+
+/**
  * Collect LEADER/MULTILEADER entity: lines and arrows decomposed into collector,
  * text rendered as vector glyphs directly into collector.
  */
@@ -189,22 +242,49 @@ export function collectLeaderEntity(
   } else if ((entity.type === "MULTILEADER" || entity.type === "MLEADER") && isMLeaderEntity(entity) && entity.leaders.length > 0) {
     const arrowSize = entity.arrowSize || ARROW_SIZE;
 
+    const isSpline = entity.leaderLineType === 2;
     for (const leader of entity.leaders) {
       for (const line of leader.lines) {
-        if (line.vertices.length < 2) continue;
-        const points = line.vertices.map(
+        // A LEADER_LINE can carry just the arrow tip (1 vertex) — the dogleg
+        // landing then comes from the parent LEADER's lastLeaderPoint, giving
+        // the second point needed to draw a segment.
+        const rawPoints = line.vertices.map(
           (vt) => new THREE.Vector3(vt.x, vt.y, vt.z || 0),
         );
         if (leader.lastLeaderPoint) {
-          points.push(new THREE.Vector3(
+          rawPoints.push(new THREE.Vector3(
             leader.lastLeaderPoint.x,
             leader.lastLeaderPoint.y,
             leader.lastLeaderPoint.z || 0,
           ));
         }
+        if (rawPoints.length < 2) continue;
+
+        let points = rawPoints;
+        if (isSpline) {
+          if (rawPoints.length === 2 && leader.doglegVector) {
+            // Single arrow-tip vertex + landing — bend toward the shelf.
+            points = sampleBezierLeader(
+              rawPoints[0],
+              rawPoints[1],
+              new THREE.Vector3(
+                leader.doglegVector.x,
+                leader.doglegVector.y,
+                leader.doglegVector.z || 0,
+              ),
+            );
+          } else if (rawPoints.length >= 3) {
+            // Several vertices — interpolate them as a Catmull-Rom curve.
+            points = catmullRomSpline(rawPoints);
+          }
+          // 2 points without a dogleg vector: fall through to a straight line.
+        }
+
         addLeaderLineToCollector(points);
 
         if (entity.hasArrowHead !== false && points.length >= 2) {
+          // Arrow direction follows the curve's tangent at the tip — for a
+          // spline, points[1] is the next sampled point on the curve.
           addArrowToCollector(points[1], points[0], arrowSize);
         }
       }

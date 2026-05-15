@@ -288,6 +288,8 @@ export interface DxfMLeaderEntity extends DxfEntityBase {
   textHeight?: number;
   arrowSize?: number;
   hasArrowHead?: boolean; // Defaults to true for MLEADER
+  /** Entity-level LeaderLineType (DXF code 170): 0=invisible, 1=straight, 2=spline. */
+  leaderLineType?: number;
 }
 
 export interface DxfAttdefEntity extends DxfEntityBase {

@@ -562,16 +562,18 @@ describe("parseMultiLeader", () => {
   it("parses basic multileader with one leader, one line, 2 vertices", () => {
     const { scanner, group } = createScannerAt(
       "0", "MULTILEADER",
-      "301", "LEADER{",
-      "302", "LEADER_LINE{",
+      "300", "CONTEXT_DATA{",
+      "302", "LEADER{",
+      "10", "10.0",
+      "20", "10.0",
+      "304", "LEADER_LINE{",
       "10", "0.0",
       "20", "0.0",
       "10", "5.0",
       "20", "5.0",
       "305", "}",
-      "10", "10.0",
-      "20", "10.0",
-      "305", "}",
+      "303", "}",
+      "301", "}",
       "0", "EOF",
     );
 
@@ -588,18 +590,20 @@ describe("parseMultiLeader", () => {
     expect(leader.lastLeaderPoint).toEqual({ x: 10, y: 10 });
   });
 
-  it("parses text content from code 304", () => {
+  it("parses text content from code 304 (value other than LEADER_LINE{ marker)", () => {
     const { scanner, group } = createScannerAt(
       "0", "MULTILEADER",
-      "301", "LEADER{",
-      "302", "LEADER_LINE{",
+      "300", "CONTEXT_DATA{",
+      "304", "Hello World",
+      "302", "LEADER{",
+      "304", "LEADER_LINE{",
       "10", "0.0",
       "20", "0.0",
-      "305", "}",
       "10", "5.0",
       "20", "5.0",
       "305", "}",
-      "304", "Hello World",
+      "303", "}",
+      "301", "}",
       "0", "EOF",
     );
 
@@ -612,24 +616,26 @@ describe("parseMultiLeader", () => {
   it("parses multiple leaders", () => {
     const { scanner, group } = createScannerAt(
       "0", "MULTILEADER",
+      "300", "CONTEXT_DATA{",
       // leader 1
-      "301", "LEADER{",
-      "302", "LEADER_LINE{",
+      "302", "LEADER{",
+      "10", "5.0",
+      "20", "5.0",
+      "304", "LEADER_LINE{",
       "10", "0.0",
       "20", "0.0",
       "305", "}",
-      "10", "5.0",
-      "20", "5.0",
-      "305", "}",
+      "303", "}",
       // leader 2
-      "301", "LEADER{",
-      "302", "LEADER_LINE{",
+      "302", "LEADER{",
+      "10", "25.0",
+      "20", "25.0",
+      "304", "LEADER_LINE{",
       "10", "20.0",
       "20", "20.0",
       "305", "}",
-      "10", "25.0",
-      "20", "25.0",
-      "305", "}",
+      "303", "}",
+      "301", "}",
       "0", "EOF",
     );
 
@@ -646,14 +652,16 @@ describe("parseMultiLeader", () => {
     const { scanner, group } = createScannerAt(
       "0", "MULTILEADER",
       "171", "0",
-      "301", "LEADER{",
-      "302", "LEADER_LINE{",
+      "300", "CONTEXT_DATA{",
+      "302", "LEADER{",
+      "304", "LEADER_LINE{",
       "10", "0.0",
       "20", "0.0",
-      "305", "}",
       "10", "5.0",
       "20", "5.0",
       "305", "}",
+      "303", "}",
+      "301", "}",
       "0", "EOF",
     );
 
@@ -663,22 +671,27 @@ describe("parseMultiLeader", () => {
     expect(entity.leaders).toHaveLength(1);
   });
 
-  it("parses textPosition, textHeight, and arrowSize at top level", () => {
+  it("parses textPosition (12 inside CONTEXT_DATA), textHeight (41 inside CONTEXT_DATA) and arrowSize (entity-level 42)", () => {
     const { scanner, group } = createScannerAt(
       "0", "MULTILEADER",
-      "301", "LEADER{",
-      "302", "LEADER_LINE{",
+      "300", "CONTEXT_DATA{",
+      "40", "1.0",          // ContentScale — must NOT become textHeight
+      "41", "2.5",          // TextHeight (CONTEXT_DATA)
+      "140", "0.36",        // LandingGap — must NOT become textHeight
+      "12", "15.0",         // textPosition X
+      "22", "15.0",
+      "304", "Test",
+      "302", "LEADER{",
+      "304", "LEADER_LINE{",
       "10", "0.0",
       "20", "0.0",
-      "305", "}",
       "10", "5.0",
       "20", "5.0",
       "305", "}",
-      "304", "Test",
-      "40", "2.5",
-      "41", "1.0",
-      "12", "15.0",
-      "22", "15.0",
+      "303", "}",
+      "301", "}",
+      "41", "0.18",         // entity-level DoglegLength — must NOT overwrite textHeight
+      "42", "1.0",          // ArrowHeadSize (entity-level)
       "0", "ENDSEC",
       "0", "EOF",
     );
@@ -691,6 +704,95 @@ describe("parseMultiLeader", () => {
     expect(entity.textPosition!.x).toBe(15);
     expect(entity.textPosition!.y).toBe(15);
     expect(entity.text).toBe("Test");
+  });
+
+  it("parses entity-level leaderLineType (code 170 = 2 → spline)", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "MULTILEADER",
+      "300", "CONTEXT_DATA{",
+      "302", "LEADER{",
+      "304", "LEADER_LINE{",
+      "10", "0.0",
+      "20", "0.0",
+      "305", "}",
+      "303", "}",
+      "301", "}",
+      "170", "2",
+      "0", "ENDSEC",
+      "0", "EOF",
+    );
+
+    const entity = parseMultiLeader(scanner, group);
+
+    expect(entity.leaderLineType).toBe(2);
+  });
+
+  it("ignores code 170 inside CONTEXT_DATA (different meaning at that scope)", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "MULTILEADER",
+      "300", "CONTEXT_DATA{",
+      "170", "1",           // HasBlockReference — not the entity-level LeaderLineType
+      "302", "LEADER{",
+      "304", "LEADER_LINE{",
+      "10", "0.0",
+      "20", "0.0",
+      "305", "}",
+      "303", "}",
+      "301", "}",
+      "0", "ENDSEC",
+      "0", "EOF",
+    );
+
+    const entity = parseMultiLeader(scanner, group);
+
+    expect(entity.leaderLineType).toBeUndefined();
+  });
+
+  it("does not overwrite text with the literal LEADER_LINE{ marker (real-world AutoCAD layout)", () => {
+    // Mirrors the actual byte sequence in todo/dxf-samples/problems/2018.dxf
+    // where the MText content "OL-A-70" comes via code 304 BEFORE the LEADER
+    // subsection is opened, and "LEADER_LINE{" arrives later — also via 304.
+    const { scanner, group } = createScannerAt(
+      "0", "MULTILEADER",
+      "300", "CONTEXT_DATA{",
+      "40", "1.0",
+      "10", "100.0",
+      "20", "200.0",
+      "41", "60.0",
+      "304", "OL-A-70",
+      "11", "0.0",
+      "21", "0.0",
+      "31", "1.0",
+      "12", "150.0",
+      "22", "250.0",
+      "32", "0.0",
+      "302", "LEADER{",
+      "290", "1",
+      "10", "120.0",
+      "20", "210.0",
+      "30", "0.0",
+      "11", "1.0",
+      "21", "0.0",
+      "31", "0.0",
+      "40", "33.0",
+      "304", "LEADER_LINE{",
+      "10", "80.0",
+      "20", "180.0",
+      "30", "0.0",
+      "305", "}",
+      "303", "}",
+      "301", "}",
+      "0", "ENDSEC",
+      "0", "EOF",
+    );
+
+    const entity = parseMultiLeader(scanner, group);
+
+    expect(entity.text).toBe("OL-A-70");
+    expect(entity.leaders).toHaveLength(1);
+    expect(entity.leaders[0].lines).toHaveLength(1);
+    expect(entity.leaders[0].lines[0].vertices).toEqual([{ x: 80, y: 180, z: 0 }]);
+    expect(entity.leaders[0].lastLeaderPoint).toEqual({ x: 120, y: 210, z: 0 });
   });
 });
 
