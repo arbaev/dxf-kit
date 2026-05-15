@@ -172,6 +172,8 @@ export async function createThreeObjectsFromDXF(
 
   // DIMSTYLE table and header $DIMLUNIT/$DIMDEC for architectural dimension formatting
   const dimStyles = dxf.tables?.dimStyle?.dimStyles;
+  // MLEADERSTYLE objects (from OBJECTS section, keyed by handle) for MULTILEADER color fallback
+  const mLeaderStyles = dxf.objects?.mLeaderStyles;
   const headerDimlunit = dxf.header?.$DIMLUNIT;
   const headerDimdec = dxf.header?.$DIMDEC;
   const headerDimadec = dxf.header?.$DIMADEC;
@@ -210,6 +212,7 @@ export async function createThreeObjectsFromDXF(
     defaultTextHeight,
     mirrText,
     dimStyles,
+    mLeaderStyles,
     headerDimlunit,
     headerDimdec,
     headerDimadec,

@@ -794,6 +794,73 @@ describe("parseMultiLeader", () => {
     expect(entity.leaders[0].lines[0].vertices).toEqual([{ x: 80, y: 180, z: 0 }]);
     expect(entity.leaders[0].lastLeaderPoint).toEqual({ x: 120, y: 210, z: 0 });
   });
+
+  it("parses entity-level styleHandle, propertyOverrideFlag, leaderLineColorRaw and CONTEXT_DATA textColorRaw", () => {
+    // Mirrors the 2018.dxf MULTILEADER 47020 byte layout: inside CONTEXT_DATA
+    // code 90 carries TextColor; after CONTEXT_DATA closes, code 90 becomes
+    // PropertyOverrideFlag, code 91 — LeaderLineColor, code 340 — styleHandle.
+    const { scanner, group } = createScannerAt(
+      "0", "MULTILEADER",
+      "300", "CONTEXT_DATA{",
+      "304", "M22-G-42",
+      "302", "LEADER{",
+      "10", "65.0",
+      "20", "260.0",
+      "30", "0.0",
+      "90", "0",                  // LeaderBranchIndex inside LEADER — must NOT become textColorRaw
+      "304", "LEADER_LINE{",
+      "10", "10.0",
+      "20", "0.0",
+      "30", "0.0",
+      "91", "0",                  // LeaderLineIndex inside LEADER_LINE — must NOT become leaderLineColorRaw
+      "305", "}",
+      "303", "}",
+      "90", "-1023410170",        // TextColor inside CONTEXT_DATA top (after LEADER closes) — byACI(6) magenta
+      "301", "}",
+      "340", "3c063",             // entity-level styleHandle (lowercase should be uppercased)
+      "90", "17122304",           // entity-level PropertyOverrideFlag
+      "170", "2",                 // entity-level LeaderLineType
+      "91", "-1023410170",        // entity-level LeaderLineColor — byACI(6) magenta
+      "42", "1.0",                // entity-level ArrowHeadSize
+      "0", "ENDSEC",
+      "0", "EOF",
+    );
+
+    const entity = parseMultiLeader(scanner, group);
+
+    expect(entity.styleHandle).toBe("3C063");
+    expect(entity.propertyOverrideFlag).toBe(17122304);
+    expect(entity.leaderLineColorRaw).toBe(-1023410170);
+    expect(entity.textColorRaw).toBe(-1023410170);
+    expect(entity.leaderLineType).toBe(2);
+    expect(entity.arrowSize).toBe(1);
+  });
+
+  it("does not capture color codes from nested LEADER/LEADER_LINE scopes", () => {
+    // Code 90 inside LEADER is LeaderBranchIndex; code 91 inside LEADER_LINE
+    // is LeaderLineIndex. Neither should leak into entity color fields.
+    const { scanner, group } = createScannerAt(
+      "0", "MULTILEADER",
+      "300", "CONTEXT_DATA{",
+      "302", "LEADER{",
+      "90", "5",                  // LeaderBranchIndex — must be ignored
+      "304", "LEADER_LINE{",
+      "10", "0.0",
+      "20", "0.0",
+      "91", "3",                  // LeaderLineIndex — must be ignored
+      "305", "}",
+      "303", "}",
+      "301", "}",
+      "0", "ENDSEC",
+      "0", "EOF",
+    );
+
+    const entity = parseMultiLeader(scanner, group);
+
+    expect(entity.textColorRaw).toBeUndefined();
+    expect(entity.leaderLineColorRaw).toBeUndefined();
+    expect(entity.propertyOverrideFlag).toBeUndefined();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

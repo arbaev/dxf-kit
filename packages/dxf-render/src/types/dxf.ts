@@ -290,6 +290,16 @@ export interface DxfMLeaderEntity extends DxfEntityBase {
   hasArrowHead?: boolean; // Defaults to true for MLEADER
   /** Entity-level LeaderLineType (DXF code 170): 0=invisible, 1=straight, 2=spline. */
   leaderLineType?: number;
+  /** Entity-level MLEADERSTYLE handle (DXF code 340, post-CONTEXT_DATA). */
+  styleHandle?: string;
+  /** Entity-level PropertyOverrideFlag (DXF code 90, post-CONTEXT_DATA).
+   *  Bitmask: bit 1 = LeaderLineColor, bit 15 = TextColor, etc.
+   *  When a bit is clear, the entity inherits from MLEADERSTYLE. */
+  propertyOverrideFlag?: number;
+  /** Entity-level LeaderLineColor raw CmEntityColor value (DXF code 91, post-CONTEXT_DATA). */
+  leaderLineColorRaw?: number;
+  /** CONTEXT_DATA TextColor raw CmEntityColor value (DXF code 92, inside CONTEXT_DATA). */
+  textColorRaw?: number;
 }
 
 export interface DxfAttdefEntity extends DxfEntityBase {
@@ -567,11 +577,27 @@ export interface DxfBlock {
   xrefPath?: string;
 }
 
+export interface DxfMLeaderStyle {
+  handle: string;
+  name?: string;
+  /** Raw CmEntityColor for LeaderLineColor (DXF code 91). */
+  leaderLineColorRaw?: number;
+  /** Raw CmEntityColor for TextColor (DXF code 93). */
+  textColorRaw?: number;
+  /** Raw CmEntityColor for BlockColor (DXF code 94). */
+  blockColorRaw?: number;
+}
+
+export interface DxfObjects {
+  mLeaderStyles?: Record<string, DxfMLeaderStyle>;
+}
+
 export interface DxfData {
   entities: DxfEntity[];
   header?: DxfHeader;
   tables?: DxfTables;
   blocks?: Record<string, DxfBlock>;
+  objects?: DxfObjects;
 }
 
 export interface DxfStatistics {

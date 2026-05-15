@@ -24,6 +24,14 @@ export interface IMLeaderEntity extends IEntityBase {
   hasArrowHead?: boolean;
   /** Entity-level LeaderLineType (code 170): 0=invisible, 1=straight, 2=spline. */
   leaderLineType?: number;
+  /** Entity-level MLEADERSTYLE handle (code 340, after CONTEXT_DATA closes). */
+  styleHandle?: string;
+  /** Entity-level PropertyOverrideFlag (code 90, after CONTEXT_DATA closes). */
+  propertyOverrideFlag?: number;
+  /** Entity-level LeaderLineColor raw CmEntityColor (code 91, after CONTEXT_DATA closes). */
+  leaderLineColorRaw?: number;
+  /** CONTEXT_DATA TextColor raw CmEntityColor (code 90 inside CONTEXT_DATA, top scope). */
+  textColorRaw?: number;
 }
 
 /**
@@ -40,8 +48,16 @@ export interface IMLeaderEntity extends IEntityBase {
  *   - code 40  : ContentScale (CONTEXT_DATA top), DoglegLength (inside LEADER)
  *   - code 41  : TextHeight (CONTEXT_DATA top), DoglegLength (entity-level)
  *   - code 42  : various (CONTEXT_DATA top), ArrowHeadSize (entity-level)
+ *   - code 90  : TextColor (CONTEXT_DATA top, raw CmEntityColor),
+ *               LeaderBranchIndex (inside LEADER, ignored),
+ *               PropertyOverrideFlag (entity-level)
+ *   - code 91  : LeaderLineColor (entity-level, raw CmEntityColor);
+ *               TextBackgroundColor (CONTEXT_DATA top, not yet supported);
+ *               LeaderLineIndex (inside LEADER_LINE, ignored)
  *   - code 140 : LandingGap (CONTEXT_DATA top — not text height!)
  *   - code 170 : LeaderLineType (entity-level only — 0/1/2)
+ *   - code 340 : LeaderStyleId / styleHandle (entity-level);
+ *               TextStyleId (CONTEXT_DATA top, ignored)
  * Inside LEADER_LINE: code 10/20/30 = vertices.
  * Inside LEADER (before LEADER_LINE): code 10/20/30 = lastLeaderPoint,
  * code 11/21/31 = doglegVector.
@@ -158,6 +174,28 @@ export function parseMultiLeader(scanner: DxfScanner, curr: IGroup): IMLeaderEnt
         if (!inContextData) {
           entity.leaderLineType = curr.value as number;
         }
+        break;
+
+      case 90:
+        if (inContextData && !inLeader) {
+          entity.textColorRaw = curr.value as number;
+        } else if (!inContextData) {
+          entity.propertyOverrideFlag = curr.value as number;
+        }
+        // inside LEADER: LeaderBranchIndex — ignore
+        break;
+      case 91:
+        if (!inContextData) {
+          entity.leaderLineColorRaw = curr.value as number;
+        }
+        // inside CONTEXT_DATA top: TextBackgroundColor — not yet supported
+        // inside LEADER_LINE: LeaderLineIndex — ignore
+        break;
+      case 340:
+        if (!inContextData) {
+          entity.styleHandle = String(curr.value).toUpperCase();
+        }
+        // inside CONTEXT_DATA top: TextStyleId — not yet used
         break;
 
       case 100:

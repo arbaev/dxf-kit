@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { DxfEntity, DxfData } from "@/types/dxf";
 import { isLeaderEntity, isMLeaderEntity } from "@/types/dxf";
-import { resolveEntityColor } from "@/utils/colorResolver";
+import { resolveEntityColor, resolveMLeaderColor } from "@/utils/colorResolver";
 import { ARROW_SIZE } from "@/constants";
 import {
   type RenderContext,
@@ -118,7 +118,11 @@ export function collectLeaderEntity(
 ): void {
   const styleName = isLeaderEntity(entity) ? entity.styleName : undefined;
   const font = resolveEntityFont(styleName, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
-  const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
+  // entityColor drives leader lines and arrows. For MULTILEADER it gets
+  // reassigned below to the resolved line color (entity override > style >
+  // ByLayer); the text body uses a separate `textColor` resolved the same way
+  // but with the TextColor override bit and MLEADERSTYLE TextColor.
+  let entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
   const matrix = worldMatrix ?? new THREE.Matrix4();
   const v = new THREE.Vector3();
 
@@ -240,6 +244,34 @@ export function collectLeaderEntity(
       }
     }
   } else if ((entity.type === "MULTILEADER" || entity.type === "MLEADER") && isMLeaderEntity(entity) && entity.leaders.length > 0) {
+    // Resolve MULTILEADER colors. AutoCAD precedence:
+    //   1. Entity-level CmEntityColor when its PropertyOverrideFlag bit is set
+    //   2. MLEADERSTYLE color (looked up by entity.styleHandle, code 340)
+    //   3. ByLayer / ByBlock via resolveEntityColor
+    // Bits in propertyOverrideFlag: bit 1 = LeaderLineColor, bit 15 = TextColor.
+    const styleHandle = entity.styleHandle;
+    const style = styleHandle && colorCtx.mLeaderStyles
+      ? colorCtx.mLeaderStyles[styleHandle.toUpperCase()]
+      : undefined;
+    const overrideFlag = entity.propertyOverrideFlag ?? 0;
+    const lineColor = resolveMLeaderColor(
+      entity.leaderLineColorRaw,
+      (overrideFlag & (1 << 1)) !== 0,
+      style?.leaderLineColorRaw,
+      entity,
+      colorCtx.layers,
+      colorCtx.blockColor,
+    );
+    const textColor = resolveMLeaderColor(
+      entity.textColorRaw,
+      (overrideFlag & (1 << 15)) !== 0,
+      style?.textColorRaw,
+      entity,
+      colorCtx.layers,
+      colorCtx.blockColor,
+    );
+    entityColor = lineColor;
+
     const arrowSize = entity.arrowSize || ARROW_SIZE;
 
     const isSpline = entity.leaderLineType === 2;
@@ -302,7 +334,7 @@ export function collectLeaderEntity(
           posY = v.y;
         }
         addTextToCollector({
-          collector, layer, color: entityColor, font, text: textContent, height: textHeight,
+          collector, layer, color: textColor, font, text: textContent, height: textHeight,
           posX, posY, posZ: 0, hAlign: HAlign.LEFT, vAlign: VAlign.MIDDLE,
         });
       }

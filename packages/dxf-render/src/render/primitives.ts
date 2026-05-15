@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { Font } from "opentype.js";
-import type { DxfLayer, DxfLineType, DxfStyle, DxfDimStyle } from "@/types/dxf";
+import type { DxfLayer, DxfLineType, DxfStyle, DxfDimStyle, DxfMLeaderStyle } from "@/types/dxf";
 import { MaterialCacheStore } from "./materialCache";
 import { isThemeAdaptiveColor } from "@/utils/colorResolver";
 import { applyLinetypePattern, type PatternGeometry } from "@/utils/linetypeResolver";
@@ -65,6 +65,7 @@ export interface RenderContext extends ColorContext, LinetypeContext {
   pointDisplaySize?: number; // Computed PDSIZE in drawing units
   dimVars?: import("./dimensions").DimVars; // Resolved dimension variables
   dimStyles?: Record<string, DxfDimStyle>; // DIMSTYLE table for dimension formatting
+  mLeaderStyles?: Record<string, DxfMLeaderStyle>; // MLEADERSTYLE objects keyed by handle (uppercase)
   headerDimlunit?: number; // $DIMLUNIT from header (fallback for dimension formatting)
   headerDimdec?: number; // $DIMDEC from header (fallback for decimal places / architectural fraction precision)
   headerDimadec?: number; // $DIMADEC from header (fallback for angular dimension decimal places)

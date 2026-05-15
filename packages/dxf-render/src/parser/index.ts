@@ -4,6 +4,7 @@ import { parseHeader } from "./sections/header";
 import { parseTables } from "./sections/tables";
 import { parseBlocks } from "./sections/blocks";
 import { parseEntities } from "./sections/entities";
+import { parseObjects } from "./sections/objects";
 import { linkRegionsToHatchBoundaries } from "./linkRegions";
 
 export function parseDxf(dxfText: string): DxfData {
@@ -35,6 +36,9 @@ export function parseDxf(dxfText: string): DxfData {
         curr = scanner.lastReadGroup;
       } else if (curr.value === "TABLES") {
         dxf.tables = parseTables(scanner) as DxfData["tables"];
+        curr = scanner.lastReadGroup;
+      } else if (curr.value === "OBJECTS") {
+        dxf.objects = parseObjects(scanner);
         curr = scanner.lastReadGroup;
       }
     } else {
