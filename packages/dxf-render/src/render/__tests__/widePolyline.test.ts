@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import * as THREE from "three";
 import { resolveSegmentWidths, hasAnyWidth } from "@/render/collectors";
 import { GeometryCollector } from "@/render/mergeCollectors";
 import { collectPolyline } from "@/render/collectors/polylineCollector";
@@ -303,5 +304,79 @@ describe("addWidePolylineToCollector", () => {
     const mesh = collectAndGetMesh(entity);
     // No width → no mesh, rendered as line
     expect(mesh).toBeNull();
+  });
+
+  it("scales width by worldMatrix scale (INSERT-scoped polyline)", () => {
+    // Reproduces the _ArchTick arrowhead inside a DIMENSION's pre-rendered block:
+    // a wide polyline inside an INSERT with uniform scale=10 should render its
+    // width scaled by the same factor. The local-space width is 0.4 → world-space
+    // width must be 4.
+    const entity = makeEntity(
+      [{ x: -0.5, y: -0.5 }, { x: 0.5, y: 0.5 }],
+      { width: 0.4 },
+    );
+    const collector = new GeometryCollector();
+    const colorCtx = makeColorCtx();
+    const worldMatrix = new THREE.Matrix4().makeScale(10, 10, 1);
+    const params: CollectEntityParams = {
+      entity,
+      colorCtx,
+      collector,
+      layer: "0",
+      worldMatrix,
+    };
+    collectPolyline(params);
+
+    const meshEntries = [...collector.meshVertices.entries()];
+    expect(meshEntries.length).toBe(1);
+    const v = meshEntries[0][1].toArray();
+    // Endpoint pair distance = width = 0.4 * scale 10 = 4
+    const dx = v[0] - v[3];
+    const dy = v[1] - v[4];
+    expect(Math.sqrt(dx * dx + dy * dy)).toBeCloseTo(4);
+
+    // Endpoint centers also scaled: (-0.5,-0.5)*10 = (-5,-5)
+    const cx = (v[0] + v[3]) / 2;
+    const cy = (v[1] + v[4]) / 2;
+    expect(cx).toBeCloseTo(-5);
+    expect(cy).toBeCloseTo(-5);
+  });
+
+  it("rotates correctly under worldMatrix rotation", () => {
+    // Horizontal width=2 polyline rotated 90° CCW: the centers go vertical,
+    // perpendicular offset goes horizontal, width preserved.
+    const entity = makeEntity(
+      [{ x: 0, y: 0 }, { x: 10, y: 0 }],
+      { width: 2 },
+    );
+    const collector = new GeometryCollector();
+    const colorCtx = makeColorCtx();
+    const worldMatrix = new THREE.Matrix4().makeRotationZ(Math.PI / 2);
+    const params: CollectEntityParams = {
+      entity,
+      colorCtx,
+      collector,
+      layer: "0",
+      worldMatrix,
+    };
+    collectPolyline(params);
+
+    const meshEntries = [...collector.meshVertices.entries()];
+    expect(meshEntries.length).toBe(1);
+    const v = meshEntries[0][1].toArray();
+
+    // pair0 center = (0,0); pair0 left = (-1,0) (perp was +y, rotated → -x),
+    // pair0 right = (+1,0).
+    expect(v[0]).toBeCloseTo(-1); // left0.x
+    expect(v[1]).toBeCloseTo(0);  // left0.y
+    expect(v[3]).toBeCloseTo(1);  // right0.x
+    expect(v[4]).toBeCloseTo(0);  // right0.y
+
+    // pair1 center = (0,10) (was (10,0) rotated 90°)
+    // pair1 left = (-1,10), pair1 right = (+1,10).
+    expect(v[6]).toBeCloseTo(-1); // left1.x
+    expect(v[7]).toBeCloseTo(10); // left1.y
+    expect(v[9]).toBeCloseTo(1);  // right1.x
+    expect(v[10]).toBeCloseTo(10); // right1.y
   });
 });

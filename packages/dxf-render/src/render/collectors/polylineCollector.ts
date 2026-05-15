@@ -138,11 +138,7 @@ const addWidePolylineToCollector = (
   const n = allCenters.length;
   if (n < 2) return;
 
-  // Phase 2: Transform OCS → WCS
-  if (ocsMatrix) for (const p of allCenters) p.applyMatrix4(ocsMatrix);
-  if (worldMatrix) for (const p of allCenters) p.applyMatrix4(worldMatrix);
-
-  // Phase 3: Compute miter normals and build left/right offset vertices.
+  // Phase 2: Compute miter normals and build left/right offset vertices.
   // At interior points, use miter join (intersection of adjacent offset lines)
   // to maintain constant perpendicular width along each segment.
   // Miter factor is clamped to MITER_LIMIT to prevent spikes at acute angles.
@@ -227,6 +223,22 @@ const addWidePolylineToCollector = (
       c.x + nx * hw, c.y + ny * hw, c.z,
       c.x - nx * hw, c.y - ny * hw, c.z,
     );
+  }
+
+  // Phase 3: Transform offset vertices from local → OCS → WCS.
+  // Width is computed in local space so worldMatrix scale propagates to thickness
+  // (matters when a wide polyline lives inside a scaled INSERT block, e.g. the
+  // _ArchTick polyline inside DIMENSION pre-rendered blocks).
+  if (ocsMatrix || worldMatrix) {
+    const tmp = new THREE.Vector3();
+    for (let i = 0; i < vertices.length; i += 3) {
+      tmp.set(vertices[i], vertices[i + 1], vertices[i + 2]);
+      if (ocsMatrix) tmp.applyMatrix4(ocsMatrix);
+      if (worldMatrix) tmp.applyMatrix4(worldMatrix);
+      vertices[i] = tmp.x;
+      vertices[i + 1] = tmp.y;
+      vertices[i + 2] = tmp.z;
+    }
   }
 
   // Phase 4: Build triangle strip indices
