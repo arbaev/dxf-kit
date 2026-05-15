@@ -16,9 +16,9 @@ import {
   resolveDimVarsFromHeader,
   applyDimStyleVars,
   mergeEntityDimVars,
-  isTickBlock,
   type DimFormatOptions,
 } from "../dimensions";
+import { classifyArrowBlock } from "../arrowheads";
 import {
   addDimensionTextToCollector,
   measureDimensionTextWidth,
@@ -82,24 +82,22 @@ export function collectDimensionEntity(
     const dimScale = (entity.dimScale ?? styleDimScale ?? headerDimScale) || 1;
 
     if (dimStyleEntry.dimtsz !== undefined && dimStyleEntry.dimtsz > 0) {
-      dv.useTicks = true;
+      // DIMTSZ > 0 forces tick rendering regardless of DIMBLK.
+      dv.arrowKind = "tick";
       dv.tickSize = dimStyleEntry.dimtsz * dimScale;
     } else if (dimStyleEntry.dimblkHandle && colorCtx.blockHandleToName) {
       const blockName = colorCtx.blockHandleToName.get(dimStyleEntry.dimblkHandle);
-      if (blockName && isTickBlock(blockName)) {
-        dv.useTicks = true;
-        // No explicit DIMTSZ -> tick size always follows arrow size
-        // (entity XDATA may override arrowSize after base tickSize was set)
-        dv.tickSize = dv.arrowSize;
-      } else {
-        // DIMBLK is not a tick block → use standard arrows
-        dv.useTicks = false;
-        dv.tickSize = 0;
-      }
-    } else if (dv.useTicks && dimStyleEntry.dimtsz === 0) {
+      // Unknown / non-standard block names fall back to closed-filled (the
+      // AutoCAD default). Custom user blocks for dimension arrowheads are not
+      // dispatched through `addBlockArrowToCollector` — only leaders do that.
+      dv.arrowKind = classifyArrowBlock(blockName) ?? "closed-filled";
+      // No explicit DIMTSZ -> tick size follows arrow size (entity XDATA may
+      // override arrowSize after base tickSize was set).
+      dv.tickSize = dv.arrowKind === "tick" ? dv.arrowSize : 0;
+    } else if (dv.arrowKind === "tick" && dimStyleEntry.dimtsz === 0) {
       // DIMSTYLE explicitly sets DIMTSZ=0 with no custom DIMBLK → default arrows
-      // (overrides header $DIMBLK=ARCHTICK that may have set useTicks=true)
-      dv.useTicks = false;
+      // (overrides header $DIMBLK=ARCHTICK that may have selected ticks).
+      dv.arrowKind = "closed-filled";
       dv.tickSize = 0;
     }
   }

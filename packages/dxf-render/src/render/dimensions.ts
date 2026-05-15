@@ -18,24 +18,20 @@ import {
   CIRCLE_SEGMENTS,
   MIN_ARC_SEGMENTS,
 } from "@/constants";
-import { createArrow, createTick } from "./primitives";
 import { replaceSpecialChars } from "./text/mtextParser";
 import type { GeometryCollector } from "./mergeCollectors";
 import { addDimensionTextToCollector, measureDimensionTextWidth } from "./text/vectorTextBuilder";
-
-/**
- * Check if a DIMBLK block name represents a tick mark (oblique stroke).
- * Common tick block names: _ArchTick, ArchTick, _OBLIQUE, Oblique, _Tick.
- */
-export const isTickBlock = (name: string): boolean => {
-  if (!name) return false;
-  const n = name.toLowerCase();
-  return n.includes("tick") || n.includes("oblique");
-};
+import { type ArrowKind, classifyArrowBlock, isArrowShape, createArrowhead } from "./arrowheads";
 
 /**
  * Resolved dimension variable set. Values are final (already scaled by DIMSCALE).
  * Priority: entity XDATA override > header $DIM* × $DIMSCALE > hardcoded defaults.
+ *
+ * `arrowKind` controls the shape rendered at each dim line endpoint:
+ *   - "tick"          — DIMTSZ > 0 or DIMBLK names a tick block (_ArchTick, _Oblique, ...).
+ *                       `tickSize` carries the explicit DIMTSZ or follows arrowSize.
+ *   - "closed-filled" — AutoCAD default (filled triangle).
+ *   - other kinds     — resolved from DIMBLK at the collector level.
  */
 export interface DimVars {
   arrowSize: number;
@@ -44,7 +40,7 @@ export interface DimVars {
   extLineDash: number;
   extLineGap: number;
   extLineExtension: number; // DIMEXE: extension line overshoot past dimension line
-  useTicks: boolean;
+  arrowKind: ArrowKind;
   tickSize: number;
 }
 
@@ -56,7 +52,7 @@ export const DEFAULT_DIM_VARS: DimVars = {
   extLineDash: EXTENSION_LINE_DASH_SIZE,
   extLineGap: EXTENSION_LINE_GAP_SIZE,
   extLineExtension: EXTENSION_LINE_EXTENSION,
-  useTicks: false,
+  arrowKind: "closed-filled",
   tickSize: 0,
 };
 
@@ -83,12 +79,17 @@ export function resolveDimVarsFromHeader(
   const extLineExtension = (header.$DIMEXE ?? EXTENSION_LINE_EXTENSION) * scale;
 
   const dimtsz = header.$DIMTSZ ?? 0;
-  const dimblk = header.$DIMBLK ?? "";
-  const useTicks = dimtsz > 0 || isTickBlock(dimblk);
-  // When using ticks: DIMTSZ provides explicit size, otherwise fall back to arrowSize
-  const tickSize = !useTicks ? 0 : dimtsz > 0 ? dimtsz * scale : arrowSize;
+  const dimblk = header.$DIMBLK;
+  // DIMTSZ > 0 forces tick rendering regardless of DIMBLK (matches AutoCAD).
+  // Unknown DIMBLK names fall back to closed-filled (the AutoCAD default).
+  const arrowKind: ArrowKind = dimtsz > 0
+    ? "tick"
+    : classifyArrowBlock(dimblk) ?? "closed-filled";
+  // For tick: DIMTSZ provides explicit size, otherwise fall back to arrowSize.
+  // Non-tick kinds ignore tickSize.
+  const tickSize = arrowKind !== "tick" ? 0 : dimtsz > 0 ? dimtsz * scale : arrowSize;
 
-  return { arrowSize, textHeight, textGap, extLineDash, extLineGap, extLineExtension, useTicks, tickSize };
+  return { arrowSize, textHeight, textGap, extLineDash, extLineGap, extLineExtension, arrowKind, tickSize };
 }
 
 /**
@@ -156,7 +157,7 @@ export function applyDimStyleVars(
   }
 
   // When ticks are derived from arrowSize (DIMTSZ=0 + tick block), keep them in sync
-  if (result.useTicks && result.tickSize > 0 && dimStyle.dimtsz === undefined) {
+  if (result.arrowKind === "tick" && result.tickSize > 0 && dimStyle.dimtsz === undefined) {
     result.tickSize = result.arrowSize;
   }
 
@@ -329,8 +330,9 @@ export const createLinearDimensionLines = (p: LinearDimensionLinesParams): THREE
   // When the dim line is too short to fit two inward-pointing arrows, flip them
   // to point inward from outside. Arrow bases sit at min - arrowSize / max + arrowSize;
   // the dim line extends one extra `tail` past each base so the arrows read as
-  // arrows (shaft + head) rather than two opposing triangles.
-  const useOutsideArrows = !dv.useTicks && (max - min) < OUTSIDE_ARROW_THRESHOLD_RATIO * dv.arrowSize;
+  // arrows (shaft + head) rather than two opposing triangles. Only applies to
+  // arrow-shape kinds — dots/ticks/boxes always sit at the endpoint.
+  const useOutsideArrows = isArrowShape(dv.arrowKind) && (max - min) < OUTSIDE_ARROW_THRESHOLD_RATIO * dv.arrowSize;
   const outsideOffset = dv.arrowSize * (1 + OUTSIDE_ARROW_TAIL_RATIO);
   const dimMin = useOutsideArrows ? min - outsideOffset : min;
   const dimMax = useOutsideArrows ? max + outsideOffset : max;
@@ -392,17 +394,21 @@ export const createLinearDimensionLines = (p: LinearDimensionLinesParams): THREE
     );
   }
 
-  if (dv.useTicks) {
-    const dimAngle = isHorizontal ? 0 : Math.PI / 2;
-    objects.push(createTick(createVec3(min, anchorFixed, 0.1), dv.tickSize, dimAngle, dimLineMaterial));
-    objects.push(createTick(createVec3(max, anchorFixed, 0.1), dv.tickSize, dimAngle, dimLineMaterial));
-  } else if (useOutsideArrows) {
+  const headSize = dv.arrowKind === "tick" ? dv.tickSize : dv.arrowSize;
+  const pushHead = (from: THREE.Vector3, tip: THREE.Vector3) => {
+    objects.push(...createArrowhead({
+      from, tip, size: headSize, kind: dv.arrowKind,
+      lineMaterial: dimLineMaterial, fillMaterial: arrowMaterial,
+    }));
+  };
+
+  if (useOutsideArrows) {
     // Flipped: tips at min/max pointing inward, bases at dimMin/dimMax (outside)
-    objects.push(createArrow(createVec3(dimMin, anchorFixed, 0.1), createVec3(min, anchorFixed, 0.1), dv.arrowSize, arrowMaterial));
-    objects.push(createArrow(createVec3(dimMax, anchorFixed, 0.1), createVec3(max, anchorFixed, 0.1), dv.arrowSize, arrowMaterial));
+    pushHead(createVec3(dimMin, anchorFixed, 0.1), createVec3(min, anchorFixed, 0.1));
+    pushHead(createVec3(dimMax, anchorFixed, 0.1), createVec3(max, anchorFixed, 0.1));
   } else {
-    objects.push(createArrow(createVec3(max, anchorFixed, 0.1), createVec3(min, anchorFixed, 0.1), dv.arrowSize, arrowMaterial));
-    objects.push(createArrow(createVec3(min, anchorFixed, 0.1), createVec3(max, anchorFixed, 0.1), dv.arrowSize, arrowMaterial));
+    pushHead(createVec3(max, anchorFixed, 0.1), createVec3(min, anchorFixed, 0.1));
+    pushHead(createVec3(min, anchorFixed, 0.1), createVec3(max, anchorFixed, 0.1));
   }
 
   return objects;
@@ -455,8 +461,9 @@ export const createRotatedDimensionLines = (p: RotatedDimensionLinesParams): THR
   // When the dim line is too short to fit two inward-pointing arrows, flip them
   // to point inward from outside. Arrow bases sit at tMin - arrowSize / tMax + arrowSize;
   // the dim line extends one extra `tail` past each base so the arrows read as
-  // arrows (shaft + head) rather than two opposing triangles.
-  const useOutsideArrows = !dv.useTicks && (tMax - tMin) < OUTSIDE_ARROW_THRESHOLD_RATIO * dv.arrowSize;
+  // arrows (shaft + head) rather than two opposing triangles. Only applies to
+  // arrow-shape kinds — dots/ticks/boxes always sit at the endpoint.
+  const useOutsideArrows = isArrowShape(dv.arrowKind) && (tMax - tMin) < OUTSIDE_ARROW_THRESHOLD_RATIO * dv.arrowSize;
   const outsideOffset = dv.arrowSize * (1 + OUTSIDE_ARROW_TAIL_RATIO);
   const tDimMin = useOutsideArrows ? tMin - outsideOffset : tMin;
   const tDimMax = useOutsideArrows ? tMax + outsideOffset : tMax;
@@ -526,16 +533,21 @@ export const createRotatedDimensionLines = (p: RotatedDimensionLinesParams): THR
     objects.push(createExtensionLine(p2, foot2, extensionLineMaterial, dv.extLineExtension));
   }
 
-  if (dv.useTicks) {
-    objects.push(createTick(new THREE.Vector3(minPt.x, minPt.y, 0.1), dv.tickSize, angleRad, dimLineMaterial));
-    objects.push(createTick(new THREE.Vector3(maxPt.x, maxPt.y, 0.1), dv.tickSize, angleRad, dimLineMaterial));
-  } else if (useOutsideArrows) {
+  const headSize = dv.arrowKind === "tick" ? dv.tickSize : dv.arrowSize;
+  const pushHead = (from: THREE.Vector3, tip: THREE.Vector3) => {
+    objects.push(...createArrowhead({
+      from, tip, size: headSize, kind: dv.arrowKind,
+      lineMaterial: dimLineMaterial, fillMaterial: arrowMaterial,
+    }));
+  };
+
+  if (useOutsideArrows) {
     // Flipped: tips at minPt/maxPt pointing inward, bases at dimMinPt/dimMaxPt (outside)
-    objects.push(createArrow(new THREE.Vector3(dimMinPt.x, dimMinPt.y, 0.1), new THREE.Vector3(minPt.x, minPt.y, 0.1), dv.arrowSize, arrowMaterial));
-    objects.push(createArrow(new THREE.Vector3(dimMaxPt.x, dimMaxPt.y, 0.1), new THREE.Vector3(maxPt.x, maxPt.y, 0.1), dv.arrowSize, arrowMaterial));
+    pushHead(new THREE.Vector3(dimMinPt.x, dimMinPt.y, 0.1), new THREE.Vector3(minPt.x, minPt.y, 0.1));
+    pushHead(new THREE.Vector3(dimMaxPt.x, dimMaxPt.y, 0.1), new THREE.Vector3(maxPt.x, maxPt.y, 0.1));
   } else {
-    objects.push(createArrow(new THREE.Vector3(maxPt.x, maxPt.y, 0.1), new THREE.Vector3(minPt.x, minPt.y, 0.1), dv.arrowSize, arrowMaterial));
-    objects.push(createArrow(new THREE.Vector3(minPt.x, minPt.y, 0.1), new THREE.Vector3(maxPt.x, maxPt.y, 0.1), dv.arrowSize, arrowMaterial));
+    pushHead(new THREE.Vector3(maxPt.x, maxPt.y, 0.1), new THREE.Vector3(minPt.x, minPt.y, 0.1));
+    pushHead(new THREE.Vector3(minPt.x, minPt.y, 0.1), new THREE.Vector3(maxPt.x, maxPt.y, 0.1));
   }
 
   return objects;
@@ -645,13 +657,14 @@ export const createDimensionGroup = (p: DimensionGroupParams): THREE.Group => {
       ),
     );
 
-    const arrow = createArrow(
-      new THREE.Vector3(centerX, centerY, 0.1),
-      new THREE.Vector3(edgeX, edgeY, 0.1),
-      dv.arrowSize,
-      arrowMaterial,
-    );
-    dimGroup.add(arrow);
+    const headSize = dv.arrowKind === "tick" ? dv.tickSize : dv.arrowSize;
+    const heads = createArrowhead({
+      from: new THREE.Vector3(centerX, centerY, 0.1),
+      tip: new THREE.Vector3(edgeX, edgeY, 0.1),
+      size: headSize, kind: dv.arrowKind,
+      lineMaterial: dimLineMaterial, fillMaterial: arrowMaterial,
+    });
+    heads.forEach((h) => dimGroup.add(h));
 
     // No extension lines in this radial branch — everything is "dim".
     tagDimParts([dimGroup]);
@@ -1033,6 +1046,13 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
   const objects: THREE.Object3D[] = [];
   const lineMat = new THREE.LineBasicMaterial({ color });
   const arrowMat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
+  const headSize = dv.arrowKind === "tick" ? dv.tickSize : dv.arrowSize;
+  const pushHead = (from: THREE.Vector3, tip: THREE.Vector3) => {
+    objects.push(...createArrowhead({
+      from, tip, size: headSize, kind: dv.arrowKind,
+      lineMaterial: lineMat, fillMaterial: arrowMat,
+    }));
+  };
 
   // Radius direction (centre → arcPt) and its perpendicular (CCW 90°).
   const radius = measurement;
@@ -1063,11 +1083,10 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
       new THREE.Vector3(arcPt.x, arcPt.y, 0),
     ]);
     objects.push(new THREE.Line(lineGeom, lineMat));
-    objects.push(createArrow(
+    pushHead(
       new THREE.Vector3(center.x, center.y, 0.1),
       new THREE.Vector3(arcPt.x, arcPt.y, 0.1),
-      dv.arrowSize, arrowMat,
-    ));
+    );
     tagDimParts(objects);
     return objects;
   }
@@ -1116,11 +1135,10 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
       ]),
       lineMat,
     ));
-    objects.push(createArrow(
+    pushHead(
       new THREE.Vector3(tailEndPoint.x, tailEndPoint.y, 0.1),
       new THREE.Vector3(arcPt.x, arcPt.y, 0.1),
-      dv.arrowSize, arrowMat,
-    ));
+    );
     tagDimParts(objects);
     return objects;
   }
@@ -1201,11 +1219,10 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
         lineMat,
       ));
     }
-    objects.push(createArrow(
+    pushHead(
       new THREE.Vector3(center.x, center.y, 0.1),
       new THREE.Vector3(arcPt.x, arcPt.y, 0.1),
-      dv.arrowSize, arrowMat,
-    ));
+    );
   } else {
     // Text outside the arc. ISO convention: NO line from the centre — just
     // an arrow at arcPt pointing inward (body outside the arc on the text side)
@@ -1231,13 +1248,12 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
         lineMat,
       ));
     }
-    // Arrow `from` lies further out so createArrow places the tip-side base
+    // Arrow `from` lies further out so the head places the tip-side base
     // OUTSIDE the arc — arrow points inward toward the arc.
-    objects.push(createArrow(
+    pushHead(
       new THREE.Vector3(center.x + outDirX * arrowBaseAlong, center.y + outDirY * arrowBaseAlong, 0.1),
       new THREE.Vector3(arcPt.x, arcPt.y, 0.1),
-      dv.arrowSize, arrowMat,
-    ));
+    );
   }
 
   // DIMTMOVE=1 (user moved text + leader): drop a connector from the projected
@@ -1299,6 +1315,13 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
   const objects: THREE.Object3D[] = [];
   const lineMat = new THREE.LineBasicMaterial({ color });
   const arrowMat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
+  const headSize = dv.arrowKind === "tick" ? dv.tickSize : dv.arrowSize;
+  const pushHead = (from: THREE.Vector3, tip: THREE.Vector3) => {
+    objects.push(...createArrowhead({
+      from, tip, size: headSize, kind: dv.arrowKind,
+      lineMaterial: lineMat, fillMaterial: arrowMat,
+    }));
+  };
 
   const cx = (p10.x + p15.x) / 2;
   const cy = (p10.y + p15.y) / 2;
@@ -1340,17 +1363,13 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
     p10.y + arrowSign * dir10y * dv.arrowSize,
     0.1,
   );
-  objects.push(
-    createArrow(arrow10From, new THREE.Vector3(p10.x, p10.y, 0.1), dv.arrowSize, arrowMat),
-  );
+  pushHead(arrow10From, new THREE.Vector3(p10.x, p10.y, 0.1));
   const arrow15From = new THREE.Vector3(
     p15.x - arrowSign * dir10x * dv.arrowSize,
     p15.y - arrowSign * dir10y * dv.arrowSize,
     0.1,
   );
-  objects.push(
-    createArrow(arrow15From, new THREE.Vector3(p15.x, p15.y, 0.1), dv.arrowSize, arrowMat),
-  );
+  pushHead(arrow15From, new THREE.Vector3(p15.x, p15.y, 0.1));
 
   const diamLineGeom = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(p15.x, p15.y, 0),
@@ -1767,31 +1786,33 @@ export const createAngularDimension = (p: DimensionTypeParams): THREE.Object3D[]
   );
   objects.push(extLineB);
 
-  // Arrowheads or tick marks at arc endpoints
-  if (dv.useTicks) {
-    // Tick marks: oriented along arc tangent at each endpoint
-    objects.push(createTick(new THREE.Vector3(arcStartPt.x, arcStartPt.y, 0.1), dv.tickSize, startAngle + Math.PI / 2, lineMat));
-    objects.push(createTick(new THREE.Vector3(arcEndPt.x, arcEndPt.y, 0.1), dv.tickSize, endAngle + Math.PI / 2, lineMat));
-  } else {
-    // Arrows follow arc curvature (chord direction, not pure tangent)
-    const arrowArcAngle = dv.arrowSize / radius;
+  // Arrowheads at arc endpoints. Direction is taken along the chord (inward from
+  // an interior point offset by arrowSize/radius along the arc) for arrow-shape
+  // kinds; symmetric kinds (dot/tick/box) ignore direction.
+  const headSize = dv.arrowKind === "tick" ? dv.tickSize : dv.arrowSize;
+  const pushHead = (from: THREE.Vector3, tip: THREE.Vector3) => {
+    objects.push(...createArrowhead({
+      from, tip, size: headSize, kind: dv.arrowKind,
+      lineMaterial: lineMat, fillMaterial: arrowMat,
+    }));
+  };
 
-    const innerStartA = startAngle + arrowArcAngle;
-    const arrowStartFrom = new THREE.Vector3(
-      vertex.x + radius * Math.cos(innerStartA),
-      vertex.y + radius * Math.sin(innerStartA),
-      0.1,
-    );
-    objects.push(createArrow(arrowStartFrom, new THREE.Vector3(arcStartPt.x, arcStartPt.y, 0.1), dv.arrowSize, arrowMat));
+  const arrowArcAngle = dv.arrowSize / radius;
+  const innerStartA = startAngle + arrowArcAngle;
+  const arrowStartFrom = new THREE.Vector3(
+    vertex.x + radius * Math.cos(innerStartA),
+    vertex.y + radius * Math.sin(innerStartA),
+    0.1,
+  );
+  pushHead(arrowStartFrom, new THREE.Vector3(arcStartPt.x, arcStartPt.y, 0.1));
 
-    const innerEndA = endAngle - arrowArcAngle;
-    const arrowEndFrom = new THREE.Vector3(
-      vertex.x + radius * Math.cos(innerEndA),
-      vertex.y + radius * Math.sin(innerEndA),
-      0.1,
-    );
-    objects.push(createArrow(arrowEndFrom, new THREE.Vector3(arcEndPt.x, arcEndPt.y, 0.1), dv.arrowSize, arrowMat));
-  }
+  const innerEndA = endAngle - arrowArcAngle;
+  const arrowEndFrom = new THREE.Vector3(
+    vertex.x + radius * Math.cos(innerEndA),
+    vertex.y + radius * Math.sin(innerEndA),
+    0.1,
+  );
+  pushHead(arrowEndFrom, new THREE.Vector3(arcEndPt.x, arcEndPt.y, 0.1));
 
   // --- Render text ---
   if (dimensionText) {

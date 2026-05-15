@@ -282,10 +282,26 @@ describe("dimension lines — outside-arrow auto-flip", () => {
       point2: { x: 4, y: 0 },
       anchorPoint: { x: 2, y: 0 },
       isHorizontal: true,
-      dv: { ...dv, useTicks: true, tickSize: 2 },
+      dv: { ...dv, arrowKind: "tick" as const, tickSize: 2 },
     });
     const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
     // Dim line stays between min/max (no extension)
+    const { x } = lineEnds(lines[0]);
+    expect(Math.min(...x)).toBeCloseTo(0, 5);
+    expect(Math.max(...x)).toBeCloseTo(4, 5);
+  });
+
+  it("does not flip when arrowKind=dot-small (symmetric, no collision)", () => {
+    const objs = createLinearDimensionLines({
+      ...baseParams,
+      point1: { x: 0, y: 0 },
+      point2: { x: 4, y: 0 },
+      anchorPoint: { x: 2, y: 0 },
+      isHorizontal: true,
+      dv: { ...dv, arrowKind: "dot-small" as const },
+    });
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    // Dim line stays between min/max — dots sit at the endpoints, no flip
     const { x } = lineEnds(lines[0]);
     expect(Math.min(...x)).toBeCloseTo(0, 5);
     expect(Math.max(...x)).toBeCloseTo(4, 5);
@@ -622,28 +638,52 @@ describe("resolveDimVarsFromHeader", () => {
     expect(dv.extLineGap).toBe(5);  // 1 * 5
   });
 
-  it("sets useTicks=true when $DIMTSZ > 0", () => {
+  it("sets arrowKind=tick when $DIMTSZ > 0", () => {
     const dv = resolveDimVarsFromHeader({ "$DIMTSZ": 2.5 });
-    expect(dv.useTicks).toBe(true);
+    expect(dv.arrowKind).toBe("tick");
     expect(dv.tickSize).toBe(2.5);
   });
 
-  it("sets useTicks=false when $DIMTSZ is 0", () => {
+  it("defaults arrowKind to closed-filled when $DIMTSZ is 0", () => {
     const dv = resolveDimVarsFromHeader({ "$DIMTSZ": 0 });
-    expect(dv.useTicks).toBe(false);
+    expect(dv.arrowKind).toBe("closed-filled");
     expect(dv.tickSize).toBe(0);
   });
 
-  it("sets useTicks=false when $DIMTSZ is absent", () => {
+  it("defaults arrowKind to closed-filled when $DIMTSZ is absent", () => {
     const dv = resolveDimVarsFromHeader({});
-    expect(dv.useTicks).toBe(false);
+    expect(dv.arrowKind).toBe("closed-filled");
     expect(dv.tickSize).toBe(0);
   });
 
   it("scales $DIMTSZ by $DIMSCALE", () => {
     const dv = resolveDimVarsFromHeader({ "$DIMTSZ": 1.5, "$DIMSCALE": 4 });
-    expect(dv.useTicks).toBe(true);
+    expect(dv.arrowKind).toBe("tick");
     expect(dv.tickSize).toBe(6);
+  });
+
+  it("resolves $DIMBLK=_DotSmall to arrowKind=dot-small", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMBLK": "_DotSmall" });
+    expect(dv.arrowKind).toBe("dot-small");
+    expect(dv.tickSize).toBe(0);
+  });
+
+  it("resolves $DIMBLK=_ArchTick to arrowKind=tick", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMBLK": "_ArchTick" });
+    expect(dv.arrowKind).toBe("tick");
+    // No explicit DIMTSZ → tick size follows arrowSize
+    expect(dv.tickSize).toBe(dv.arrowSize);
+  });
+
+  it("$DIMTSZ > 0 wins over $DIMBLK", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMTSZ": 2, "$DIMBLK": "_DotSmall" });
+    expect(dv.arrowKind).toBe("tick");
+    expect(dv.tickSize).toBe(2);
+  });
+
+  it("falls back to closed-filled for unknown $DIMBLK", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMBLK": "MyCustomArrow" });
+    expect(dv.arrowKind).toBe("closed-filled");
   });
 });
 

@@ -5,18 +5,14 @@ import { resolveEntityColor, resolveMLeaderColor } from "@/utils/colorResolver";
 import { ARROW_SIZE } from "@/constants";
 import {
   type RenderContext,
-  createArrow,
-  createTick,
   getLineMaterial,
   getMeshMaterial,
 } from "../primitives";
 import type { GeometryCollector } from "../mergeCollectors";
 import { resolveEntityFont } from "../text/fontClassifier";
 import { replaceSpecialChars } from "../text/mtextParser";
-import {
-  resolveDimVarsFromHeader,
-  isTickBlock,
-} from "../dimensions";
+import { resolveDimVarsFromHeader } from "../dimensions";
+import { classifyArrowBlock, createArrowhead, type ArrowKind } from "../arrowheads";
 import {
   addTextToCollector,
   HAlign,
@@ -135,22 +131,52 @@ export function collectLeaderEntity(
     }
   };
 
-  const addArrowToCollector = (from: THREE.Vector3, to: THREE.Vector3, size: number) => {
-    const arrow = createArrow(from, to, size, getMeshMaterial(entityColor, colorCtx.materials));
-    const geo = arrow.geometry as THREE.BufferGeometry;
-    const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
-    const count = posAttr.count;
-    const positions: number[] = [];
-    for (let i = 0; i < count; i++) {
-      v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
-      positions.push(v.x, v.y, v.z);
+  /**
+   * Build any standard AutoCAD arrowhead (closed-filled, dot, tick, box, ...)
+   * and decompose it into the collector. `kind` defaults to closed-filled —
+   * the AutoCAD default arrow used when DIMLDRBLK is unset.
+   */
+  const addArrowheadToCollector = (
+    from: THREE.Vector3, to: THREE.Vector3, size: number, kind: ArrowKind = "closed-filled",
+  ) => {
+    const lineMat = getLineMaterial(entityColor, colorCtx.materials);
+    const fillMat = getMeshMaterial(entityColor, colorCtx.materials);
+    const heads = createArrowhead({ from, tip: to, size, kind, lineMaterial: lineMat, fillMaterial: fillMat });
+    for (const head of heads) {
+      const geo = (head as THREE.Mesh | THREE.Line | THREE.LineSegments).geometry as THREE.BufferGeometry;
+      const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
+      const count = posAttr.count;
+
+      if (head instanceof THREE.LineSegments) {
+        const verts: number[] = [];
+        for (let i = 0; i < count; i++) {
+          v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
+          verts.push(v.x, v.y, v.z);
+        }
+        collector.addLineSegments(layer, entityColor, verts);
+      } else if (head instanceof THREE.Line) {
+        const verts: number[] = [];
+        for (let i = 0; i < count - 1; i++) {
+          v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
+          const x1 = v.x, y1 = v.y, z1 = v.z;
+          v.fromBufferAttribute(posAttr, i + 1).applyMatrix4(matrix);
+          verts.push(x1, y1, z1, v.x, v.y, v.z);
+        }
+        collector.addLineSegments(layer, entityColor, verts);
+      } else if (head instanceof THREE.Mesh) {
+        const positions: number[] = [];
+        for (let i = 0; i < count; i++) {
+          v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
+          positions.push(v.x, v.y, v.z);
+        }
+        const index = geo.getIndex();
+        const indices = index ? Array.from(index.array) : [];
+        if (indices.length === 0) {
+          for (let i = 0; i < count; i++) indices.push(i);
+        }
+        collector.addOverlayMesh(layer, entityColor, positions, indices);
+      }
     }
-    const index = geo.getIndex();
-    const indices = index ? Array.from(index.array) : [];
-    if (indices.length === 0) {
-      for (let i = 0; i < count; i++) indices.push(i);
-    }
-    collector.addOverlayMesh(layer, entityColor, positions, indices);
   };
 
   // Resolve arrow block for LEADER: DIMSTYLE code 341 (DIMLDRBLK) -> block name
@@ -192,19 +218,6 @@ export function collectLeaderEntity(
     return true;
   };
 
-  const addTickToCollector = (point: THREE.Vector3, dimAngle: number) => {
-    const tick = createTick(point, baseDv.tickSize || baseDv.arrowSize, dimAngle,
-      getLineMaterial(entityColor, colorCtx.materials));
-    const geo = tick.geometry as THREE.BufferGeometry;
-    const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
-    const verts: number[] = [];
-    for (let i = 0; i < posAttr.count; i++) {
-      v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
-      verts.push(v.x, v.y, v.z);
-    }
-    collector.addLineSegments(layer, entityColor, verts);
-  };
-
   if (entity.type === "LEADER" && isLeaderEntity(entity) && entity.vertices.length >= 2) {
     const rawPoints = entity.vertices.map(
       (vt) => new THREE.Vector3(vt.x, vt.y, vt.z || 0),
@@ -225,22 +238,19 @@ export function collectLeaderEntity(
         const d = (points[i].x - points[0].x) ** 2 + (points[i].y - points[0].y) ** 2;
         if (d >= arrowSize * arrowSize) break;
       }
-      const dx = points[0].x - points[baseIdx].x;
-      const dy = points[0].y - points[baseIdx].y;
-      const angle = Math.atan2(dy, dx);
-      let drawn = false;
-      // Try custom arrow block from DIMLDRBLK
-      if (leaderArrowBlockName && !isTickBlock(leaderArrowBlockName)) {
-        drawn = addBlockArrowToCollector(leaderArrowBlockName, points[0], angle, arrowSize);
-      }
-      if (!drawn) {
-        // Leaders use ticks only if DIMLDRBLK explicitly specifies a tick block.
-        // Do NOT inherit useTicks from baseDv — that's for dimension arrowheads.
-        if (leaderArrowBlockName && isTickBlock(leaderArrowBlockName)) {
-          addTickToCollector(points[0], angle);
-        } else {
-          addArrowToCollector(points[baseIdx], points[0], arrowSize);
-        }
+      const angle = Math.atan2(points[0].y - points[baseIdx].y, points[0].x - points[baseIdx].x);
+      // DIMLDRBLK resolution: try standard kinds first; non-standard names fall
+      // back to rendering the user-defined block geometry; if that fails, use
+      // the AutoCAD default (closed-filled). Leaders never inherit DIMBLK's
+      // tick kind from baseDv — that's for dimension arrowheads only.
+      const leaderArrowKind = classifyArrowBlock(leaderArrowBlockName);
+      if (leaderArrowKind !== undefined) {
+        addArrowheadToCollector(points[baseIdx], points[0], arrowSize, leaderArrowKind);
+      } else if (leaderArrowBlockName) {
+        const drawn = addBlockArrowToCollector(leaderArrowBlockName, points[0], angle, arrowSize);
+        if (!drawn) addArrowheadToCollector(points[baseIdx], points[0], arrowSize);
+      } else {
+        addArrowheadToCollector(points[baseIdx], points[0], arrowSize);
       }
     }
   } else if ((entity.type === "MULTILEADER" || entity.type === "MLEADER") && isMLeaderEntity(entity) && entity.leaders.length > 0) {
@@ -317,7 +327,9 @@ export function collectLeaderEntity(
         if (entity.hasArrowHead !== false && points.length >= 2) {
           // Arrow direction follows the curve's tangent at the tip — for a
           // spline, points[1] is the next sampled point on the curve.
-          addArrowToCollector(points[1], points[0], arrowSize);
+          // MULTILEADER arrowhead style is selected by the MLEADERSTYLE; we
+          // currently always render closed-filled (the AutoCAD default).
+          addArrowheadToCollector(points[1], points[0], arrowSize);
         }
       }
     }
