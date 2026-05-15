@@ -1,7 +1,11 @@
 import * as THREE from "three";
 import type { DxfEntity } from "@/types/dxf";
 import { resolveEntityColor, isThemeAdaptiveColor } from "@/utils/colorResolver";
-import { GeometryCollector } from "./mergeCollectors";
+import {
+  GeometryCollector,
+  RENDER_ORDER_MESH,
+  RENDER_ORDER_LINE,
+} from "./mergeCollectors";
 import { type RenderContext, getLineMaterial, getMeshMaterial, getPointsMaterial } from "./primitives";
 import { LINETYPE_DOT_SIZE } from "@/constants";
 
@@ -296,6 +300,7 @@ export function addSharedBlockInstance(
       obj.matrixAutoUpdate = false;
       obj.matrix.copy(mat4);
       obj.frustumCulled = false;
+      obj.renderOrder = RENDER_ORDER_LINE;
       obj.userData.layerName = layer;
       group.add(obj);
     }
@@ -306,6 +311,7 @@ export function addSharedBlockInstance(
       obj.matrixAutoUpdate = false;
       obj.matrix.copy(mat4);
       obj.frustumCulled = false;
+      obj.renderOrder = RENDER_ORDER_MESH;
       obj.userData.layerName = layer;
       group.add(obj);
     }
@@ -316,6 +322,7 @@ export function addSharedBlockInstance(
       obj.matrixAutoUpdate = false;
       obj.matrix.copy(mat4);
       obj.frustumCulled = false;
+      obj.renderOrder = RENDER_ORDER_LINE;
       obj.userData.layerName = layer;
       group.add(obj);
     }
@@ -334,6 +341,7 @@ export function addSharedBlockInstance(
       obj.matrixAutoUpdate = false;
       obj.matrix.copy(mat4);
       obj.frustumCulled = false;
+      obj.renderOrder = RENDER_ORDER_LINE;
       obj.userData.layerName = layer;
       group.add(obj);
     }

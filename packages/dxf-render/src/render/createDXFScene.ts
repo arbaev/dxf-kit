@@ -413,6 +413,13 @@ export async function createThreeObjectsFromDXF(
     group.add(obj);
   }
 
+  // The renderer has sortObjects=false, so Three.js iterates children in array order.
+  // Sort children by renderOrder (stable in ES2019+) so fills draw first, then outlines,
+  // then text/arrow overlays — regardless of when each object joined the group during
+  // entity processing. Without this, INSERT block outlines added via the shared-geometry
+  // fast path end up hidden under HATCH meshes that arrive later from flush().
+  group.children.sort((a, b) => a.renderOrder - b.renderOrder);
+
   const totalIssues = errors.length + unsupportedTypes.length;
   if (totalIssues > 0) {
     const warningParts = [];

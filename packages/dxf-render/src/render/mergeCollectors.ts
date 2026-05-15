@@ -4,6 +4,16 @@ import { MaterialCacheStore } from "./materialCache";
 import { isThemeAdaptiveColor } from "@/utils/colorResolver";
 import { LINETYPE_DOT_SIZE } from "@/constants";
 
+// ─── Render order ───────────────────────────────────────────────────
+// With depthTest disabled on all materials, draw order is decided by
+// Three.js's sort: lower renderOrder draws first (back), higher draws last (front).
+// Block-instance LineSegments added directly to the group via addSharedBlockInstance
+// would otherwise be covered by HATCH meshes that arrive later from flush().
+
+export const RENDER_ORDER_MESH = 0;
+export const RENDER_ORDER_LINE = 1;
+export const RENDER_ORDER_OVERLAY = 2;
+
 // ─── Growable typed arrays ──────────────────────────────────────────
 
 /**
@@ -277,7 +287,8 @@ export class GeometryCollector {
   flush(materials: MaterialCacheStore): THREE.Object3D[] {
     const objects: THREE.Object3D[] = [];
 
-    // Merged Meshes — rendered first (behind lines/points)
+    // Merged Meshes — rendered first (behind lines/points). renderOrder=0 keeps fills
+    // (HATCH, SOLID) behind block outlines that were added to the group before flush().
     for (const [key, vArr] of this.meshVertices) {
       const iArr = this.meshIndices.get(key);
       if (!iArr || vArr.length < 9 || iArr.length < 3) continue;
@@ -292,6 +303,7 @@ export class GeometryCollector {
         geo.setIndex(new THREE.BufferAttribute(iArr.toUint32Array(), 1));
         const obj = new THREE.Mesh(geo, mat);
         obj.frustumCulled = false;
+        obj.renderOrder = RENDER_ORDER_MESH;
         obj.userData.layerName = layer;
         objects.push(obj);
       } else {
@@ -306,6 +318,7 @@ export class GeometryCollector {
           geo.setIndex(new THREE.BufferAttribute(allIdx.slice(start, end), 1));
           const obj = new THREE.Mesh(geo, mat);
           obj.frustumCulled = false;
+          obj.renderOrder = RENDER_ORDER_MESH;
           obj.userData.layerName = layer;
           objects.push(obj);
         }
@@ -322,6 +335,7 @@ export class GeometryCollector {
         geo.setAttribute("position", posAttr);
         const obj = new THREE.LineSegments(geo, mat);
         obj.frustumCulled = false;
+        obj.renderOrder = RENDER_ORDER_LINE;
         obj.userData.layerName = lyr;
         return obj;
       });
@@ -337,6 +351,7 @@ export class GeometryCollector {
         geo.setAttribute("position", posAttr);
         const obj = new THREE.Points(geo, mat);
         obj.frustumCulled = false;
+        obj.renderOrder = RENDER_ORDER_LINE;
         obj.userData.layerName = lyr;
         return obj;
       });
@@ -365,6 +380,7 @@ export class GeometryCollector {
         geo.setAttribute("position", posAttr);
         const obj = new THREE.Points(geo, mat!);
         obj.frustumCulled = false;
+        obj.renderOrder = RENDER_ORDER_LINE;
         obj.userData.layerName = lyr;
         return obj;
       });
@@ -384,6 +400,7 @@ export class GeometryCollector {
         geo.setIndex(new THREE.BufferAttribute(iArr.toUint32Array(), 1));
         const obj = new THREE.Mesh(geo, mat);
         obj.frustumCulled = false;
+        obj.renderOrder = RENDER_ORDER_OVERLAY;
         obj.userData.layerName = layer;
         objects.push(obj);
       } else {
@@ -396,6 +413,7 @@ export class GeometryCollector {
           geo.setIndex(new THREE.BufferAttribute(allIdx.slice(start, end), 1));
           const obj = new THREE.Mesh(geo, mat);
           obj.frustumCulled = false;
+          obj.renderOrder = RENDER_ORDER_OVERLAY;
           obj.userData.layerName = layer;
           objects.push(obj);
         }
