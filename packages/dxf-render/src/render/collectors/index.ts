@@ -58,6 +58,7 @@ export { collectDimensionEntity } from "./dimensionCollector";
 export { collectLeaderEntity, catmullRomSpline } from "./leaderCollector";
 export {
   collectInsertEntity,
+  processDimensionEntity,
   MAX_RECURSION_DEPTH,
   type YieldState,
   type ProcessEntityFn,

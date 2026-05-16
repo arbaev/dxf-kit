@@ -140,6 +140,66 @@ function addFallbackObjects(
   }
 }
 
+// ─── DIMENSION dispatch (pre-rendered block vs DIMSTYLE) ──────────────
+
+/**
+ * Render a DIMENSION entity. If the entity has a non-empty pre-rendered
+ * associated block (`entity.block`, the WYSIWYG geometry stashed by
+ * AutoCAD / Revit / Civil3D into `*D###` / `DIMBLOCKn-…`), materialise that
+ * block as a synthetic identity-transform INSERT and recurse through
+ * `collectInsertEntity` — the caller's `worldMatrix` propagates intact, so
+ * dim's that live inside an outer scaled / rotated block still land correctly.
+ *
+ * Falls back to `collectDimensionEntity` (the DIMSTYLE-synthesizing path) when
+ * the dim has no block or the block is empty (typical for QCAD / DXF files
+ * that omit the rendered geometry).
+ *
+ * Shared by the top-level dispatch in `createDXFScene.ts` and both paths
+ * (template / slow) inside `collectInsertEntity` for nested DIMENSIONs.
+ */
+export async function processDimensionEntity(
+  entity: DxfEntity,
+  dxf: DxfData,
+  colorCtx: RenderContext,
+  collector: GeometryCollector,
+  entityLayer: string,
+  worldMatrix: THREE.Matrix4 | null,
+  fallbackGroup: THREE.Group,
+  depth: number,
+  yieldState: YieldState,
+  blockTemplates: Map<string, BlockTemplate> | undefined,
+  sharedBlockGeos: Map<string, SharedBlockGeo> | undefined,
+  collectEntityFn: CollectEntityFn,
+  processEntityFn?: ProcessEntityFn,
+): Promise<void> {
+  if (!isDimensionEntity(entity)) return;
+  const dimBlock = entity.block && dxf.blocks ? dxf.blocks[entity.block] : undefined;
+  if (dimBlock?.entities?.length) {
+    const syntheticInsert = {
+      type: "INSERT",
+      name: entity.block!,
+      position: { x: 0, y: 0, z: 0 },
+      xScale: 1,
+      yScale: 1,
+      zScale: 1,
+      rotation: 0,
+      columnCount: 1,
+      rowCount: 1,
+      layer: entity.layer,
+      colorIndex: entity.colorIndex,
+      color: entity.color,
+      handle: entity.handle,
+    } as DxfEntity;
+    await collectInsertEntity(
+      syntheticInsert, dxf, colorCtx, collector, entityLayer, worldMatrix,
+      fallbackGroup, depth, yieldState, blockTemplates, sharedBlockGeos,
+      collectEntityFn, processEntityFn,
+    );
+    return;
+  }
+  collectDimensionEntity(entity, dxf, colorCtx, collector, entityLayer, worldMatrix ?? undefined);
+}
+
 // ─── Main INSERT collector ────────────────────────────────────────────
 
 /**
@@ -258,7 +318,11 @@ export async function collectInsertEntity(
           continue;
         }
         if (entity.type === "DIMENSION" && isDimensionEntity(entity)) {
-          collectDimensionEntity(entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix);
+          await processDimensionEntity(
+            entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix,
+            fallbackGroup, depth + 1, yieldState, blockTemplates, sharedBlockGeos,
+            collectEntityFn, processEntityFn,
+          );
           continue;
         }
         if (entity.type === "LEADER" || entity.type === "MULTILEADER" || entity.type === "MLEADER") {
@@ -310,7 +374,11 @@ export async function collectInsertEntity(
         continue;
       }
       if (entity.type === "DIMENSION" && isDimensionEntity(entity)) {
-        collectDimensionEntity(entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix);
+        await processDimensionEntity(
+          entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix,
+          fallbackGroup, depth + 1, yieldState, blockTemplates, sharedBlockGeos,
+          collectEntityFn, processEntityFn,
+        );
         continue;
       }
       if (entity.type === "LEADER" || entity.type === "MULTILEADER" || entity.type === "MLEADER") {

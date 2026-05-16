@@ -28,9 +28,9 @@ import {
   computePointDisplaySize,
   collectTextOrMText,
   collectAttdefEntity,
-  collectDimensionEntity,
   collectLeaderEntity,
   collectInsertEntity,
+  processDimensionEntity,
   type YieldState,
 } from "./collectors";
 
@@ -350,34 +350,15 @@ export async function createThreeObjectsFromDXF(
         continue;
       }
 
-      // Vector text: collect DIMENSION directly (lines decomposed, text via collector)
+      // Vector text: collect DIMENSION directly (lines decomposed, text via collector).
+      // Routes through the pre-rendered block path when entity.block is non-empty,
+      // falling back to the DIMSTYLE-synthesizing path otherwise.
       if (entity.type === "DIMENSION" && isDimensionEntity(entity)) {
-        // If the dim has a non-empty pre-rendered block (Revit / Civil3D / AutoCAD-saved
-        // DXF stash the WYSIWYG dim geometry there), render the block directly instead of
-        // synthesizing geometry from DIMSTYLE rules. The block's coordinates are in world
-        // space, so the synthetic INSERT sits at the origin with identity scale/rotation.
-        // Falls through to the DIMSTYLE-based path when no usable block is attached.
-        const dimBlock = entity.block && dxf.blocks ? dxf.blocks[entity.block] : undefined;
-        if (dimBlock?.entities?.length) {
-          const syntheticInsert = {
-            type: "INSERT",
-            name: entity.block!,
-            position: { x: 0, y: 0, z: 0 },
-            xScale: 1,
-            yScale: 1,
-            zScale: 1,
-            rotation: 0,
-            columnCount: 1,
-            rowCount: 1,
-            layer: entity.layer,
-            colorIndex: entity.colorIndex,
-            color: entity.color,
-            handle: entity.handle,
-          } as DxfEntity;
-          await collectInsertEntity(syntheticInsert, dxf, colorCtx, collector, layer, null, group, 0, yieldState, blockTemplates, sharedBlockGeos, collectEntity, undefined);
-          continue;
-        }
-        collectDimensionEntity(entity, dxf, colorCtx, collector, layer);
+        await processDimensionEntity(
+          entity, dxf, colorCtx, collector, layer, null,
+          group, 0, yieldState, blockTemplates, sharedBlockGeos,
+          collectEntity, undefined,
+        );
         continue;
       }
 
