@@ -83,13 +83,19 @@ function renderAttribs(
     // layer "0" (ByLayer) both resolve to the parent INSERT's effective color.
     const attribColor = resolveEntityColor(attrib, colorCtx.layers, insertColor);
     const textHeight = attrib.textHeight || colorCtx.defaultTextHeight;
+    const hAlign = attrib.horizontalJustification ?? HAlign.LEFT;
+    const isFitOrAligned = hAlign === HAlign.FIT || hAlign === HAlign.ALIGNED;
 
     const hasJustification =
       (attrib.horizontalJustification && attrib.horizontalJustification > 0) ||
       (attrib.verticalJustification && attrib.verticalJustification > 0);
-    const posCoord = hasJustification && attrib.endPoint
-      ? attrib.endPoint
-      : attrib.startPoint;
+    // FIT/ALIGNED use startPoint as origin and endPoint as the second alignment
+    // point; other justified modes anchor at endPoint (DXF spec).
+    const posCoord = isFitOrAligned
+      ? attrib.startPoint
+      : hasJustification && attrib.endPoint
+        ? attrib.endPoint
+        : attrib.startPoint;
     if (!posCoord) continue;
 
     const attribMatrix = buildOcsMatrix(attrib.extrusionDirection);
@@ -98,6 +104,17 @@ function renderAttribs(
       attribMatrix,
     );
 
+    let endX: number | undefined;
+    let endY: number | undefined;
+    if (isFitOrAligned && attrib.endPoint) {
+      const ep = transformOcsPoint(
+        new THREE.Vector3(attrib.endPoint.x, attrib.endPoint.y, attrib.endPoint.z || 0),
+        attribMatrix,
+      );
+      endX = ep.x;
+      endY = ep.y;
+    }
+
     const rotation = attrib.rotation ? degreesToRadians(attrib.rotation) : 0;
     const attribFont = resolveEntityFont(attrib.textStyle, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
     const attribStyleFlags = resolveStyleFlags(attrib.textStyle, colorCtx.styles);
@@ -105,9 +122,10 @@ function renderAttribs(
       collector, layer: insertLayer, color: attribColor, font: attribFont,
       text: replaceSpecialChars(text), height: textHeight,
       posX: attribPos.x, posY: attribPos.y, posZ: attribPos.z, rotation,
-      hAlign: attrib.horizontalJustification ?? HAlign.LEFT,
+      hAlign,
       vAlign: attrib.verticalJustification ?? VAlign.BASELINE,
       widthFactor: attrib.scale ?? attribStyleFlags.widthFactor,
+      endPosX: endX, endPosY: endY,
       obliqueAngle: attrib.obliqueAngle,
       bold: attribStyleFlags.bold,
       italic: attribStyleFlags.italic,

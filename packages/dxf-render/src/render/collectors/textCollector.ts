@@ -166,7 +166,18 @@ export function collectAttdefEntity(
   if (entity.invisible) return;
   const text = entity.text || entity.tag;
   if (!text) return;
-  const posCoord = entity.startPoint;
+
+  const hAlign = entity.horizontalJustification ?? HAlign.LEFT;
+  const vAlign = entity.verticalJustification ?? VAlign.BASELINE;
+  const isFitOrAligned = hAlign === HAlign.FIT || hAlign === HAlign.ALIGNED;
+  const hasJustification = hAlign > 0 || vAlign > 0;
+  // FIT/ALIGNED use startPoint as origin and endPoint as the second alignment
+  // point; other justified modes anchor at endPoint (DXF spec).
+  const posCoord = isFitOrAligned
+    ? entity.startPoint
+    : hasJustification && entity.endPoint
+      ? entity.endPoint
+      : entity.startPoint;
   if (!posCoord) return;
 
   const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
@@ -176,6 +187,18 @@ export function collectAttdefEntity(
     new THREE.Vector3(posCoord.x, posCoord.y, posCoord.z || 0),
     ocsMatrix,
   );
+
+  let endX: number | undefined;
+  let endY: number | undefined;
+  if (isFitOrAligned && entity.endPoint) {
+    const ep = transformOcsPoint(
+      new THREE.Vector3(entity.endPoint.x, entity.endPoint.y, entity.endPoint.z || 0),
+      ocsMatrix,
+    );
+    endX = ep.x;
+    endY = ep.y;
+  }
+
   const rotation = entity.rotation ? degreesToRadians(entity.rotation) : 0;
   const font = resolveEntityFont(entity.textStyle, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
   const styleFlags = resolveStyleFlags(entity.textStyle, colorCtx.styles);
@@ -184,9 +207,10 @@ export function collectAttdefEntity(
     collector, layer, color: entityColor, font,
     text: replaceSpecialChars(text), height: textHeight,
     posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
-    hAlign: entity.horizontalJustification ?? HAlign.LEFT,
-    vAlign: entity.verticalJustification ?? VAlign.BASELINE,
+    hAlign,
+    vAlign,
     widthFactor: entity.scale ?? styleFlags.widthFactor,
+    endPosX: endX, endPosY: endY,
     obliqueAngle: entity.obliqueAngle,
     bold: styleFlags.bold,
     italic: styleFlags.italic,
