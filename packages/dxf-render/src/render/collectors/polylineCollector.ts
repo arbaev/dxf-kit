@@ -123,9 +123,17 @@ const addWidePolylineToCollector = (
       segPts = [p1, p2];
     }
 
-    // Skip shared junction point for subsequent segments;
-    // for the closing segment of closed polylines, also skip the last point (duplicate of first)
-    const first = (i === 0) ? 0 : 1;
+    // Decide whether to keep the shared junction point. Normally we skip it
+    // (already emitted as the end of the previous segment), but when adjacent
+    // segments have a width discontinuity (prev endW != current startW, e.g.
+    // an AutoCAD-style arrow: 0/0 followed by 120/0), we must re-emit the
+    // junction so the new segment opens at its real start width.
+    let skipJunction = i > 0;
+    if (skipJunction) {
+      const prevEndW = resolveSegmentWidths(verts[i - 1], entity).endW;
+      if (Math.abs(prevEndW - startW) > EPSILON) skipJunction = false;
+    }
+    const first = skipJunction ? 1 : 0;
     const last = (isClosed && i === segCount - 1) ? segPts.length - 1 : segPts.length;
 
     for (let j = first; j < last; j++) {
@@ -257,6 +265,27 @@ const addWidePolylineToCollector = (
   }
 
   collector.addMesh(layer, color, vertices, indices);
+
+  // Phase 5: Zero-width segments inside an otherwise-wide polyline render as
+  // a thin line (per AutoCAD convention — a 0/0 segment is the shaft of an
+  // arrow whose head is the next 120/0 segment). Without this they collapse
+  // to a zero-area mesh strip and disappear.
+  for (let i = 0; i < segCount; i++) {
+    const v1 = verts[i];
+    const v2 = verts[(i + 1) % verts.length];
+    const { startW, endW } = resolveSegmentWidths(v1, entity);
+    if (Math.abs(startW) > EPSILON || Math.abs(endW) > EPSILON) continue;
+
+    const p1 = new THREE.Vector3(v1.x, v1.y, 0);
+    const p2 = new THREE.Vector3(v2.x, v2.y, 0);
+    const segPts = (v1.bulge && Math.abs(v1.bulge) > EPSILON)
+      ? createBulgeArc(p1, p2, v1.bulge)
+      : [p1, p2];
+
+    if (ocsMatrix) for (const p of segPts) p.applyMatrix4(ocsMatrix);
+    if (worldMatrix) for (const p of segPts) p.applyMatrix4(worldMatrix);
+    collector.addLineFromPoints(layer, color, segPts);
+  }
 };
 
 /**

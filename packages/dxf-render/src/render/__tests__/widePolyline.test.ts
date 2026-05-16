@@ -249,6 +249,65 @@ describe("addWidePolylineToCollector", () => {
     expect(mesh!.vertices[16]).toBeCloseTo(-3); // right2.y
   });
 
+  it("preserves width discontinuity at segment junction (AutoCAD-style arrow)", () => {
+    // LWPOLYLINE: thin line (0→0) then triangular arrowhead (120→0).
+    // Junction at vertex 1 has prev endW=0 but next startW=120 — the strip
+    // must re-emit the junction so the arrow opens at half-width 60, otherwise
+    // the arrowhead collapses to zero width and disappears.
+    const entity = makeEntity([
+      { x: 0, y: 0, startWidth: 0, endWidth: 0 },
+      { x: 100, y: 0, startWidth: 120, endWidth: 0 },
+      { x: 150, y: 0 },
+    ]);
+    const mesh = collectAndGetMesh(entity);
+    expect(mesh).not.toBeNull();
+
+    // 4 center points (3 vertices + 1 duplicated junction) → 8 mesh vertices
+    expect(mesh!.vertices.length).toBe(8 * 3);
+
+    const v = mesh!.vertices;
+    // pair 0 (v0): half-width 0, both at origin
+    expect(v[0]).toBeCloseTo(0); expect(v[1]).toBeCloseTo(0);
+    expect(v[3]).toBeCloseTo(0); expect(v[4]).toBeCloseTo(0);
+    // pair 1 (v1, end of segment 0): half-width 0, both at (100, 0)
+    expect(v[6]).toBeCloseTo(100); expect(v[7]).toBeCloseTo(0);
+    expect(v[9]).toBeCloseTo(100); expect(v[10]).toBeCloseTo(0);
+    // pair 2 (v1 duplicated, start of segment 1): half-width 60, ±y at (100, 0)
+    expect(v[12]).toBeCloseTo(100); expect(v[13]).toBeCloseTo(60);
+    expect(v[15]).toBeCloseTo(100); expect(v[16]).toBeCloseTo(-60);
+    // pair 3 (v2): half-width 0, both at (150, 0)
+    expect(v[18]).toBeCloseTo(150); expect(v[19]).toBeCloseTo(0);
+    expect(v[21]).toBeCloseTo(150); expect(v[22]).toBeCloseTo(0);
+  });
+
+  it("emits zero-width segments as thin lines inside a mixed-width polyline", () => {
+    // Same AutoCAD arrow as above. The shaft (segment 0, widths 0/0) must
+    // render as a thin line — without it the arrowhead floats in space and
+    // the shaft is invisible (zero-area mesh strip).
+    const entity = makeEntity([
+      { x: 0, y: 0, startWidth: 0, endWidth: 0 },
+      { x: 100, y: 0, startWidth: 120, endWidth: 0 },
+      { x: 150, y: 0 },
+    ]);
+    const collector = new GeometryCollector();
+    const colorCtx = makeColorCtx();
+    collectPolyline({ entity, colorCtx, collector, layer: "0" });
+
+    // Mesh present (the arrowhead)
+    expect([...collector.meshVertices.entries()].length).toBe(1);
+
+    // Line segments present (the shaft) — exactly one segment, 2 endpoints, 6 floats
+    const lineEntries = [...collector.lineSegments.entries()];
+    expect(lineEntries.length).toBe(1);
+    const lineVerts = lineEntries[0][1].toArray();
+    expect(lineVerts.length).toBe(2 * 3); // 1 segment = 2 endpoints
+    // (0,0) → (100,0)
+    expect(lineVerts[0]).toBeCloseTo(0);
+    expect(lineVerts[1]).toBeCloseTo(0);
+    expect(lineVerts[3]).toBeCloseTo(100);
+    expect(lineVerts[4]).toBeCloseTo(0);
+  });
+
   it("handles bulge arc with variable width", () => {
     const entity = makeEntity([
       { x: 0, y: 0, startWidth: 2, endWidth: 0, bulge: 1 },
