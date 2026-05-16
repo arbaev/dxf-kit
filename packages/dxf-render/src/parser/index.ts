@@ -7,7 +7,21 @@ import { parseEntities } from "./sections/entities";
 import { parseObjects } from "./sections/objects";
 import { linkRegionsToHatchBoundaries } from "./linkRegions";
 
+/**
+ * Sentinel at the start of every Binary DXF file (followed by \r\n\x1A\0).
+ * Pure ASCII, so it survives intact through both UTF-8 and UTF-16 decoders —
+ * detecting it on the decoded string catches all entry paths.
+ */
+const BINARY_DXF_SENTINEL = "AutoCAD Binary DXF";
+
 export function parseDxf(dxfText: string): DxfData {
+  // Reject Binary DXF early: the line-based scanner reads garbled token codes
+  // from the binary stream and eventually throws a cryptic "Unexpected end of
+  // input … code <mojibake>". Better to fail fast with a clear message.
+  if (dxfText.startsWith(BINARY_DXF_SENTINEL)) {
+    throw new Error("Binary DXF format is not supported. Save the file as ASCII (text) DXF and try again.");
+  }
+
   const dxf = {} as DxfData;
   const dxfLinesArray = dxfText.split(/\r\n|\r|\n/g);
   const scanner = new DxfScanner(dxfLinesArray);

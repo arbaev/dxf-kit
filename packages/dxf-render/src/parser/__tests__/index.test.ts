@@ -13,6 +13,16 @@ describe("parseDxf", () => {
     expect(() => parseDxf("")).toThrow("Empty file");
   });
 
+  // ── 1b. Binary DXF → clear "not supported" error ─────────────────────
+
+  it("throws a clear error when input starts with the AutoCAD Binary DXF sentinel", () => {
+    // Real Binary DXF preamble: "AutoCAD Binary DXF\r\n\x1A\0" followed by binary tokens.
+    // We pass the prefix as-is — the scanner would otherwise read garbled token codes
+    // and fail with a cryptic mojibake message.
+    const binaryPrefix = "AutoCAD Binary DXF\r\n\x1A\0\x00\x00\x00SECTION\x00";
+    expect(() => parseDxf(binaryPrefix)).toThrow(/Binary DXF format is not supported/);
+  });
+
   // ── 2. Minimal valid DXF (EOF only) ──────────────────────────────────
 
   it("returns DxfData with empty entities for a minimal DXF containing only EOF", () => {
