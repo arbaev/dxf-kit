@@ -130,7 +130,11 @@ const restorePlaceholders = (s: string): string =>
  * \U+XXXX (Unicode), %%d/%%p/%%c/%%nnn (special chars), ^I (tab), ^^ (caret).
  * Codes \T (tracking) and \A (per-run baseline shift) are accepted and skipped.
  */
-export const parseMTextContent = (rawText: string, defaultHeight?: number): MTextLine[] => {
+export const parseMTextContent = (
+  rawText: string,
+  defaultHeight?: number,
+  defaultWidthFactor?: number,
+): MTextLine[] => {
   // Protect literal \\, \{, \} from formatting parser via placeholders.
   let text = rawText.replace(/\\\\/g, "\x01").replace(/\\\{/g, "\x02").replace(/\\\}/g, "\x03");
   // Unicode escapes \U+XXXX -> character (done before special-char pass so the
@@ -141,6 +145,12 @@ export const parseMTextContent = (rawText: string, defaultHeight?: number): MTex
   text = replaceSpecialChars(text, true);
 
   const state = initialState();
+  // Seed the base width factor from STYLE.widthFactor (DXF code 41) — runs
+  // without inline \W<n>; inherit it. Skip when 1 (or unset) so unmarked runs
+  // stay as MTextRun without a widthFactor field.
+  if (defaultWidthFactor !== undefined && defaultWidthFactor !== 1) {
+    state.widthFactor = defaultWidthFactor;
+  }
   const stack: FormatState[] = [];
 
   const lines: MTextLine[] = [];

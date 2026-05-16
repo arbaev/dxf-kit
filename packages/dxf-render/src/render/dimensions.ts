@@ -206,6 +206,9 @@ export interface DimensionTypeParams {
   /** DIMTMOVE (DIMSTYLE code 279): how to draw text the user repositioned —
    *  0=move dim line, 1=add leader, 2=move text only. Default 0. */
   dimtmove?: number;
+  /** STYLE.widthFactor (DXF code 41) for the dim text style referenced by
+   *  DIMSTYLE.DIMTXSTY (code 340). Horizontal stretch only. Defaults to 1. */
+  widthFactor?: number;
 }
 
 /** Params for createLinearDimensionLines */
@@ -848,6 +851,7 @@ export const cleanDimensionMText = (rawText: string): string => {
 export const createOrdinateDimension = (p: DimensionTypeParams): THREE.Object3D[] | null => {
   const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS, fmt } = p;
   const textColor = p.textColor ?? color;
+  const widthFactor = p.widthFactor ?? 1;
   const feature = entity.linearOrAngularPoint1; // Code 13 -- point on object
   const leader = entity.linearOrAngularPoint2; // Code 14 -- end of diagonal
   const textPos = entity.middleOfText; // Code 11
@@ -874,10 +878,10 @@ export const createOrdinateDimension = (p: DimensionTypeParams): THREE.Object3D[
   // Create text mesh first to determine actual width for leader endpoint
   let actualTextWidth = 0;
   if (textPos) {
-    actualTextWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
+    actualTextWidth = measureDimensionTextWidth(font!, dimensionText, textHeight, widthFactor);
     addDimensionTextToCollector({
       collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
-      posX: textPos.x, posY: textPos.y, posZ: 0.2, transform,
+      posX: textPos.x, posY: textPos.y, posZ: 0.2, transform, widthFactor,
     });
   }
 
@@ -1024,6 +1028,7 @@ export const createOrdinateDimension = (p: DimensionTypeParams): THREE.Object3D[
 export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] | null => {
   const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS, fmt } = p;
   const textColor = p.textColor ?? color;
+  const widthFactor = p.widthFactor ?? 1;
   const center = entity.anchorPoint; // code 10
   const arcPt = entity.diameterOrRadiusPoint; // code 15
   const textPos = entity.middleOfText; // code 11
@@ -1114,10 +1119,10 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
       const t = (underlineY - arcPt.y) / leaderDirY;
       intersectX = arcPt.x + t * leaderDirX;
     }
-    const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
+    const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight, widthFactor);
     addDimensionTextToCollector({
       collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
-      posX: textPos.x, posY: textPos.y, posZ: 0.2, transform,
+      posX: textPos.x, posY: textPos.y, posZ: 0.2, transform, widthFactor,
     });
     const tailEndPoint = new THREE.Vector3(intersectX, underlineY, 0);
     objects.push(new THREE.Line(
@@ -1279,6 +1284,7 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
   addDimensionTextToCollector({
     collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
     posX: renderTextX, posY: renderTextY, posZ: 0.2, rotation: textAngle, hAlign: "center", transform,
+    widthFactor,
   });
 
   tagDimParts(objects);
@@ -1292,6 +1298,7 @@ export const createRadialDimension = (p: DimensionTypeParams): THREE.Object3D[] 
  */
 export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D[] | null => {
   const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS, fmt } = p;
+  const widthFactor = p.widthFactor ?? 1;
   const textColor = p.textColor ?? color;
   const p10 = entity.anchorPoint; // code 10 -- first point on circle
   const p15 = entity.diameterOrRadiusPoint; // code 15 -- opposite point
@@ -1421,7 +1428,7 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
     }
     addDimensionTextToCollector({
       collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
-      posX: renderX, posY: renderY, posZ: 0.2, rotation: angle, transform,
+      posX: renderX, posY: renderY, posZ: 0.2, rotation: angle, transform, widthFactor,
     });
   } else if (textPos) {
     // Text projects OFF the diameter segment (t < 0 or t > 1).
@@ -1443,7 +1450,7 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
       // Distance from nearPt to textPos projected onto outDir (always ≥ 0 here
       // because textPos is past nearPt along outDir).
       const projAlong = (textPos.x - nearPt.x) * outDirX + (textPos.y - nearPt.y) * outDirY;
-      const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
+      const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight, widthFactor);
       const halfWidth = textWidth / 2;
       const dimgap = p.dimgap ?? textHeight * 0.4;
       const arrowTail = dv.arrowSize * OUTSIDE_ARROW_TAIL_RATIO;
@@ -1481,7 +1488,7 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
       if (angle < -Math.PI / 2) angle += Math.PI;
       addDimensionTextToCollector({
         collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
-        posX: textPos.x, posY: textPos.y, posZ: 0.2, rotation: angle, transform,
+        posX: textPos.x, posY: textPos.y, posZ: 0.2, rotation: angle, transform, widthFactor,
       });
     } else {
       // ── ANSI horizontal-with-shelf ─────────────────────────────────────
@@ -1500,10 +1507,10 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
         intersectX = nearPt.x + t * dirNx;
       }
 
-      const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight);
+      const textWidth = measureDimensionTextWidth(font!, dimensionText, textHeight, widthFactor);
       addDimensionTextToCollector({
         collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
-        posX: textPos.x, posY: textPos.y, posZ: 0.2, transform,
+        posX: textPos.x, posY: textPos.y, posZ: 0.2, transform, widthFactor,
       });
 
       const textLeft = textPos.x - textWidth / 2;
@@ -1530,7 +1537,7 @@ export const createDiametricDimension = (p: DimensionTypeParams): THREE.Object3D
     objects.push(new THREE.Line(diamLineGeom2, lineMat));
     addDimensionTextToCollector({
       collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
-      posX: cx, posY: cy, posZ: 0.2, transform,
+      posX: cx, posY: cy, posZ: 0.2, transform, widthFactor,
     });
   }
 
@@ -1579,6 +1586,7 @@ export const isAngleInSweep = (startAngle: number, endAngle: number, testAngle: 
 export const createAngularDimension = (p: DimensionTypeParams): THREE.Object3D[] | null => {
   const { entity, color, font, collector, layer, transform, dv = DEFAULT_DIM_VARS, fmt } = p;
   const textColor = p.textColor ?? color;
+  const widthFactor = p.widthFactor ?? 1;
   const p13 = entity.linearOrAngularPoint1; // code 13 -- end 1 of first line
   const p14 = entity.linearOrAngularPoint2; // code 14 -- end 2 of first line
   const p15 = entity.diameterOrRadiusPoint; // code 15 -- end 1 of second line
@@ -1825,7 +1833,7 @@ export const createAngularDimension = (p: DimensionTypeParams): THREE.Object3D[]
 
     addDimensionTextToCollector({
       collector: collector!, layer: layer!, color: textColor, font: font!, rawText: dimensionText, height: textHeight,
-      posX: textX, posY: textY, posZ: 0.2, rotation: textRotation, transform,
+      posX: textX, posY: textY, posZ: 0.2, rotation: textRotation, transform, widthFactor,
     });
   }
 

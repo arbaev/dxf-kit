@@ -98,7 +98,9 @@ export function collectTextOrMText(
       posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
       hAlign: entity.halign ?? HAlign.LEFT,
       vAlign: entity.valign ?? VAlign.BASELINE,
-      widthFactor: (entity.xScale ?? 1) * mirrorWidthFactor,
+      // STYLE.widthFactor (DXF code 41) is the fallback when the TEXT entity
+      // doesn't carry its own xScale (code 41). Entity-level wins per DXF spec.
+      widthFactor: (entity.xScale ?? styleFlags.widthFactor ?? 1) * mirrorWidthFactor,
       endPosX: endX, endPosY: endY,
       underline: parsed.underline,
       bold: styleFlags.bold,
@@ -133,7 +135,7 @@ export function collectTextOrMText(
       height *= Math.sqrt(m[4] * m[4] + m[5] * m[5]);
     }
 
-    const lines = parseMTextContent(textContent, height);
+    const lines = parseMTextContent(textContent, height, styleFlags.widthFactor);
     addMTextToCollector({
       collector, layer, color: entityColor, font, lines, defaultHeight: height,
       posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
@@ -184,7 +186,7 @@ export function collectAttdefEntity(
     posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
     hAlign: entity.horizontalJustification ?? HAlign.LEFT,
     vAlign: entity.verticalJustification ?? VAlign.BASELINE,
-    widthFactor: entity.scale,
+    widthFactor: entity.scale ?? styleFlags.widthFactor,
     obliqueAngle: entity.obliqueAngle,
     bold: styleFlags.bold,
     italic: styleFlags.italic,

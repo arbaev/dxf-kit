@@ -46,6 +46,14 @@ export function collectDimensionEntity(
 
   // Resolve dimension variables: header -> DIMSTYLE -> entity XDATA overrides
   const dimStyleEntry = entity.styleName ? colorCtx.dimStyles?.[entity.styleName] : undefined;
+
+  // DIMTXSTY (DIMSTYLE code 340) → STYLE name → STYLE.widthFactor (code 41).
+  // Applied to dim-text horizontal advance via addDimensionTextToCollector.
+  // Falls back to 1 (no stretch) when missing.
+  const dimTextStyleName = dimStyleEntry?.dimtxstyHandle
+    ? colorCtx.styleHandleToName?.get(dimStyleEntry.dimtxstyHandle)
+    : undefined;
+  const dimTextWidthFactor = (dimTextStyleName ? colorCtx.styles?.[dimTextStyleName]?.widthFactor : undefined) ?? 1;
   let baseDv = colorCtx.dimVars ?? resolveDimVarsFromHeader(undefined);
   // Apply DIMSTYLE-level overrides (DIMSCALE, DIMTXT, DIMASZ) between header and entity
   if (dimStyleEntry) {
@@ -135,7 +143,7 @@ export function collectDimensionEntity(
   // textColor is the un-resolved sentinel (e.g. ACI7_COLOR) so the
   // collector can keep DIMCLRT theme-adaptive — materials.resolveColor()
   // happens later inside GeometryCollector.flush().
-  const dimParams = { entity, color: resolvedColor, textColor, font, collector, layer, transform, dv, fmt: dimFmt, dimtih, dimtoh, dimtad, dimgap, dimtmove };
+  const dimParams = { entity, color: resolvedColor, textColor, font, collector, layer, transform, dv, fmt: dimFmt, dimtih, dimtoh, dimtad, dimgap, dimtmove, widthFactor: dimTextWidthFactor };
   if ((baseDimType & 0x0e) === 6) {
     result = createOrdinateDimension(dimParams);
   } else if (baseDimType === 2) {
@@ -158,7 +166,7 @@ export function collectDimensionEntity(
 
     // Compute text gap from actual text width so dimension line doesn't overlap text
     if (dimData.textPos && dimData.dimensionText && font) {
-      const textWidth = measureDimensionTextWidth(font, dimData.dimensionText, dimData.textHeight);
+      const textWidth = measureDimensionTextWidth(font, dimData.dimensionText, dimData.textHeight, dimTextWidthFactor);
       const padding = dimData.textHeight * 0.5;
       dv.textGap = Math.max(dv.textGap, textWidth + padding);
     }
@@ -180,6 +188,7 @@ export function collectDimensionEntity(
         rawText: dimData.dimensionText, height: dimData.textHeight,
         posX: dimData.textPos.x, posY: dimData.textPos.y, posZ: 0.2,
         rotation: dimAngleRad, hAlign: "center", transform,
+        widthFactor: dimTextWidthFactor,
       });
     }
   }

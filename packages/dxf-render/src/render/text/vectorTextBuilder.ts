@@ -174,6 +174,11 @@ export interface DimensionTextParams {
   rotation?: number;
   hAlign?: "left" | "center" | "right";
   transform?: readonly number[];
+  /**
+   * Horizontal width factor (STYLE.widthFactor, DXF code 41). Applied uniformly
+   * to glyph advance and to the measured width. Defaults to 1 when unset.
+   */
+  widthFactor?: number;
 }
 
 // ── addTextToCollector ────────────────────────────────────────────────
@@ -979,8 +984,14 @@ const STACKED_REGEX = /^(.*?)\\S([^^/#;]*)[\^/#]([^;]*);(.*)$/;
 /**
  * Measure dimension text width in world units.
  * Cleans MTEXT formatting, handles stacked fractions (\S).
+ * `widthFactor` (STYLE.widthFactor / DXF code 41) scales horizontal advance.
  */
-export function measureDimensionTextWidth(font: Font, rawText: string, height: number): number {
+export function measureDimensionTextWidth(
+  font: Font,
+  rawText: string,
+  height: number,
+  widthFactor: number = 1,
+): number {
   const cleaned = cleanDimensionMText(rawText);
   const stackedMatch = cleaned.match(STACKED_REGEX);
 
@@ -992,8 +1003,8 @@ export function measureDimensionTextWidth(font: Font, rawText: string, height: n
 
     const stackedHeight = height * STACKED_RATIO;
     const capRatio = getCapHeightRatio(font);
-    const mainEmScale = height / capRatio;
-    const stackedEmScale = stackedHeight / capRatio;
+    const mainEmScale = (height / capRatio) * widthFactor;
+    const stackedEmScale = (stackedHeight / capRatio) * widthFactor;
     const mainAdvance = mainText ? measureText(font, mainText).totalAdvance * mainEmScale : 0;
     const topAdvance = topText ? measureText(font, topText).totalAdvance * stackedEmScale : 0;
     const bottomAdvance = bottomText
@@ -1008,7 +1019,7 @@ export function measureDimensionTextWidth(font: Font, rawText: string, height: n
 
   // Plain text: strip remaining \S patterns
   const plain = cleaned.replace(/\\S[^;]*;/g, "").trim();
-  return measureTextWidth(font, plain, height);
+  return measureTextWidth(font, plain, height, widthFactor);
 }
 
 /**
@@ -1023,6 +1034,7 @@ export function addDimensionTextToCollector(p: DimensionTextParams): void {
     rotation = 0,
     hAlign = "center",
     transform,
+    widthFactor = 1,
   } = p;
   const cleaned = cleanDimensionMText(rawText);
   if (!cleaned.trim() || height <= 0) return;
@@ -1039,10 +1051,11 @@ export function addDimensionTextToCollector(p: DimensionTextParams): void {
     const cos = Math.cos(rotation);
     const sin = Math.sin(rotation);
 
-    // Measure widths to compute horizontal alignment (using em scale)
+    // Measure widths to compute horizontal alignment (using em scale).
+    // widthFactor (STYLE.widthFactor, DXF code 41) scales horizontal advance only.
     const capRatio = getCapHeightRatio(font);
-    const mainEmScale = height / capRatio;
-    const stackedEmScale = stackedHeight / capRatio;
+    const mainEmScale = (height / capRatio) * widthFactor;
+    const stackedEmScale = (stackedHeight / capRatio) * widthFactor;
     const mainAdvance = mainText ? measureText(font, mainText).totalAdvance * mainEmScale : 0;
     const topAdvance = topText ? measureText(font, topText).totalAdvance * stackedEmScale : 0;
     const bottomAdvance = bottomText
@@ -1067,7 +1080,7 @@ export function addDimensionTextToCollector(p: DimensionTextParams): void {
         collector, layer, color, font, text: mainText, height,
         posX: curX, posY: curY, posZ,
         rotation, hAlign: HAlign.LEFT, vAlign: VAlign.MIDDLE,
-        transform,
+        transform, widthFactor,
       });
       curX += (mainAdvance + gap) * cos;
       curY += (mainAdvance + gap) * sin;
@@ -1075,20 +1088,23 @@ export function addDimensionTextToCollector(p: DimensionTextParams): void {
 
     // Fractions: centered vertically around posY (= dimension midpoint).
     // Extra gap so digits don't touch the horizontal separator line.
-    const vGap = mainEmScale * 0.12;
+    // vGap uses the unscaled em (height / capRatio) so vertical spacing is
+    // unaffected by widthFactor — only horizontal stretches.
+    const vGap = (height / capRatio) * 0.12;
+    const stackedEmY = stackedHeight / capRatio;
     const topMetrics = topText ? measureText(font, topText) : null;
     const bottomMetrics = bottomText ? measureText(font, bottomText) : null;
     const topVisualH = topMetrics
-      ? (topMetrics.bounds.yMax - topMetrics.bounds.yMin) * stackedEmScale
+      ? (topMetrics.bounds.yMax - topMetrics.bounds.yMin) * stackedEmY
       : 0;
     const bottomVisualH = bottomMetrics
-      ? (bottomMetrics.bounds.yMax - bottomMetrics.bounds.yMin) * stackedEmScale
+      ? (bottomMetrics.bounds.yMax - bottomMetrics.bounds.yMin) * stackedEmY
       : 0;
     const totalStackH = topVisualH + vGap + bottomVisualH;
     const halfStack = totalStackH / 2;
 
     if (topText && topMetrics) {
-      const topBaseY = halfStack - topMetrics.bounds.yMax * stackedEmScale;
+      const topBaseY = halfStack - topMetrics.bounds.yMax * stackedEmY;
       const topCenterX = (stackedWidth - topAdvance) / 2;
       const topX = curX + topCenterX * cos - topBaseY * sin;
       const topY = curY + topCenterX * sin + topBaseY * cos;
@@ -1096,12 +1112,12 @@ export function addDimensionTextToCollector(p: DimensionTextParams): void {
         collector, layer, color, font, text: topText, height: stackedHeight,
         posX: topX, posY: topY, posZ,
         rotation, hAlign: HAlign.LEFT, vAlign: VAlign.BASELINE,
-        transform,
+        transform, widthFactor,
       });
     }
 
     if (bottomText && bottomMetrics) {
-      const bottomBaseY = -halfStack - bottomMetrics.bounds.yMin * stackedEmScale;
+      const bottomBaseY = -halfStack - bottomMetrics.bounds.yMin * stackedEmY;
       const bottomCenterX = (stackedWidth - bottomAdvance) / 2;
       const bottomX = curX + bottomCenterX * cos - bottomBaseY * sin;
       const bottomY = curY + bottomCenterX * sin + bottomBaseY * cos;
@@ -1109,7 +1125,7 @@ export function addDimensionTextToCollector(p: DimensionTextParams): void {
         collector, layer, color, font, text: bottomText, height: stackedHeight,
         posX: bottomX, posY: bottomY, posZ,
         rotation, hAlign: HAlign.LEFT, vAlign: VAlign.BASELINE,
-        transform,
+        transform, widthFactor,
       });
     }
 
@@ -1146,7 +1162,7 @@ export function addDimensionTextToCollector(p: DimensionTextParams): void {
         collector, layer, color, font, text: suffixText, height,
         posX: suffX, posY: suffY, posZ,
         rotation, hAlign: HAlign.LEFT, vAlign: VAlign.MIDDLE,
-        transform,
+        transform, widthFactor,
       });
     }
   } else {
@@ -1158,7 +1174,7 @@ export function addDimensionTextToCollector(p: DimensionTextParams): void {
       collector, layer, color, font, text: plain, height,
       posX, posY, posZ,
       rotation, hAlign: hAlignEnum, vAlign: VAlign.MIDDLE,
-      transform,
+      transform, widthFactor,
     });
   }
 }

@@ -104,6 +104,7 @@ describe("resolveStyleFlags", () => {
     bold: { name: "bold", fontFile: "Arial Bold.ttf", bold: true },
     italic: { name: "italic", fontFile: "Arial Italic.ttf", italic: true },
     boldItalic: { name: "boldItalic", fontFile: "Arial Bold Italic.ttf", bold: true, italic: true },
+    narrow: { name: "narrow", fontFile: "Arial.ttf", widthFactor: 0.8 },
   };
 
   it("returns empty object when style is missing", () => {
@@ -116,17 +117,22 @@ describe("resolveStyleFlags", () => {
     const flags = resolveStyleFlags("plain", styles);
     expect(flags.bold).toBeUndefined();
     expect(flags.italic).toBeUndefined();
+    expect(flags.widthFactor).toBeUndefined();
   });
 
   it("returns bold for a bold style", () => {
-    expect(resolveStyleFlags("bold", styles)).toEqual({ bold: true, italic: undefined });
+    expect(resolveStyleFlags("bold", styles)).toEqual({ bold: true, italic: undefined, widthFactor: undefined });
   });
 
   it("returns italic for an italic style", () => {
-    expect(resolveStyleFlags("italic", styles)).toEqual({ bold: undefined, italic: true });
+    expect(resolveStyleFlags("italic", styles)).toEqual({ bold: undefined, italic: true, widthFactor: undefined });
   });
 
   it("returns both flags for bold-italic", () => {
-    expect(resolveStyleFlags("boldItalic", styles)).toEqual({ bold: true, italic: true });
+    expect(resolveStyleFlags("boldItalic", styles)).toEqual({ bold: true, italic: true, widthFactor: undefined });
+  });
+
+  it("returns widthFactor when STYLE.widthFactor (DXF code 41) is set", () => {
+    expect(resolveStyleFlags("narrow", styles).widthFactor).toBe(0.8);
   });
 });

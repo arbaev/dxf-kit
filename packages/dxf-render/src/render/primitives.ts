@@ -75,6 +75,7 @@ export interface RenderContext extends ColorContext, LinetypeContext {
   headerDimgap?: number; // $DIMGAP from header (gap between dim line and text, break-radius around text)
   headerDimtmove?: number; // $DIMTMOVE from header (text movement strategy when user moves text)
   blockHandleToName?: Map<string, string>; // BLOCK_RECORD handle → name (for DIMBLK resolution)
+  styleHandleToName?: Map<string, string>; // STYLE handle → name (for DIMTXSTY resolution)
   xlineClipSize?: number; // Half-length for clipping XLINE/RAY to drawing extents
   originOffset?: { x: number; y: number; z: number }; // Subtracted from coords for Float32 precision
 }

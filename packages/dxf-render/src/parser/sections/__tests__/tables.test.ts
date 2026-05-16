@@ -417,6 +417,27 @@ describe("parseTables", () => {
       expect(styles.Heading.widthFactor).toBe(0.8);
     });
 
+    it("stores STYLE handle (code 5) uppercase for DIMTXSTY cross-reference", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "STYLE",
+        "70", "1",
+        "0", "STYLE",
+        "5", "2a3",            // entity handle (mixed case → uppercased)
+        "2", "Standard",
+        "3", "arial.ttf",
+        "41", "0.8",           // widthFactor
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+      const styles = tables.style.styles as Record<string, IStyle>;
+      expect(styles.Standard.handle).toBe("2A3");
+      expect(styles.Standard.widthFactor).toBe(0.8);
+    });
+
     it("extracts bold/italic flags from ACAD XDATA 1071 (bits 25/24)", () => {
       // Mirrors the encoding produced by AutoCAD:
       //   "Arial Bold.ttf"        → 1071 = 33554466 = 0x02000022 (bold)
@@ -631,6 +652,25 @@ describe("parseTables", () => {
       expect(dimStyles.stil1.dimclrd).toBe(5);
       expect(dimStyles.stil1.dimclre).toBe(5);
       expect(dimStyles.stil1.dimclrt).toBe(7);
+    });
+
+    it("parses DIMTXSTY (code 340) — handle of dimension text STYLE", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "DIMSTYLE",
+        "70", "1",
+        "0", "DIMSTYLE",
+        "2", "ISO-25",
+        "340", "2a3",          // DIMTXSTY — text style handle (mixed case → uppercased)
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const dimStyles = tables.dimStyle.dimStyles as Record<string, IDimStyle>;
+      expect(dimStyles["ISO-25"].dimtxstyHandle).toBe("2A3");
     });
 
     it("parses DIMSTYLE with dimtoh (code 73) and dimtih (code 74)", () => {

@@ -84,16 +84,17 @@ export function resolveEntityFont(
 }
 
 /**
- * Resolve bold/italic flags from a STYLE-table entry referenced by `textStyle`.
- * Returns undefined for missing flags so callers can apply their own fallback
- * (e.g. MTEXT inline \f...|b0; should be able to turn off entity-level bold).
+ * Resolve bold/italic flags and the horizontal width factor from a STYLE-table
+ * entry referenced by `textStyle`. Returns undefined for missing fields so
+ * callers can apply their own fallback (e.g. MTEXT inline \f...|b0; should be
+ * able to turn off entity-level bold; TEXT.xScale beats STYLE.widthFactor).
  */
 export function resolveStyleFlags(
   textStyle: string | undefined,
   styles: Record<string, DxfStyle> | undefined,
-): { bold?: boolean; italic?: boolean } {
+): { bold?: boolean; italic?: boolean; widthFactor?: number } {
   if (!textStyle || !styles) return {};
   const style = styles[textStyle];
   if (!style) return {};
-  return { bold: style.bold, italic: style.italic };
+  return { bold: style.bold, italic: style.italic, widthFactor: style.widthFactor };
 }

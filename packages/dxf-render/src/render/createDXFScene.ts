@@ -194,6 +194,16 @@ export async function createThreeObjectsFromDXF(
     }
   }
 
+  // Build handle -> name map from STYLE for DIMTXSTY (DIMSTYLE code 340) resolution
+  let styleHandleToName: Map<string, string> | undefined;
+  const styleRecords = dxf.tables?.style?.styles;
+  if (styleRecords) {
+    styleHandleToName = new Map();
+    for (const rec of Object.values(styleRecords)) {
+      if (rec.handle) styleHandleToName.set(rec.handle.toUpperCase(), rec.name);
+    }
+  }
+
   const materials = new MaterialCacheStore();
   materials.darkTheme = darkTheme ?? false;
 
@@ -223,6 +233,7 @@ export async function createThreeObjectsFromDXF(
     headerDimgap,
     headerDimtmove,
     blockHandleToName,
+    styleHandleToName,
   };
 
   // Compute clip size for XLINE/RAY from drawing extents

@@ -107,7 +107,7 @@ function renderAttribs(
       posX: attribPos.x, posY: attribPos.y, posZ: attribPos.z, rotation,
       hAlign: attrib.horizontalJustification ?? HAlign.LEFT,
       vAlign: attrib.verticalJustification ?? VAlign.BASELINE,
-      widthFactor: attrib.scale,
+      widthFactor: attrib.scale ?? attribStyleFlags.widthFactor,
       obliqueAngle: attrib.obliqueAngle,
       bold: attribStyleFlags.bold,
       italic: attribStyleFlags.italic,

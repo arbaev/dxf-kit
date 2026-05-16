@@ -756,6 +756,32 @@ describe("vectorTextBuilder", () => {
       addDimensionTextToCollector(dp({ collector: c2 as any, font }));
       expect(c1.totalVertices).toBe(c2.totalVertices);
     });
+
+    it("widthFactor=0.8 makes dim text ~20% narrower (height unchanged)", () => {
+      // Wired through DIMSTYLE.DIMTXSTY → STYLE.widthFactor (DXF code 41).
+      // Horizontal advance scales by widthFactor; cap height stays the same.
+      const baseline = new MockCollector();
+      const narrow = new MockCollector();
+      addDimensionTextToCollector(dp({ collector: baseline as any, font, hAlign: "left" }));
+      addDimensionTextToCollector(dp({ collector: narrow as any, font, hAlign: "left", widthFactor: 0.8 }));
+
+      const bb = baseline.getBounds();
+      const bn = narrow.getBounds();
+      const widthBase = bb.xMax - bb.xMin;
+      const widthNarrow = bn.xMax - bn.xMin;
+      expect(widthNarrow).toBeCloseTo(widthBase * 0.8, 0);
+
+      // Vertical extent unchanged (widthFactor is horizontal-only)
+      const heightBase = bb.yMax - bb.yMin;
+      const heightNarrow = bn.yMax - bn.yMin;
+      expect(heightNarrow).toBeCloseTo(heightBase, 1);
+    });
+
+    it("measureDimensionTextWidth scales by widthFactor", () => {
+      const wBase = measureDimensionTextWidth(font, "25.40", 10);
+      const wNarrow = measureDimensionTextWidth(font, "25.40", 10, 0.8);
+      expect(wNarrow).toBeCloseTo(wBase * 0.8, 1);
+    });
   });
 
   describe("addDimensionTextToCollector — stacked text", () => {

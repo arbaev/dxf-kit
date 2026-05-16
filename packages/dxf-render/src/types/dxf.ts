@@ -477,6 +477,8 @@ export function isRegionEntity(entity: DxfEntity): entity is DxfRegionEntity {
 
 export interface DxfStyle {
   name: string;
+  /** Entity handle (DXF code 5) — used for DIMSTYLE.DIMTXSTY (code 340) cross-reference. */
+  handle?: string;
   fontFile?: string;
   bigFont?: string;
   fixedHeight?: number;
@@ -533,6 +535,7 @@ export interface DxfDimStyle {
   dimzin?: number;   // code 78: zero suppression flags
   dimblkHandle?: string; // code 342: handle of dimension arrow block (-> BLOCK_RECORD name)
   dimldrblkHandle?: string; // code 341: handle of leader arrow block (-> BLOCK_RECORD name)
+  dimtxstyHandle?: string; // code 340: handle of dimension text STYLE (-> DxfStyle handle)
 }
 
 export interface DxfTables {

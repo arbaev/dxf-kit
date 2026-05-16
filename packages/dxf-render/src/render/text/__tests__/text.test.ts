@@ -498,6 +498,24 @@ describe("parseMTextContent", () => {
     expect(result[0].runs[0].widthFactor).toBeUndefined();
   });
 
+  it("defaultWidthFactor seeds initial state — runs without \\W inherit STYLE.widthFactor", () => {
+    // Wired from STYLE.widthFactor (DXF code 41) via the third parameter.
+    const result = parseMTextContent("plain", undefined, 0.8);
+    expect(result[0].runs[0].widthFactor).toBe(0.8);
+  });
+
+  it("inline \\W overrides defaultWidthFactor for the following run", () => {
+    const result = parseMTextContent("a\\W1.5;b", undefined, 0.8);
+    const runs = result[0].runs;
+    expect(runs[0].widthFactor).toBe(0.8);
+    expect(runs[1].widthFactor).toBe(1.5);
+  });
+
+  it("defaultWidthFactor=1 is ignored (no widthFactor field on runs)", () => {
+    const result = parseMTextContent("plain", undefined, 1);
+    expect(result[0].runs[0].widthFactor).toBeUndefined();
+  });
+
   it("\\Q accepts negative oblique angles", () => {
     const result = parseMTextContent("\\Q-12.5;slanted");
     expect(result[0].runs[0].obliqueAngle).toBe(-12.5);
