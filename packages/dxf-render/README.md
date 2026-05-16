@@ -20,7 +20,7 @@ For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer)
 - **Accurate rendering** — linetype patterns, OCS transforms, hatch patterns, proper color resolution
 - **Picking & associations** — bbox-based raycast index plus DXF-driven entity links (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION)
 - **Two entry points** — full renderer or parser-only (zero deps, works in Node.js)
-- **Battle-tested** — 1121 tests covering parser, renderer, and utilities
+- **Battle-tested** — 1141 tests covering parser, renderer, and utilities
 - **Modern stack** — TypeScript native, ES modules, tree-shakeable, Vite-built
 - **Framework-agnostic** — works with React, Svelte, Angular, vanilla JS, or any framework
 
@@ -514,7 +514,7 @@ Names are matched case-insensitively, with an optional leading underscore. Unkno
 | Geometry merging          | ✅                          | ✅           | —          | ❌        |
 | Dark theme                | ✅ instant switch           | bg only      | —          | ❌        |
 | TypeScript                | ✅ native                   | .d.ts        | ✅         | ❌        |
-| Tests                     | 1121 tests                  | 0            | ✅         | 0         |
+| Tests                     | 1141 tests                  | 0            | ✅         | 0         |
 | Web Worker parsing        | ✅                          | ✅           | ❌         | ❌        |
 | Parser-only entry         | ✅ zero deps                | ❌           | ✅         | ❌        |
 | Framework                 | agnostic                    | agnostic     | —          | agnostic  |

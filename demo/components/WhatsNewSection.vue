@@ -29,9 +29,14 @@ const whatsNew: WhatsNewItem[] = [
     text: "REGION entities now render their contour by borrowing the boundary edges of any HATCH that references them as a source object (DXF codes 97/330) — no ACIS decoding needed. The REGION becomes pickable too, so hatched details with a REGION outline (common in AutoCAD-built profile drawings) finally show their visible boundary and fire entity-hover / entity-click events.",
   },
   {
-    pkg: "dxf-vuer",
-    version: "2.6.0",
-    text: "Keyboard navigation — arrow keys pan, +/- zoom, 0 resets the view; canvas is now focusable and respects form fields",
+    pkg: "dxf-render",
+    version: "1.6.0",
+    text: "Standard AutoCAD arrowhead blocks at DIMENSION endpoints and on LEADER / MULTILEADER tips — all 18 names now supported: filled / blank dots, ticks, boxes, origin rings, integral, open arrows at 30° / 90°, datum, and none. Previously only ticks were recognised; everything else collapsed to a default triangle.",
+  },
+  {
+    pkg: "dxf-render",
+    version: "1.6.0",
+    text: "MTEXT inline scoped formatting — \\C, \\H, \\f, \\L\\l, \\O\\o, \\K\\k inside brace groups {…} now apply only to that scope and revert on the closing brace. Each line is a list of MTextRun segments with per-run color / height / bold / italic / font / underline / overline / strikethrough. \\W<n>; (width factor) and \\Q<n>; (obliquing angle) are now honored too.",
   },
   {
     pkg: "dxf-vuer",
