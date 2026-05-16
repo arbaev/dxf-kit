@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import * as THREE from "three";
 import { resolveSegmentWidths, hasAnyWidth } from "@/render/collectors";
 import { GeometryCollector } from "@/render/mergeCollectors";
 import { collectPolyline } from "@/render/collectors/polylineCollector";
@@ -248,6 +249,65 @@ describe("addWidePolylineToCollector", () => {
     expect(mesh!.vertices[16]).toBeCloseTo(-3); // right2.y
   });
 
+  it("preserves width discontinuity at segment junction (AutoCAD-style arrow)", () => {
+    // LWPOLYLINE: thin line (0→0) then triangular arrowhead (120→0).
+    // Junction at vertex 1 has prev endW=0 but next startW=120 — the strip
+    // must re-emit the junction so the arrow opens at half-width 60, otherwise
+    // the arrowhead collapses to zero width and disappears.
+    const entity = makeEntity([
+      { x: 0, y: 0, startWidth: 0, endWidth: 0 },
+      { x: 100, y: 0, startWidth: 120, endWidth: 0 },
+      { x: 150, y: 0 },
+    ]);
+    const mesh = collectAndGetMesh(entity);
+    expect(mesh).not.toBeNull();
+
+    // 4 center points (3 vertices + 1 duplicated junction) → 8 mesh vertices
+    expect(mesh!.vertices.length).toBe(8 * 3);
+
+    const v = mesh!.vertices;
+    // pair 0 (v0): half-width 0, both at origin
+    expect(v[0]).toBeCloseTo(0); expect(v[1]).toBeCloseTo(0);
+    expect(v[3]).toBeCloseTo(0); expect(v[4]).toBeCloseTo(0);
+    // pair 1 (v1, end of segment 0): half-width 0, both at (100, 0)
+    expect(v[6]).toBeCloseTo(100); expect(v[7]).toBeCloseTo(0);
+    expect(v[9]).toBeCloseTo(100); expect(v[10]).toBeCloseTo(0);
+    // pair 2 (v1 duplicated, start of segment 1): half-width 60, ±y at (100, 0)
+    expect(v[12]).toBeCloseTo(100); expect(v[13]).toBeCloseTo(60);
+    expect(v[15]).toBeCloseTo(100); expect(v[16]).toBeCloseTo(-60);
+    // pair 3 (v2): half-width 0, both at (150, 0)
+    expect(v[18]).toBeCloseTo(150); expect(v[19]).toBeCloseTo(0);
+    expect(v[21]).toBeCloseTo(150); expect(v[22]).toBeCloseTo(0);
+  });
+
+  it("emits zero-width segments as thin lines inside a mixed-width polyline", () => {
+    // Same AutoCAD arrow as above. The shaft (segment 0, widths 0/0) must
+    // render as a thin line — without it the arrowhead floats in space and
+    // the shaft is invisible (zero-area mesh strip).
+    const entity = makeEntity([
+      { x: 0, y: 0, startWidth: 0, endWidth: 0 },
+      { x: 100, y: 0, startWidth: 120, endWidth: 0 },
+      { x: 150, y: 0 },
+    ]);
+    const collector = new GeometryCollector();
+    const colorCtx = makeColorCtx();
+    collectPolyline({ entity, colorCtx, collector, layer: "0" });
+
+    // Mesh present (the arrowhead)
+    expect([...collector.meshVertices.entries()].length).toBe(1);
+
+    // Line segments present (the shaft) — exactly one segment, 2 endpoints, 6 floats
+    const lineEntries = [...collector.lineSegments.entries()];
+    expect(lineEntries.length).toBe(1);
+    const lineVerts = lineEntries[0][1].toArray();
+    expect(lineVerts.length).toBe(2 * 3); // 1 segment = 2 endpoints
+    // (0,0) → (100,0)
+    expect(lineVerts[0]).toBeCloseTo(0);
+    expect(lineVerts[1]).toBeCloseTo(0);
+    expect(lineVerts[3]).toBeCloseTo(100);
+    expect(lineVerts[4]).toBeCloseTo(0);
+  });
+
   it("handles bulge arc with variable width", () => {
     const entity = makeEntity([
       { x: 0, y: 0, startWidth: 2, endWidth: 0, bulge: 1 },
@@ -303,5 +363,79 @@ describe("addWidePolylineToCollector", () => {
     const mesh = collectAndGetMesh(entity);
     // No width → no mesh, rendered as line
     expect(mesh).toBeNull();
+  });
+
+  it("scales width by worldMatrix scale (INSERT-scoped polyline)", () => {
+    // Reproduces the _ArchTick arrowhead inside a DIMENSION's pre-rendered block:
+    // a wide polyline inside an INSERT with uniform scale=10 should render its
+    // width scaled by the same factor. The local-space width is 0.4 → world-space
+    // width must be 4.
+    const entity = makeEntity(
+      [{ x: -0.5, y: -0.5 }, { x: 0.5, y: 0.5 }],
+      { width: 0.4 },
+    );
+    const collector = new GeometryCollector();
+    const colorCtx = makeColorCtx();
+    const worldMatrix = new THREE.Matrix4().makeScale(10, 10, 1);
+    const params: CollectEntityParams = {
+      entity,
+      colorCtx,
+      collector,
+      layer: "0",
+      worldMatrix,
+    };
+    collectPolyline(params);
+
+    const meshEntries = [...collector.meshVertices.entries()];
+    expect(meshEntries.length).toBe(1);
+    const v = meshEntries[0][1].toArray();
+    // Endpoint pair distance = width = 0.4 * scale 10 = 4
+    const dx = v[0] - v[3];
+    const dy = v[1] - v[4];
+    expect(Math.sqrt(dx * dx + dy * dy)).toBeCloseTo(4);
+
+    // Endpoint centers also scaled: (-0.5,-0.5)*10 = (-5,-5)
+    const cx = (v[0] + v[3]) / 2;
+    const cy = (v[1] + v[4]) / 2;
+    expect(cx).toBeCloseTo(-5);
+    expect(cy).toBeCloseTo(-5);
+  });
+
+  it("rotates correctly under worldMatrix rotation", () => {
+    // Horizontal width=2 polyline rotated 90° CCW: the centers go vertical,
+    // perpendicular offset goes horizontal, width preserved.
+    const entity = makeEntity(
+      [{ x: 0, y: 0 }, { x: 10, y: 0 }],
+      { width: 2 },
+    );
+    const collector = new GeometryCollector();
+    const colorCtx = makeColorCtx();
+    const worldMatrix = new THREE.Matrix4().makeRotationZ(Math.PI / 2);
+    const params: CollectEntityParams = {
+      entity,
+      colorCtx,
+      collector,
+      layer: "0",
+      worldMatrix,
+    };
+    collectPolyline(params);
+
+    const meshEntries = [...collector.meshVertices.entries()];
+    expect(meshEntries.length).toBe(1);
+    const v = meshEntries[0][1].toArray();
+
+    // pair0 center = (0,0); pair0 left = (-1,0) (perp was +y, rotated → -x),
+    // pair0 right = (+1,0).
+    expect(v[0]).toBeCloseTo(-1); // left0.x
+    expect(v[1]).toBeCloseTo(0);  // left0.y
+    expect(v[3]).toBeCloseTo(1);  // right0.x
+    expect(v[4]).toBeCloseTo(0);  // right0.y
+
+    // pair1 center = (0,10) (was (10,0) rotated 90°)
+    // pair1 left = (-1,10), pair1 right = (+1,10).
+    expect(v[6]).toBeCloseTo(-1); // left1.x
+    expect(v[7]).toBeCloseTo(10); // left1.y
+    expect(v[9]).toBeCloseTo(1);  // right1.x
+    expect(v[10]).toBeCloseTo(10); // right1.y
   });
 });

@@ -21,10 +21,16 @@ export interface ILineType {
 
 export interface IStyle {
   name: string;
+  /** Entity handle (DXF code 5) — used for DIMSTYLE.DIMTXSTY (code 340) cross-reference. */
+  handle?: string;
   fontFile?: string;
   bigFont?: string;
   fixedHeight?: number;
   widthFactor?: number;
+  /** True if the style references a bold TTF (parsed from ACAD XDATA 1071, bit 25). */
+  bold?: boolean;
+  /** True if the style references an italic TTF (parsed from ACAD XDATA 1071, bit 24). */
+  italic?: boolean;
 }
 
 export interface IBlockRecord {
@@ -40,11 +46,23 @@ export interface IDimStyle {
   dimtxt?: number;   // code 140: text height (unscaled)
   dimtsz?: number;   // code 142: tick size (>0 = use ticks instead of arrows)
   dimexe?: number;   // code 44: extension line extension past dimension line
+  dimtoh?: number;   // code 73: text outside arc/dim line — 0=aligned, 1=horizontal
+  dimtih?: number;   // code 74: text inside arc/dim line — 0=aligned, 1=horizontal
+  dimtad?: number;   // code 77: text vertical position (0=centered, 1=above, 2=outside, 3=JIS, 4=below)
+  dimgap?: number;   // code 147: distance from dim line to text (and break-radius around text)
+  dimtmove?: number; // code 279: text movement (0=move dim line, 1=add leader, 2=move text only)
+  dimupt?: number;   // code 288: 0=default text position, 1=allow user-positioned text
+  dimatfit?: number; // code 289: arrow/text auto-fit strategy (linear dims)
+  dimclrd?: number;  // code 176: dimension line color (ACI index, 0=BYBLOCK, 256=BYLAYER)
+  dimclre?: number;  // code 177: extension line color (ACI index, 0=BYBLOCK, 256=BYLAYER)
   dimclrt?: number;  // code 178: dimension text color (ACI index)
   dimlunit?: number; // code 277: 2=Decimal, 4=Architectural
+  dimdec?: number;   // code 271: decimal places for primary units (arch: 2^dimdec is fraction denominator)
+  dimadec?: number;  // code 179: decimal places for angular dimensions
   dimzin?: number;   // code 78: zero suppression flags
   dimblkHandle?: string; // code 342: handle of dimension arrow block (→ BLOCK_RECORD name)
   dimldrblkHandle?: string; // code 341: handle of leader arrow block (→ BLOCK_RECORD name)
+  dimtxstyHandle?: string; // code 340: handle of dimension text STYLE (→ DxfStyle handle)
 }
 
 interface IBaseTable {
@@ -194,10 +212,12 @@ function parseLayers(scanner: DxfScanner): Record<string, ILayer> {
         curr = scanner.next();
         break;
       case 70: {
-        // Bits 1 and 2: frozen and frozen by default in new viewports
+        // Bit 1 (0x01): frozen in current drawing.
+        // Bit 2 (0x02): "frozen by default in new viewports" — does not
+        // hide the layer in model space, so it must not affect `frozen`.
+        // Bit 4 (0x04): locked.
         const flags = curr.value as number;
-        layer.frozen = (flags & 1) !== 0 || (flags & 2) !== 0;
-        // Bit 4 (0x04): locked
+        layer.frozen = (flags & 1) !== 0;
         layer.locked = (flags & 4) !== 0;
         curr = scanner.next();
         break;
@@ -277,6 +297,10 @@ function parseStyles(scanner: DxfScanner): Record<string, IStyle> {
         styleName = curr.value as string;
         curr = scanner.next();
         break;
+      case 5:
+        style.handle = (curr.value as string).toUpperCase();
+        curr = scanner.next();
+        break;
       case 3:
         style.fontFile = curr.value as string;
         curr = scanner.next();
@@ -293,6 +317,21 @@ function parseStyles(scanner: DxfScanner): Record<string, IStyle> {
         style.widthFactor = curr.value as number;
         curr = scanner.next();
         break;
+      case 1071: {
+        // ACAD XDATA TrueType font flags. Packed 32-bit value with the same
+        // layout as MTEXT inline \f...|b<n>|i<n>|c<n>|p<n>;
+        //   bits 0-7  : pitchAndFamily
+        //   bits 8-15 : charset
+        //   bit 24    : italic
+        //   bit 25    : bold
+        // Empirical from the AutoCAD writer: "Arial.ttf" → 34 (0x22);
+        // "Arial Bold.ttf" → 33554466 (0x02000022).
+        const flags = curr.value as number;
+        if ((flags >>> 25) & 1) style.bold = true;
+        if ((flags >>> 24) & 1) style.italic = true;
+        curr = scanner.next();
+        break;
+      }
       case 0:
         if (curr.value === "STYLE") {
           if (styleName) styles[styleName] = style;
@@ -420,6 +459,21 @@ function parseDimStyles(scanner: DxfScanner): Record<string, IDimStyle> {
         ds.dimexe = curr.value as number;
         curr = scanner.next();
         break;
+      case 73:
+        // DIMTOH — text outside dimension lines: 0=aligned with line, 1=horizontal.
+        ds.dimtoh = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 74:
+        // DIMTIH — text inside dimension lines: 0=aligned with line, 1=horizontal.
+        ds.dimtih = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 77:
+        // DIMTAD — text vertical position relative to the dim line.
+        ds.dimtad = curr.value as number;
+        curr = scanner.next();
+        break;
       case 78:
         ds.dimzin = curr.value as number;
         curr = scanner.next();
@@ -432,12 +486,57 @@ function parseDimStyles(scanner: DxfScanner): Record<string, IDimStyle> {
         ds.dimtsz = curr.value as number;
         curr = scanner.next();
         break;
+      case 147:
+        // DIMGAP — distance between dim line and text (and break-radius around text).
+        ds.dimgap = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 176:
+        ds.dimclrd = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 177:
+        ds.dimclre = curr.value as number;
+        curr = scanner.next();
+        break;
       case 178:
         ds.dimclrt = curr.value as number;
         curr = scanner.next();
         break;
+      case 271:
+        // DIMDEC: keep only first occurrence — legacy DXF files sometimes repeat code 271
+        // (the second occurrence carries a different meaning in older versions).
+        if (ds.dimdec === undefined) ds.dimdec = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 179:
+        // DIMADEC: decimal places for angular dimensions
+        ds.dimadec = curr.value as number;
+        curr = scanner.next();
+        break;
       case 277:
         ds.dimlunit = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 279:
+        // DIMTMOVE — text movement strategy when user moves text.
+        ds.dimtmove = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 288:
+        // DIMUPT — allow user-positioned text.
+        ds.dimupt = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 289:
+        // DIMATFIT — arrow/text auto-fit strategy (mostly linear dims).
+        ds.dimatfit = curr.value as number;
+        curr = scanner.next();
+        break;
+      case 340:
+        // DIMTXSTY — handle of the STYLE record this DIMSTYLE uses for dim text.
+        // Stored uppercase to match the styleHandleToName map built in createDXFScene.
+        ds.dimtxstyHandle = (curr.value as string).toUpperCase();
         curr = scanner.next();
         break;
       case 341:

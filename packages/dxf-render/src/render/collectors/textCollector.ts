@@ -4,7 +4,7 @@ import { resolveEntityColor } from "@/utils/colorResolver";
 import { buildOcsMatrix, transformOcsPoint } from "@/utils/ocsTransform";
 import { type RenderContext, degreesToRadians } from "../primitives";
 import type { GeometryCollector } from "../mergeCollectors";
-import { resolveEntityFont } from "../text/fontClassifier";
+import { resolveEntityFont, resolveStyleFlags } from "../text/fontClassifier";
 import { replaceSpecialChars, parseTextWithUnderline, parseMTextContent } from "../text/mtextParser";
 import {
   addTextToCollector,
@@ -25,6 +25,7 @@ export function collectTextOrMText(
   worldMatrix?: THREE.Matrix4,
 ): void {
   const font = resolveEntityFont(entity.textStyle, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
+  const styleFlags = resolveStyleFlags(entity.textStyle, colorCtx.styles);
   const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
   const textContent = entity.text;
   if (!textContent) return;
@@ -97,9 +98,13 @@ export function collectTextOrMText(
       posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
       hAlign: entity.halign ?? HAlign.LEFT,
       vAlign: entity.valign ?? VAlign.BASELINE,
-      widthFactor: (entity.xScale ?? 1) * mirrorWidthFactor,
+      // STYLE.widthFactor (DXF code 41) is the fallback when the TEXT entity
+      // doesn't carry its own xScale (code 41). Entity-level wins per DXF spec.
+      widthFactor: (entity.xScale ?? styleFlags.widthFactor ?? 1) * mirrorWidthFactor,
       endPosX: endX, endPosY: endY,
       underline: parsed.underline,
+      bold: styleFlags.bold,
+      italic: styleFlags.italic,
     });
 
   } else {
@@ -130,7 +135,7 @@ export function collectTextOrMText(
       height *= Math.sqrt(m[4] * m[4] + m[5] * m[5]);
     }
 
-    const lines = parseMTextContent(textContent, height);
+    const lines = parseMTextContent(textContent, height, styleFlags.widthFactor);
     addMTextToCollector({
       collector, layer, color: entityColor, font, lines, defaultHeight: height,
       posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
@@ -141,6 +146,8 @@ export function collectTextOrMText(
       width: entity.width && entity.width >= height * 0.05 ? entity.width : undefined,
       serifFont: colorCtx.serifFont,
       lineSpacingFactor: entity.lineSpacingFactor,
+      bold: styleFlags.bold,
+      italic: styleFlags.italic,
     });
 
   }
@@ -159,7 +166,18 @@ export function collectAttdefEntity(
   if (entity.invisible) return;
   const text = entity.text || entity.tag;
   if (!text) return;
-  const posCoord = entity.startPoint;
+
+  const hAlign = entity.horizontalJustification ?? HAlign.LEFT;
+  const vAlign = entity.verticalJustification ?? VAlign.BASELINE;
+  const isFitOrAligned = hAlign === HAlign.FIT || hAlign === HAlign.ALIGNED;
+  const hasJustification = hAlign > 0 || vAlign > 0;
+  // FIT/ALIGNED use startPoint as origin and endPoint as the second alignment
+  // point; other justified modes anchor at endPoint (DXF spec).
+  const posCoord = isFitOrAligned
+    ? entity.startPoint
+    : hasJustification && entity.endPoint
+      ? entity.endPoint
+      : entity.startPoint;
   if (!posCoord) return;
 
   const entityColor = resolveEntityColor(entity, colorCtx.layers, colorCtx.blockColor);
@@ -169,16 +187,32 @@ export function collectAttdefEntity(
     new THREE.Vector3(posCoord.x, posCoord.y, posCoord.z || 0),
     ocsMatrix,
   );
+
+  let endX: number | undefined;
+  let endY: number | undefined;
+  if (isFitOrAligned && entity.endPoint) {
+    const ep = transformOcsPoint(
+      new THREE.Vector3(entity.endPoint.x, entity.endPoint.y, entity.endPoint.z || 0),
+      ocsMatrix,
+    );
+    endX = ep.x;
+    endY = ep.y;
+  }
+
   const rotation = entity.rotation ? degreesToRadians(entity.rotation) : 0;
   const font = resolveEntityFont(entity.textStyle, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
+  const styleFlags = resolveStyleFlags(entity.textStyle, colorCtx.styles);
 
   addTextToCollector({
     collector, layer, color: entityColor, font,
     text: replaceSpecialChars(text), height: textHeight,
     posX: pos.x, posY: pos.y, posZ: pos.z, rotation,
-    hAlign: entity.horizontalJustification ?? HAlign.LEFT,
-    vAlign: entity.verticalJustification ?? VAlign.BASELINE,
-    widthFactor: entity.scale,
+    hAlign,
+    vAlign,
+    widthFactor: entity.scale ?? styleFlags.widthFactor,
+    endPosX: endX, endPosY: endY,
     obliqueAngle: entity.obliqueAngle,
+    bold: styleFlags.bold,
+    italic: styleFlags.italic,
   });
 }

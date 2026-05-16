@@ -1,8 +1,11 @@
-import ACI_PALETTE from "@/parser/acadColorIndex";
-import { rgbNumberToHex } from "@/utils/colorResolver";
+import { aciToColor } from "@/utils/colorResolver";
 
-/** MTEXT line with optional color, height, and style overrides */
-export interface MTextLine {
+/**
+ * MTEXT run: a contiguous span of characters within a line sharing one set of
+ * formatting attributes. Created on every inline format change ({}, \C, \H,
+ * \f, \L\l, \O\o, \K\k) so each segment can be rendered independently.
+ */
+export interface MTextRun {
   text: string;
   color?: string;
   height?: number;
@@ -10,10 +13,25 @@ export interface MTextLine {
   italic?: boolean;
   fontFamily?: string;
   underline?: boolean;
-  stackedTop?: string; // \Stop^bottom; -> superscript
-  stackedBottom?: string; // \Stop^bottom; -> subscript
-  leftMargin?: number; // \p...l<value>... left margin (drawing units)
-  firstIndent?: number; // \p...i<value>... first-line indent (drawing units)
+  overline?: boolean;
+  strikethrough?: boolean;
+  /** Horizontal stretch factor (DXF `\W<n>;`, analogous to TEXT code 41). */
+  widthFactor?: number;
+  /** Glyph slant in degrees (DXF `\Q<n>;`, analogous to TEXT code 51). */
+  obliqueAngle?: number;
+}
+
+/**
+ * MTEXT line: an ordered list of runs plus paragraph-level attributes.
+ * Stacked fractions (\S) are stored on the line, not on a run, because \S
+ * is a single self-contained segment that doesn't nest inside braces.
+ */
+export interface MTextLine {
+  runs: MTextRun[];
+  leftMargin?: number;
+  firstIndent?: number;
+  stackedTop?: string;
+  stackedBottom?: string;
 }
 
 /**
@@ -26,9 +44,9 @@ export interface MTextLine {
  */
 export const replaceSpecialChars = (text: string, preserveTabs = false): string =>
   text
-    .replace(/%%[dD]/g, "\u00B0")
-    .replace(/%%[pP]/g, "\u00B1")
-    .replace(/%%[cC]/g, "\u2300")
+    .replace(/%%[dD]/g, "°")
+    .replace(/%%[pP]/g, "±")
+    .replace(/%%[cC]/g, "⌀")
     .replace(/%%[uUoO]/g, "") // toggle underline/overline — remove
     .replace(/%%(\d{3})/g, (_, code) => String.fromCharCode(parseInt(code)))
     // DXF caret notation: ^I = tab, ^^ = literal caret, ^X = control char
@@ -46,170 +64,313 @@ export function parseTextWithUnderline(rawText: string): { text: string; underli
   return { text: replaceSpecialChars(rawText), underline };
 }
 
-/**
- * Parse MTEXT formatting into an array of lines with color and height.
- * Handles: \P (line break), \C<n>; (ACI color), \H<n>; (height),
- * \f...; (font), %%d/%%p/%%c (special chars), {}, \L/\O/\K, etc.
- */
-export const parseMTextContent = (rawText: string, defaultHeight?: number): MTextLine[] => {
-  // Protect literal escape sequences with placeholders
-  // so they are not consumed by the formatting parser (\\ -> \, \{ -> {, \} -> })
-  let text = rawText.replace(/\\\\/g, "\x01").replace(/\\\{/g, "\x02").replace(/\\\}/g, "\x03");
+/** Concatenate run texts to recover the plain text of an MTextLine. */
+export const getMTextLineText = (line: MTextLine): string =>
+  line.runs.map((r) => r.text).join("");
 
-  // Unicode characters by code: \U+XXXX -> character
+interface FormatState {
+  color: string | undefined;
+  height: number | undefined;
+  bold: boolean;
+  italic: boolean;
+  fontFamily: string | undefined;
+  underline: boolean;
+  overline: boolean;
+  strikethrough: boolean;
+  widthFactor: number | undefined;
+  obliqueAngle: number | undefined;
+}
+
+const initialState = (): FormatState => ({
+  color: undefined,
+  height: undefined,
+  bold: false,
+  italic: false,
+  fontFamily: undefined,
+  underline: false,
+  overline: false,
+  strikethrough: false,
+  widthFactor: undefined,
+  obliqueAngle: undefined,
+});
+
+const cloneState = (s: FormatState): FormatState => ({ ...s });
+
+const snapshotRun = (text: string, s: FormatState): MTextRun => {
+  const run: MTextRun = { text };
+  if (s.color !== undefined) run.color = s.color;
+  if (s.height !== undefined) run.height = s.height;
+  if (s.bold) run.bold = true;
+  if (s.italic) run.italic = true;
+  if (s.fontFamily !== undefined) run.fontFamily = s.fontFamily;
+  if (s.underline) run.underline = true;
+  if (s.overline) run.overline = true;
+  if (s.strikethrough) run.strikethrough = true;
+  if (s.widthFactor !== undefined) run.widthFactor = s.widthFactor;
+  if (s.obliqueAngle !== undefined) run.obliqueAngle = s.obliqueAngle;
+  return run;
+};
+
+const restorePlaceholders = (s: string): string =>
+  s.replace(/\x01/g, "\\").replace(/\x02/g, "{").replace(/\x03/g, "}");
+
+/**
+ * Parse MTEXT formatting into an array of lines, each composed of one or more
+ * formatted runs. Brace groups {…} create a scope: format changes inside the
+ * group apply only to that scope and are popped on the matching `}`.
+ *
+ * Supported inline codes: \P (line break), \C<n>;/\c<n>; (ACI color),
+ * \H<n>[x]; (height, absolute or relative multiplier), \f<name>|...;
+ * (font + bold/italic flags), \L/\l (underline on/off),
+ * \O/\o (overline on/off), \K/\k (strikethrough on/off),
+ * \S<top><sep><bot>; (stacked fraction; `#` separator becomes inline "a/b"),
+ * \W<n>; (width factor, horizontal stretch),
+ * \Q<n>; (obliquing angle in degrees),
+ * \p…; (paragraph indent/left margin), \~ (NBSP), \N (column break -> space),
+ * \U+XXXX (Unicode), %%d/%%p/%%c/%%nnn (special chars), ^I (tab), ^^ (caret).
+ * Codes \T (tracking) and \A (per-run baseline shift) are accepted and skipped.
+ */
+export const parseMTextContent = (
+  rawText: string,
+  defaultHeight?: number,
+  defaultWidthFactor?: number,
+): MTextLine[] => {
+  // Protect literal \\, \{, \} from formatting parser via placeholders.
+  let text = rawText.replace(/\\\\/g, "\x01").replace(/\\\{/g, "\x02").replace(/\\\}/g, "\x03");
+  // Unicode escapes \U+XXXX -> character (done before special-char pass so the
+  // resulting characters can't be misread as %% sequences)
   text = text.replace(/\\U\+([0-9A-Fa-f]{4})/g, (_, hex) =>
     String.fromCodePoint(parseInt(hex, 16)),
   );
-
   text = replaceSpecialChars(text, true);
 
-  // Split by \P (MTEXT line break)
-  const rawLines = text.split(/\\P/);
+  const state = initialState();
+  // Seed the base width factor from STYLE.widthFactor (DXF code 41) — runs
+  // without inline \W<n>; inherit it. Skip when 1 (or unset) so unmarked runs
+  // stay as MTextRun without a widthFactor field.
+  if (defaultWidthFactor !== undefined && defaultWidthFactor !== 1) {
+    state.widthFactor = defaultWidthFactor;
+  }
+  const stack: FormatState[] = [];
 
   const lines: MTextLine[] = [];
-  let currentColor: string | undefined;
-  let currentHeight: number | undefined;
-  let currentBold = false;
-  let currentItalic = false;
-  let currentFont: string | undefined;
-  let currentUnderline = false;
+  let line: MTextLine = { runs: [] };
+  let runText = "";
 
-  for (const rawLine of rawLines) {
-    let clean = rawLine;
+  const flushRun = () => {
+    if (runText.length === 0) return;
+    line.runs.push(snapshotRun(restorePlaceholders(runText), state));
+    runText = "";
+  };
 
-    let lineFont = currentFont;
-    let lineBold = currentBold;
-    let lineItalic = currentItalic;
-    let firstFontInLine = true;
+  const pushLine = () => {
+    flushRun();
+    lines.push(line);
+    line = { runs: [] };
+  };
 
-    // Brace scoping: formatting codes inside {…} are scoped — they apply
-    // within the braces but don't persist to subsequent lines.
-    // \H inside braces: apply to this line's height only when ALL text is
-    // inside brace groups (e.g. {\H0.75x;A4.2}). When there's content
-    // outside braces (e.g. {\H0.7x;text}rest), \H is stripped since our
-    // line-level model can't represent mixed heights within one line.
-    let bracedHeight: number | undefined;
-    const allContentInBraces = /^\s*(\{[^{}]*\}\s*)+$/.test(clean);
-    clean = clean.replace(/\{([^{}]*)\}/g, (_, inner: string) => {
-      // Extract \H from braces — apply scoped height without persisting
-      if (allContentInBraces) {
-        inner = inner.replace(/\\H([\d.]+)(x?);/gi, (__, val, suffix) => {
-          const v = parseFloat(val);
-          if (suffix === "x" || suffix === "X") {
-            bracedHeight = (currentHeight ?? defaultHeight ?? 1) * v;
-          } else {
-            bracedHeight = v;
-          }
-          return "";
-        });
-      } else {
-        inner = inner.replace(/\\H[\d.]+x?;/gi, "");
-      }
-      return inner
-        .replace(/\\f[^|;]*\|?[^;]*;/g, "")
-        .replace(/\\[cC]\d+;/g, "");
-    });
+  for (let i = 0; i < text.length; ) {
+    const ch = text[i];
 
-    // Font: \fFontName|b1|i0|c0|p0; — extract font name, bold, italic
-    // First \f in line determines the visible text style for this line,
-    // last \f updates carry-over state for subsequent lines
-    clean = clean.replace(/\\f([^|;]*)\|?[^;]*;/g, (fullMatch, fontName) => {
-      if (fontName) currentFont = fontName;
-      const boldMatch = fullMatch.match(/\|b(\d)/);
-      const italicMatch = fullMatch.match(/\|i(\d)/);
-      if (boldMatch) currentBold = boldMatch[1] === "1";
-      if (italicMatch) currentItalic = italicMatch[1] === "1";
-      if (firstFontInLine) {
-        lineFont = currentFont;
-        lineBold = currentBold;
-        lineItalic = currentItalic;
-        firstFontInLine = false;
-      }
-      return "";
-    });
+    if (ch === "{") {
+      flushRun();
+      stack.push(cloneState(state));
+      i++;
+      continue;
+    }
 
-    // ACI color: \C<index>; or \c<index>;
-    clean = clean.replace(/\\[cC](\d+);/g, (_, indexStr) => {
-      const idx = parseInt(indexStr);
+    if (ch === "}") {
+      flushRun();
+      const popped = stack.pop();
+      if (popped) Object.assign(state, popped);
+      i++;
+      continue;
+    }
+
+    if (ch !== "\\") {
+      runText += ch;
+      i++;
+      continue;
+    }
+
+    // ── command starting with '\' ─────────────────────────────────────
+    const rest = text.slice(i);
+
+    // \P — line break
+    if (rest.startsWith("\\P")) {
+      pushLine();
+      i += 2;
+      continue;
+    }
+    // \~ — non-breaking space (rendered as regular space)
+    if (rest.startsWith("\\~")) {
+      runText += " ";
+      i += 2;
+      continue;
+    }
+    // \N — column break (treat as space)
+    if (rest.startsWith("\\N")) {
+      runText += " ";
+      i += 2;
+      continue;
+    }
+
+    // \C<n>; / \c<n>; — ACI color
+    const colorMatch = rest.match(/^\\[cC](\d+);/);
+    if (colorMatch) {
+      flushRun();
+      const idx = parseInt(colorMatch[1]);
       if (idx === 0 || idx === 256) {
-        currentColor = undefined; // ByBlock/ByLayer — use entity color
+        state.color = undefined; // ByBlock/ByLayer — inherit from entity
       } else if (idx >= 1 && idx <= 255) {
-        currentColor = rgbNumberToHex(ACI_PALETTE[idx]);
+        state.color = aciToColor(idx);
       }
-      return "";
-    });
+      i += colorMatch[0].length;
+      continue;
+    }
 
-    // Height: \H<value>; (absolute) or \H<value>x; (relative multiplier)
-    clean = clean.replace(/\\H([\d.]+)(x?);/gi, (_, val, suffix) => {
-      const v = parseFloat(val);
-      if (suffix === "x" || suffix === "X") {
-        currentHeight = (currentHeight ?? defaultHeight ?? 1) * v;
-      } else {
-        currentHeight = v;
-      }
-      return "";
-    });
+    // \H<num>[x]; — height (absolute or relative multiplier)
+    const heightMatch = rest.match(/^\\H([\d.]+)(x?);/i);
+    if (heightMatch) {
+      flushRun();
+      const v = parseFloat(heightMatch[1]);
+      const relative = heightMatch[2] === "x" || heightMatch[2] === "X";
+      state.height = relative ? (state.height ?? defaultHeight ?? 1) * v : v;
+      i += heightMatch[0].length;
+      continue;
+    }
 
-    // Paragraph formatting: \p[i<indent>][,l<left>][,r<right>][,t<tabs>]; or \pxq[lcr];
-    let lineLeftMargin: number | undefined;
-    let lineFirstIndent: number | undefined;
-    clean = clean.replace(/\\p([^;]*);/g, (_, params: string) => {
-      const iMatch = params.match(/i([+-]?[\d.]+)/);
-      if (iMatch) lineFirstIndent = parseFloat(iMatch[1]);
-      const lMatch = params.match(/l([\d.]+)/);
-      if (lMatch) lineLeftMargin = parseFloat(lMatch[1]);
-      return "";
-    });
-    // Width, tracking, oblique, alignment: \W, \T, \Q, \A
-    clean = clean.replace(/\\[WTQA][\d.+-]+;/gi, "");
-    // Underline toggle: \L starts, \l ends; track state across lines
-    let lineUnderline = currentUnderline;
-    clean = clean.replace(/\\([LOKlok])/g, (_, code: string) => {
-      if (code === "L") { currentUnderline = true; lineUnderline = true; }
-      else if (code === "l") currentUnderline = false;
-      // O, o, K, k: overline/strikethrough — strip silently
-      return "";
-    });
-    // Fractions: \Stop^bottom; or \Stop/bottom; -> stacked fields
-    // \Stop#bottom; -> inline flat text "top/bottom" (horizontal bar fraction)
-    let lineStackedTop: string | undefined;
-    let lineStackedBottom: string | undefined;
-    clean = clean.replace(/\\S([^^/#;]*)([\^/#])([^;]*);/g, (_, top, sep, bottom) => {
+    // \f<name>|b<0|1>|i<0|1>|c<n>|p<n>; — font + bold/italic
+    const fontMatch = rest.match(/^\\f([^;]*);/);
+    if (fontMatch) {
+      flushRun();
+      const params = fontMatch[1];
+      const semi = params.indexOf("|");
+      const name = (semi === -1 ? params : params.slice(0, semi)).trim();
+      if (name) state.fontFamily = name;
+      const bMatch = params.match(/\|b(\d)/);
+      const iMatch = params.match(/\|i(\d)/);
+      if (bMatch) state.bold = bMatch[1] === "1";
+      if (iMatch) state.italic = iMatch[1] === "1";
+      i += fontMatch[0].length;
+      continue;
+    }
+
+    // \L / \l — underline on / off
+    if (rest.startsWith("\\L")) {
+      flushRun();
+      state.underline = true;
+      i += 2;
+      continue;
+    }
+    if (rest.startsWith("\\l")) {
+      flushRun();
+      state.underline = false;
+      i += 2;
+      continue;
+    }
+    // \O / \o — overline on / off
+    if (rest.startsWith("\\O")) {
+      flushRun();
+      state.overline = true;
+      i += 2;
+      continue;
+    }
+    if (rest.startsWith("\\o")) {
+      flushRun();
+      state.overline = false;
+      i += 2;
+      continue;
+    }
+    // \K / \k — strikethrough on / off
+    if (rest.startsWith("\\K")) {
+      flushRun();
+      state.strikethrough = true;
+      i += 2;
+      continue;
+    }
+    if (rest.startsWith("\\k")) {
+      flushRun();
+      state.strikethrough = false;
+      i += 2;
+      continue;
+    }
+
+    // \S<top><sep><bottom>; — stacked fraction (or inline a/b with `#`)
+    const stackedMatch = rest.match(/^\\S([^^/#;]*)([\^/#])([^;]*);/);
+    if (stackedMatch) {
+      const top = stackedMatch[1].trim();
+      const sep = stackedMatch[2];
+      const bottom = stackedMatch[3].trim();
       if (sep === "#") {
-        return `${top.trim()}/${bottom.trim()}`; // inline fraction
+        runText += `${top}/${bottom}`;
+      } else {
+        flushRun();
+        line.stackedTop = top;
+        line.stackedBottom = bottom;
       }
-      lineStackedTop = top.trim();
-      lineStackedBottom = bottom.trim();
-      return "";
-    });
-    // Non-breaking space
-    clean = clean.replace(/\\~/g, " ");
-    // Column break \N -> space
-    clean = clean.replace(/\\N/g, " ");
-    // Grouping braces (literal ones are already protected by placeholders)
-    clean = clean.replace(/[{}]/g, "");
-    // Remaining unknown escape sequences \X...;
-    clean = clean.replace(/\\[a-zA-Z][^;]*;/g, "");
+      i += stackedMatch[0].length;
+      continue;
+    }
 
-    // Restore literal characters from placeholders
-    clean = clean.replace(/\x01/g, "\\").replace(/\x02/g, "{").replace(/\x03/g, "}");
+    // \p<params>; — paragraph indent / left margin / alignment
+    const paragraphMatch = rest.match(/^\\p([^;]*);/);
+    if (paragraphMatch) {
+      const params = paragraphMatch[1];
+      const iMatchPara = params.match(/i([+-]?[\d.]+)/);
+      if (iMatchPara) line.firstIndent = parseFloat(iMatchPara[1]);
+      const lMatchPara = params.match(/l([\d.]+)/);
+      if (lMatchPara) line.leftMargin = parseFloat(lMatchPara[1]);
+      i += paragraphMatch[0].length;
+      continue;
+    }
 
-    // Always push lines — empty lines (\P\P) serve as paragraph spacing
-    lines.push({
-      text: clean,
-      color: currentColor,
-      height: bracedHeight ?? currentHeight,
-      bold: lineBold,
-      italic: lineItalic,
-      fontFamily: lineFont,
-      underline: lineUnderline || undefined,
-      stackedTop: lineStackedTop,
-      stackedBottom: lineStackedBottom,
-      leftMargin: lineLeftMargin,
-      firstIndent: lineFirstIndent,
-    });
+    // \W<num>; — width factor (horizontal stretch). Positive values only.
+    const widthMatch = rest.match(/^\\W([\d.]+);/);
+    if (widthMatch) {
+      flushRun();
+      const v = parseFloat(widthMatch[1]);
+      if (Number.isFinite(v) && v > 0) state.widthFactor = v;
+      i += widthMatch[0].length;
+      continue;
+    }
+
+    // \Q<num>; — obliquing angle in degrees (glyph slant).
+    const obliqueMatch = rest.match(/^\\Q(-?[\d.]+);/);
+    if (obliqueMatch) {
+      flushRun();
+      const v = parseFloat(obliqueMatch[1]);
+      if (Number.isFinite(v)) state.obliqueAngle = v;
+      i += obliqueMatch[0].length;
+      continue;
+    }
+
+    // \T / \A — tracking / per-run baseline shift (not yet implemented, skip).
+    const skipMatch = rest.match(/^\\[TA][^;]*;/i);
+    if (skipMatch) {
+      i += skipMatch[0].length;
+      continue;
+    }
+
+    // Unknown \<letter>...; — consume up to and including the next ';'
+    const unknownTerminated = rest.match(/^\\[a-zA-Z][^;]*;/);
+    if (unknownTerminated) {
+      i += unknownTerminated[0].length;
+      continue;
+    }
+    // Unknown \<letter> without semicolon — drop the two chars
+    const unknownShort = rest.match(/^\\[a-zA-Z]/);
+    if (unknownShort) {
+      i += 2;
+      continue;
+    }
+
+    // Lone backslash at end of input — treat as literal
+    runText += ch;
+    i++;
   }
 
+  pushLine();
   return lines;
 };
 

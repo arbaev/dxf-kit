@@ -19,6 +19,7 @@ import {
   isHatchEntity,
   isMlineEntity,
   isXlineEntity,
+  isRegionEntity,
   isTextEntity,
   isAttdefEntity,
   isAttribEntity,
@@ -308,6 +309,11 @@ function computeLocalBBox(entity: DxfEntity): THREE.Box3 | null {
 
   if (isHatchEntity(entity)) {
     return hatchBBox(entity);
+  }
+
+  if (isRegionEntity(entity)) {
+    if (!entity.contourBoundary?.length) return null;
+    return hatchBBox({ boundaryPaths: entity.contourBoundary });
   }
 
   if (isMlineEntity(entity)) {

@@ -15,12 +15,12 @@ For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer)
 
 ## Why dxf-render?
 
-- **Most entities** — 21 rendered types including all dimension variants, LEADER, MULTILEADER, MLINE
+- **Most entities** — 22 rendered types including all dimension variants, LEADER, MULTILEADER, MLINE, REGION (contour via HATCH boundary)
 - **Variable-width polylines** — per-vertex tapering, arrows, donuts rendered as mesh with miter joins
 - **Accurate rendering** — linetype patterns, OCS transforms, hatch patterns, proper color resolution
 - **Picking & associations** — bbox-based raycast index plus DXF-driven entity links (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION)
 - **Two entry points** — full renderer or parser-only (zero deps, works in Node.js)
-- **Battle-tested** — 945 tests covering parser, renderer, and utilities
+- **Battle-tested** — 1141 tests covering parser, renderer, and utilities
 - **Modern stack** — TypeScript native, ES modules, tree-shakeable, Vite-built
 - **Framework-agnostic** — works with React, Svelte, Angular, vanilla JS, or any framework
 
@@ -477,9 +477,24 @@ Full TypeScript types exported: `DxfData`, `DxfEntity`, `DxfLayer`, `DxfHeader`,
 
 ## Supported entities
 
-21 rendered entity types: LINE, CIRCLE, ARC, ELLIPSE, POINT, POLYLINE, LWPOLYLINE, SPLINE, TEXT, MTEXT, DIMENSION, INSERT, SOLID, 3DFACE, HATCH, LEADER, MULTILEADER, MLINE, XLINE, RAY, ATTDEF, plus ATTRIB within INSERT blocks and HELIX via SPLINE.
+22 rendered entity types: LINE, CIRCLE, ARC, ELLIPSE, POINT, POLYLINE, LWPOLYLINE, SPLINE, TEXT, MTEXT, DIMENSION, INSERT, SOLID, 3DFACE, HATCH, LEADER, MULTILEADER, MLINE, XLINE, RAY, ATTDEF, REGION, plus ATTRIB within INSERT blocks and HELIX via SPLINE.
+
+REGION entities are rendered without decoding their ACIS modeler data: when a HATCH lists the REGION as a source object via DXF codes 97/330, the REGION borrows that HATCH's already-parsed boundary edges (lines, arcs, ellipses, splines, polyline vertices) for its visible contour. Color, layer and linetype come from the REGION itself; OCS from the HATCH. REGIONs with no HATCH referencing them are silently skipped.
 
 POLYLINE/LWPOLYLINE support includes per-vertex variable width (tapering), constant-width segments, arrows, donuts, and bulge arcs — all rendered as triangle-strip mesh geometry with proper miter joins at corners.
+
+### Dimension & leader arrowheads
+
+DIMENSION endpoints and LEADER tips honour the DXF block referenced by the DIMSTYLE (codes 342 / 341 for DIMBLK / DIMLDRBLK) or by the header `$DIMBLK`. All 18 standard AutoCAD block names are recognised and rendered with the correct shape:
+
+- **Arrow-shaped**: `_ClosedFilled` (AutoCAD default), `_Closed` / `_ClosedBlank`, `_Open` / `_Open30` / `_OpenArrow`, `_DatumFilled` / `_DatumBlank`
+- **Ticks**: `_ArchTick`, `_Oblique`, `_Small`, `_Tick`
+- **Dots**: `_Dot`, `_DotSmall`, `_DotBlank`, `_DotSmallBlank`
+- **Rings**: `_Origin`, `_Origin2`
+- **Boxes**: `_Box`, `_BoxFilled`
+- **Other**: `_Integral`, `_None`
+
+Names are matched case-insensitively, with an optional leading underscore. Unknown DIMBLK names fall back to `_ClosedFilled` (matching AutoCAD's default), but for LEADERs an unknown DIMLDRBLK name first tries to render the user-defined block geometry. `DIMTSZ > 0` forces tick rendering regardless of DIMBLK. The "outside arrows" flip for short dim lines only applies to direction-dependent arrow-shape kinds — dots, ticks, boxes and origin rings always sit at the endpoint.
 
 ## Comparison
 
@@ -487,10 +502,11 @@ POLYLINE/LWPOLYLINE support includes per-vertex variable width (tapering), const
 | ------------------------- | --------------------------- | ------------ | ---------- | --------- |
 | DXF parsing               | ✅                          | ✅           | ✅         | ✅        |
 | Three.js rendering        | ✅                          | ✅           | ❌         | ✅        |
-| Entity types              | 21 rendered                 | ~15          | ~15 parsed | ~8        |
+| Entity types              | 22 rendered                 | ~15          | ~15 parsed | ~8        |
 | Variable-width polylines  | ✅ tapering, arrows, donuts | ❌           | —          | ❌        |
 | Linetype patterns         | ✅ DASHED, CENTER, DOT...   | ❌ all solid | —          | ❌        |
 | All dimension types       | ✅ 7 types                  | linear only  | —          | ❌        |
+| Standard arrowhead blocks | ✅ 18 kinds (DIMBLK)        | ❌           | —          | ❌        |
 | LEADER / MULTILEADER      | ✅                          | ❌           | —          | ❌        |
 | HATCH patterns            | ✅ 25 built-in              | ✅           | —          | ❌        |
 | OCS (Arbitrary Axis)      | ✅ full                     | Z-flip only  | —          | ❌        |
@@ -498,7 +514,7 @@ POLYLINE/LWPOLYLINE support includes per-vertex variable width (tapering), const
 | Geometry merging          | ✅                          | ✅           | —          | ❌        |
 | Dark theme                | ✅ instant switch           | bg only      | —          | ❌        |
 | TypeScript                | ✅ native                   | .d.ts        | ✅         | ❌        |
-| Tests                     | 945 tests                   | 0            | ✅         | 0         |
+| Tests                     | 1141 tests                  | 0            | ✅         | 0         |
 | Web Worker parsing        | ✅                          | ✅           | ❌         | ❌        |
 | Parser-only entry         | ✅ zero deps                | ❌           | ✅         | ❌        |
 | Framework                 | agnostic                    | agnostic     | —          | agnostic  |

@@ -78,11 +78,12 @@ async function loadFile(file) {
 
 ## Features
 
-- **21 DXF entity types** — LINE, CIRCLE, ARC, ELLIPSE, SPLINE, POLYLINE, LWPOLYLINE, TEXT, MTEXT, DIMENSION, HATCH, INSERT, SOLID, 3DFACE, LEADER, MULTILEADER, MLINE, XLINE, RAY, ATTDEF, HELIX, plus ATTRIB within blocks
+- **22 DXF entity types** — LINE, CIRCLE, ARC, ELLIPSE, SPLINE, POLYLINE, LWPOLYLINE, TEXT, MTEXT, DIMENSION, HATCH, INSERT, SOLID, 3DFACE, LEADER, MULTILEADER, MLINE, XLINE, RAY, ATTDEF, HELIX, REGION (contour via HATCH boundary), plus ATTRIB within blocks
 - **Variable-width polylines** — per-vertex `startWidth`/`endWidth` tapering, constant-width, arrows, donuts rendered as mesh geometry with miter joins
+- **Standard arrowhead blocks** — DIMENSION endpoints and LEADER tips honour DIMBLK / DIMLDRBLK; all 18 stock AutoCAD blocks rendered with the correct shape (`_ClosedFilled`, `_Open*`, `_Dot*`, `_Origin*`, `_Box*`, `_Datum*`, `_ArchTick`, `_Integral`, `_None`, …)
 - **Linetype rendering** — DASHED, HIDDEN, CENTER, PHANTOM, DOT, DASHDOT with LTSCALE support
 - **Hatch patterns** — 25 built-in AutoCAD patterns with multi-boundary clipping
-- **Vector text** — crisp at any zoom; Liberation Sans/Serif fonts; bold, italic, underline, MTEXT formatting
+- **Vector text** — crisp at any zoom; Liberation Sans/Serif fonts; bold, italic, underline, overline, strikethrough; MTEXT inline scoped formatting (color/font/size/decoration inside `{…}` groups)
 - **Picking & associations** — bbox-based raycast, hover/click events, semantic links derived from DXF (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION)
 - **Search APIs** — `findEntitiesByText` / `findEntitiesByLayer` / `findEntitiesByType`, paired with `viewer.zoomToEntity` / `zoomToLayer` for find-and-focus UX
 - **Dark theme** — instant switching

@@ -96,6 +96,9 @@ function parseLWPolylineVertices(n: number, scanner: DxfScanner): ILWVertex[] {
         case 42:
           if (curr.value !== 0) vertex.bulge = curr.value as number;
           break;
+        case 91:
+          // Vertex identifier (per-vertex, optional). Ignore — geometry doesn't need it.
+          break;
         default:
           // Unknown code — return vertices, code may belong to the entity
           scanner.rewind();

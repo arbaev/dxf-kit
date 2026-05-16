@@ -425,6 +425,31 @@ describe("parseDimension", () => {
     // Direct code 140 should win — XDATA only sets if not already set
     expect(entity.textHeight).toBe(4.0);
   });
+
+  it("extracts dimdec (DIMDEC=271) and dimadec (DIMADEC=179) from XDATA DSTYLE override", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "DIMENSION",
+      "10", "0.0",
+      "20", "0.0",
+      "70", "32",
+      "42", "24.005",
+      // XDATA: ACAD DSTYLE with DIMDEC=1 and DIMADEC=2
+      "1001", "ACAD",
+      "1000", "DSTYLE",
+      "1002", "{",
+      "1070", "271",  // DIMDEC variable
+      "1070", "1",    // decimal places = 1
+      "1070", "179",  // DIMADEC variable
+      "1070", "2",    // angular decimal places = 2
+      "1002", "}",
+      "0", "EOF",
+    );
+
+    const entity = parseDimension(scanner, group);
+
+    expect(entity.dimdec).toBe(1);
+    expect(entity.dimadec).toBe(2);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

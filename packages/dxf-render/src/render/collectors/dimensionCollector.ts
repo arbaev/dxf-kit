@@ -1,8 +1,7 @@
 import * as THREE from "three";
 import type { DxfEntity, DxfData } from "@/types/dxf";
 import { isDimensionEntity } from "@/types/dxf";
-import { resolveEntityColor, rgbNumberToHex } from "@/utils/colorResolver";
-import ACI_PALETTE from "@/parser/acadColorIndex";
+import { resolveEntityColor, aciToColor } from "@/utils/colorResolver";
 import { DEGREES_TO_RADIANS_DIVISOR } from "@/constants";
 import { type RenderContext, degreesToRadians } from "../primitives";
 import type { GeometryCollector } from "../mergeCollectors";
@@ -17,9 +16,9 @@ import {
   resolveDimVarsFromHeader,
   applyDimStyleVars,
   mergeEntityDimVars,
-  isTickBlock,
   type DimFormatOptions,
 } from "../dimensions";
+import { classifyArrowBlock } from "../arrowheads";
 import {
   addDimensionTextToCollector,
   measureDimensionTextWidth,
@@ -46,7 +45,15 @@ export function collectDimensionEntity(
   const matrix = worldMatrix ?? new THREE.Matrix4();
 
   // Resolve dimension variables: header -> DIMSTYLE -> entity XDATA overrides
-  const dimStyleEntry = entity.styleName && colorCtx.dimStyles?.[entity.styleName];
+  const dimStyleEntry = entity.styleName ? colorCtx.dimStyles?.[entity.styleName] : undefined;
+
+  // DIMTXSTY (DIMSTYLE code 340) → STYLE name → STYLE.widthFactor (code 41).
+  // Applied to dim-text horizontal advance via addDimensionTextToCollector.
+  // Falls back to 1 (no stretch) when missing.
+  const dimTextStyleName = dimStyleEntry?.dimtxstyHandle
+    ? colorCtx.styleHandleToName?.get(dimStyleEntry.dimtxstyHandle)
+    : undefined;
+  const dimTextWidthFactor = (dimTextStyleName ? colorCtx.styles?.[dimTextStyleName]?.widthFactor : undefined) ?? 1;
   let baseDv = colorCtx.dimVars ?? resolveDimVarsFromHeader(undefined);
   // Apply DIMSTYLE-level overrides (DIMSCALE, DIMTXT, DIMASZ) between header and entity
   if (dimStyleEntry) {
@@ -54,16 +61,26 @@ export function collectDimensionEntity(
   }
   const dv = mergeEntityDimVars(baseDv, entity);
 
-  // Resolve DIMLUNIT: DIMSTYLE -> header -> undefined (defaults)
-  const dimlunit = dimStyleEntry ? dimStyleEntry.dimlunit : colorCtx.headerDimlunit;
-  const dimzin = dimStyleEntry ? dimStyleEntry.dimzin : undefined;
-  const dimFmt: DimFormatOptions | undefined = dimlunit !== undefined ? { dimlunit, dimzin } : undefined;
+  // Resolve formatting variables: entity XDATA override → DIMSTYLE → header → undefined.
+  const dimlunit = dimStyleEntry?.dimlunit ?? colorCtx.headerDimlunit;
+  const dimzin = dimStyleEntry?.dimzin ?? colorCtx.headerDimzin;
+  const dimdec = entity.dimdec ?? dimStyleEntry?.dimdec ?? colorCtx.headerDimdec;
+  const dimadec = entity.dimadec ?? dimStyleEntry?.dimadec ?? colorCtx.headerDimadec;
+  // Build dimFmt whenever any of these is defined so DIMDEC alone (without DIMLUNIT) is enough.
+  const dimFmt: DimFormatOptions | undefined =
+    dimlunit !== undefined || dimzin !== undefined || dimdec !== undefined || dimadec !== undefined
+      ? { dimlunit, dimzin, dimdec, dimadec }
+      : undefined;
 
-  // DIMCLRT: dimension text color from DIMSTYLE (ACI index)
-  let textColor = entityColor;
-  if (dimStyleEntry && dimStyleEntry.dimclrt !== undefined && dimStyleEntry.dimclrt > 0 && dimStyleEntry.dimclrt <= 255) {
-    textColor = rgbNumberToHex(ACI_PALETTE[dimStyleEntry.dimclrt]);
-  }
+  // DIMCLRD/DIMCLRE/DIMCLRT: dimension component colors from DIMSTYLE (ACI index).
+  // Route through aciToColor so ACI 7/255 stay theme-adaptive — otherwise
+  // a DIMSTYLE with DIMCLRT=7 renders white text invisible on a light background.
+  // Values 0 (BYBLOCK) and 256 (BYLAYER) fall back to entity color.
+  const resolveDimStyleColor = (aci: number | undefined): string =>
+    aci !== undefined && aci > 0 && aci <= 255 ? aciToColor(aci) : entityColor;
+  const dimColor = resolveDimStyleColor(dimStyleEntry?.dimclrd);
+  const extColor = resolveDimStyleColor(dimStyleEntry?.dimclre);
+  const textColor = resolveDimStyleColor(dimStyleEntry?.dimclrt);
 
   // DIMTSZ / DIMBLK from DIMSTYLE overrides header values
   if (dimStyleEntry) {
@@ -73,24 +90,22 @@ export function collectDimensionEntity(
     const dimScale = (entity.dimScale ?? styleDimScale ?? headerDimScale) || 1;
 
     if (dimStyleEntry.dimtsz !== undefined && dimStyleEntry.dimtsz > 0) {
-      dv.useTicks = true;
+      // DIMTSZ > 0 forces tick rendering regardless of DIMBLK.
+      dv.arrowKind = "tick";
       dv.tickSize = dimStyleEntry.dimtsz * dimScale;
     } else if (dimStyleEntry.dimblkHandle && colorCtx.blockHandleToName) {
       const blockName = colorCtx.blockHandleToName.get(dimStyleEntry.dimblkHandle);
-      if (blockName && isTickBlock(blockName)) {
-        dv.useTicks = true;
-        // No explicit DIMTSZ -> tick size always follows arrow size
-        // (entity XDATA may override arrowSize after base tickSize was set)
-        dv.tickSize = dv.arrowSize;
-      } else {
-        // DIMBLK is not a tick block → use standard arrows
-        dv.useTicks = false;
-        dv.tickSize = 0;
-      }
-    } else if (dv.useTicks && dimStyleEntry.dimtsz === 0) {
+      // Unknown / non-standard block names fall back to closed-filled (the
+      // AutoCAD default). Custom user blocks for dimension arrowheads are not
+      // dispatched through `addBlockArrowToCollector` — only leaders do that.
+      dv.arrowKind = classifyArrowBlock(blockName) ?? "closed-filled";
+      // No explicit DIMTSZ -> tick size follows arrow size (entity XDATA may
+      // override arrowSize after base tickSize was set).
+      dv.tickSize = dv.arrowKind === "tick" ? dv.arrowSize : 0;
+    } else if (dv.arrowKind === "tick" && dimStyleEntry.dimtsz === 0) {
       // DIMSTYLE explicitly sets DIMTSZ=0 with no custom DIMBLK → default arrows
-      // (overrides header $DIMBLK=ARCHTICK that may have set useTicks=true)
-      dv.useTicks = false;
+      // (overrides header $DIMBLK=ARCHTICK that may have selected ticks).
+      dv.arrowKind = "closed-filled";
       dv.tickSize = 0;
     }
   }
@@ -100,8 +115,35 @@ export function collectDimensionEntity(
   // Resolve sentinel for Three.js material creation in dimension helpers
   const resolvedColor = colorCtx.materials.resolveColor(entityColor);
 
+  // DIMTIH/DIMTOH/DIMTAD/DIMGAP/DIMTMOVE control radial & diametric text layout.
+  // Pulled from DIMSTYLE → header. Entity XDATA overrides aren't standardized for these.
+  // DIMSCALE is applied to DIMGAP (length value); the rest are flags.
+  const headerDimScale = _dxf.header?.$DIMSCALE ?? 1;
+  const styleDimScale = dimStyleEntry?.dimscale;
+  const effectiveDimScale = (entity.dimScale ?? styleDimScale ?? headerDimScale) || 1;
+
+  // DIMTIH/DIMTOH are looked up on the DIMSTYLE record only — `$DIMTIH`/`$DIMTOH`
+  // in the header are system-wide current values used when AutoCAD creates new
+  // dimensions, not for rendering existing ones (DXF reference for the HEADER
+  // block: those vars track the editor's current setting, while the per-dim
+  // record is the source of truth). Falling back to header here used to make
+  // diametric/radial dims whose dimstyle set DIMTOH=0 but omitted DIMTIH render
+  // text horizontally — e.g. QCAD's QCADDimStyle writes only DIMTOH, leaving
+  // DIMTIH unspecified, and the header's $DIMTIH=1 leaked into the "text inside"
+  // path. Now an unspecified DIMSTYLE field means undefined here, which the
+  // diametric/radial helpers interpret as 0 (aligned — the ISO default).
+  const dimtih = dimStyleEntry?.dimtih;
+  const dimtoh = dimStyleEntry?.dimtoh;
+  const dimtad = dimStyleEntry?.dimtad ?? colorCtx.headerDimtad;
+  const dimgapRaw = dimStyleEntry?.dimgap ?? colorCtx.headerDimgap;
+  const dimgap = dimgapRaw !== undefined ? dimgapRaw * effectiveDimScale : undefined;
+  const dimtmove = dimStyleEntry?.dimtmove ?? colorCtx.headerDimtmove;
+
   // Ordinate dimension (type 6 = Y-ordinate, type 7 = X-ordinate)
-  const dimParams = { entity, color: resolvedColor, font, collector, layer, transform, dv };
+  // textColor is the un-resolved sentinel (e.g. ACI7_COLOR) so the
+  // collector can keep DIMCLRT theme-adaptive — materials.resolveColor()
+  // happens later inside GeometryCollector.flush().
+  const dimParams = { entity, color: resolvedColor, textColor, font, collector, layer, transform, dv, fmt: dimFmt, dimtih, dimtoh, dimtad, dimgap, dimtmove, widthFactor: dimTextWidthFactor };
   if ((baseDimType & 0x0e) === 6) {
     result = createOrdinateDimension(dimParams);
   } else if (baseDimType === 2) {
@@ -124,7 +166,7 @@ export function collectDimensionEntity(
 
     // Compute text gap from actual text width so dimension line doesn't overlap text
     if (dimData.textPos && dimData.dimensionText && font) {
-      const textWidth = measureDimensionTextWidth(font, dimData.dimensionText, dimData.textHeight);
+      const textWidth = measureDimensionTextWidth(font, dimData.dimensionText, dimData.textHeight, dimTextWidthFactor);
       const padding = dimData.textHeight * 0.5;
       dv.textGap = Math.max(dv.textGap, textWidth + padding);
     }
@@ -146,12 +188,17 @@ export function collectDimensionEntity(
         rawText: dimData.dimensionText, height: dimData.textHeight,
         posX: dimData.textPos.x, posY: dimData.textPos.y, posZ: 0.2,
         rotation: dimAngleRad, hAlign: "center", transform,
+        widthFactor: dimTextWidthFactor,
       });
     }
   }
 
   // Decompose geometry objects (lines, arrows) into collector.
-  // Use entityColor (sentinel) for collector calls so theme-switching works.
+  // Color per object is selected by userData.dimPart ("ext" = extension line,
+  // anything else = dimension line / arrows / ticks). Uses sentinel colors so
+  // theme-switching keeps working.
+  const colorFor = (obj: THREE.Object3D): string =>
+    obj.userData?.dimPart === "ext" ? extColor : dimColor;
   if (result) {
     for (const obj of result) {
       if (obj instanceof THREE.Group) {
@@ -163,6 +210,7 @@ export function collectDimensionEntity(
           const posAttr = geo.getAttribute("position") as THREE.BufferAttribute | undefined;
           if (!posAttr) return;
           const v = new THREE.Vector3();
+          const partColor = colorFor(child);
 
           if (child instanceof THREE.LineSegments || child instanceof THREE.Line) {
             const count = posAttr.count;
@@ -170,7 +218,7 @@ export function collectDimensionEntity(
               v.fromBufferAttribute(posAttr, i).applyMatrix4(child.matrixWorld).applyMatrix4(matrix);
               const x1 = v.x, y1 = v.y, z1 = v.z;
               v.fromBufferAttribute(posAttr, i + 1).applyMatrix4(child.matrixWorld).applyMatrix4(matrix);
-              collector.addLineSegments(layer, entityColor, [x1, y1, z1, v.x, v.y, v.z]);
+              collector.addLineSegments(layer, partColor, [x1, y1, z1, v.x, v.y, v.z]);
             }
           } else if (child instanceof THREE.Mesh) {
             const count = posAttr.count;
@@ -184,7 +232,7 @@ export function collectDimensionEntity(
             if (indices.length === 0) {
               for (let i = 0; i < count; i++) indices.push(i);
             }
-            collector.addOverlayMesh(layer, entityColor, positions, indices);
+            collector.addOverlayMesh(layer, partColor, positions, indices);
           }
         });
       } else {
@@ -194,6 +242,7 @@ export function collectDimensionEntity(
         const posAttr = geo.getAttribute("position") as THREE.BufferAttribute | undefined;
         if (!posAttr) continue;
         const v = new THREE.Vector3();
+        const partColor = colorFor(obj);
 
         if (obj instanceof THREE.LineSegments || obj instanceof THREE.Line) {
           const count = posAttr.count;
@@ -201,7 +250,7 @@ export function collectDimensionEntity(
             v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
             const x1 = v.x, y1 = v.y, z1 = v.z;
             v.fromBufferAttribute(posAttr, i + 1).applyMatrix4(matrix);
-            collector.addLineSegments(layer, entityColor, [x1, y1, z1, v.x, v.y, v.z]);
+            collector.addLineSegments(layer, partColor, [x1, y1, z1, v.x, v.y, v.z]);
           }
         } else if (obj instanceof THREE.Mesh) {
           const count = posAttr.count;
@@ -215,7 +264,7 @@ export function collectDimensionEntity(
           if (indices.length === 0) {
             for (let i = 0; i < count; i++) indices.push(i);
           }
-          collector.addOverlayMesh(layer, entityColor, positions, indices);
+          collector.addOverlayMesh(layer, partColor, positions, indices);
         }
       }
     }

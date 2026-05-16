@@ -124,6 +124,8 @@ export interface DxfDimensionEntity extends DxfEntityBase {
   arcPoint?: DxfVertex; // code 16
   arrowSize?: number; // DIMASZ from XDATA DSTYLE override
   dimScale?: number; // DIMSCALE from XDATA DSTYLE override
+  dimdec?: number; // DIMDEC from XDATA DSTYLE override (code 271): decimal places for primary units
+  dimadec?: number; // DIMADEC from XDATA DSTYLE override (code 179): decimal places for angular
 }
 
 export interface DxfAttribEntity extends DxfEntityBase {
@@ -234,6 +236,8 @@ export type HatchEdge = HatchLineEdge | HatchArcEdge | HatchEllipseEdge | HatchS
 export interface HatchBoundaryPath {
   edges?: HatchEdge[];
   polylineVertices?: DxfVertex[];
+  /** Handles of source entities this boundary path was generated from (DXF codes 97/330). */
+  sourceObjectHandles?: string[];
 }
 
 export interface HatchPatternLine {
@@ -284,6 +288,18 @@ export interface DxfMLeaderEntity extends DxfEntityBase {
   textHeight?: number;
   arrowSize?: number;
   hasArrowHead?: boolean; // Defaults to true for MLEADER
+  /** Entity-level LeaderLineType (DXF code 170): 0=invisible, 1=straight, 2=spline. */
+  leaderLineType?: number;
+  /** Entity-level MLEADERSTYLE handle (DXF code 340, post-CONTEXT_DATA). */
+  styleHandle?: string;
+  /** Entity-level PropertyOverrideFlag (DXF code 90, post-CONTEXT_DATA).
+   *  Bitmask: bit 1 = LeaderLineColor, bit 15 = TextColor, etc.
+   *  When a bit is clear, the entity inherits from MLEADERSTYLE. */
+  propertyOverrideFlag?: number;
+  /** Entity-level LeaderLineColor raw CmEntityColor value (DXF code 91, post-CONTEXT_DATA). */
+  leaderLineColorRaw?: number;
+  /** CONTEXT_DATA TextColor raw CmEntityColor value (DXF code 92, inside CONTEXT_DATA). */
+  textColorRaw?: number;
 }
 
 export interface DxfAttdefEntity extends DxfEntityBase {
@@ -342,6 +358,15 @@ export interface DxfXlineEntity extends DxfEntityBase {
   direction: DxfVertex;
 }
 
+export interface DxfRegionEntity extends DxfEntityBase {
+  type: "REGION";
+  /** Boundary edges borrowed from a HATCH whose source object handle points to this REGION.
+   *  Populated post-parsing by linkRegionsToHatchBoundaries(); empty when no HATCH references this REGION. */
+  contourBoundary?: HatchBoundaryPath[];
+  /** Extrusion direction (normal) of the HATCH that owns the borrowed boundary — used to apply the same OCS. */
+  contourExtrusionDirection?: DxfVertex;
+}
+
 export interface DxfUnknownEntity extends DxfEntityBase {
   type: string;
   [key: string]: unknown;
@@ -367,6 +392,7 @@ export type DxfEntity =
   | DxfAttribEntity
   | DxfMlineEntity
   | DxfXlineEntity
+  | DxfRegionEntity
   | DxfUnknownEntity;
 
 export function isLineEntity(entity: DxfEntity): entity is DxfLineEntity {
@@ -445,12 +471,22 @@ export function isXlineEntity(entity: DxfEntity): entity is DxfXlineEntity {
   return entity.type === "XLINE" || entity.type === "RAY";
 }
 
+export function isRegionEntity(entity: DxfEntity): entity is DxfRegionEntity {
+  return entity.type === "REGION";
+}
+
 export interface DxfStyle {
   name: string;
+  /** Entity handle (DXF code 5) — used for DIMSTYLE.DIMTXSTY (code 340) cross-reference. */
+  handle?: string;
   fontFile?: string;
   bigFont?: string;
   fixedHeight?: number;
   widthFactor?: number;
+  /** True if the style references a bold TTF (parsed from ACAD XDATA 1071, bit 25). */
+  bold?: boolean;
+  /** True if the style references an italic TTF (parsed from ACAD XDATA 1071, bit 24). */
+  italic?: boolean;
 }
 
 export interface DxfLayer {
@@ -483,11 +519,23 @@ export interface DxfDimStyle {
   dimtxt?: number;   // code 140: text height (unscaled)
   dimtsz?: number;   // code 142: tick size (>0 = use ticks instead of arrows)
   dimexe?: number;   // code 44: extension line extension past dimension line
+  dimtoh?: number;   // code 73: text outside dimension lines — 0=aligned with line, 1=horizontal
+  dimtih?: number;   // code 74: text inside dimension lines — 0=aligned with line, 1=horizontal
+  dimtad?: number;   // code 77: text vertical position (0=centered, 1=above, 2=outside, 3=JIS, 4=below)
+  dimgap?: number;   // code 147: distance from dim line to text (and break-radius around text)
+  dimtmove?: number; // code 279: text movement (0=move dim line, 1=add leader, 2=move text only)
+  dimupt?: number;   // code 288: 0=default text position, 1=allow user-positioned text
+  dimatfit?: number; // code 289: arrow/text auto-fit strategy (linear dims)
+  dimclrd?: number;  // code 176: dimension line color (ACI index, 0=BYBLOCK, 256=BYLAYER)
+  dimclre?: number;  // code 177: extension line color (ACI index, 0=BYBLOCK, 256=BYLAYER)
   dimclrt?: number;  // code 178: dimension text color (ACI index)
   dimlunit?: number; // code 277: 2=Decimal, 4=Architectural
+  dimdec?: number;   // code 271: decimal places for primary units (arch: 2^dimdec is fraction denominator)
+  dimadec?: number;  // code 179: decimal places for angular dimensions
   dimzin?: number;   // code 78: zero suppression flags
   dimblkHandle?: string; // code 342: handle of dimension arrow block (-> BLOCK_RECORD name)
   dimldrblkHandle?: string; // code 341: handle of leader arrow block (-> BLOCK_RECORD name)
+  dimtxstyHandle?: string; // code 340: handle of dimension text STYLE (-> DxfStyle handle)
 }
 
 export interface DxfTables {
@@ -532,11 +580,27 @@ export interface DxfBlock {
   xrefPath?: string;
 }
 
+export interface DxfMLeaderStyle {
+  handle: string;
+  name?: string;
+  /** Raw CmEntityColor for LeaderLineColor (DXF code 91). */
+  leaderLineColorRaw?: number;
+  /** Raw CmEntityColor for TextColor (DXF code 93). */
+  textColorRaw?: number;
+  /** Raw CmEntityColor for BlockColor (DXF code 94). */
+  blockColorRaw?: number;
+}
+
+export interface DxfObjects {
+  mLeaderStyles?: Record<string, DxfMLeaderStyle>;
+}
+
 export interface DxfData {
   entities: DxfEntity[];
   header?: DxfHeader;
   tables?: DxfTables;
   blocks?: Record<string, DxfBlock>;
+  objects?: DxfObjects;
 }
 
 export interface DxfStatistics {

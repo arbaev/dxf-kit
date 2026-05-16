@@ -42,6 +42,29 @@ type IHatchEdge = IHatchEdgeLine | IHatchEdgeArc | IHatchEdgeEllipse | IHatchEdg
 interface IHatchBoundaryPath {
   edges?: IHatchEdge[];
   polylineVertices?: (IPoint & { bulge?: number })[];
+  sourceObjectHandles?: string[];
+}
+
+/**
+ * Read optional source-object handles (codes 97 + N × 330) that follow the edges/vertices
+ * of a boundary path. Returns the next group after the handles (or the same `curr`
+ * if there were none).
+ */
+function parseBoundarySourceObjects(
+  scanner: DxfScanner,
+  curr: IGroup,
+  path: IHatchBoundaryPath,
+): IGroup {
+  if (curr.code !== 97) return curr;
+  const numSources = curr.value as number;
+  const handles: string[] = [];
+  curr = scanner.next();
+  for (let i = 0; i < numSources && curr.code === 330; i++) {
+    handles.push(String(curr.value).toUpperCase());
+    curr = scanner.next();
+  }
+  if (handles.length > 0) path.sourceObjectHandles = handles;
+  return curr;
 }
 
 interface IHatchPatternLine {
@@ -209,7 +232,9 @@ function parseEdgeBoundary(scanner: DxfScanner, curr: IGroup): { path: IHatchBou
     }
   }
 
-  return { path: { edges }, curr };
+  const path: IHatchBoundaryPath = { edges };
+  curr = parseBoundarySourceObjects(scanner, curr, path);
+  return { path, curr };
 }
 
 /**
@@ -261,7 +286,9 @@ function parsePolylineBoundary(scanner: DxfScanner, curr: IGroup): { path: IHatc
     vertices.push({ x: first.x, y: first.y, bulge: first.bulge });
   }
 
-  return { path: { polylineVertices: vertices }, curr };
+  const path: IHatchBoundaryPath = { polylineVertices: vertices };
+  curr = parseBoundarySourceObjects(scanner, curr, path);
+  return { path, curr };
 }
 
 /**

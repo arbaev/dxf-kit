@@ -55,6 +55,32 @@ describe("parseTables", () => {
       expect(layers.HiddenLayer.colorIndex).toBe(3);
     });
 
+    it("does not mark layer as frozen when only bit 2 is set in code 70", () => {
+      // Bit 2 (0x02) means "frozen by default in new viewports", which is a
+      // template setting for newly created viewports. It must not hide the
+      // layer in model space. Regression: previously bit 2 was OR-ed into
+      // `frozen`, which silently hid visible layers in many real-world files.
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "LAYER",
+        "70", "1",
+        "0", "LAYER",
+        "2", "VisibleLayer",
+        "62", "5",
+        "70", "2",          // bit 2 only — must NOT mean currently frozen
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const layers = tables.layer.layers as Record<string, ILayer>;
+      expect(layers.VisibleLayer.frozen).toBe(false);
+      expect(layers.VisibleLayer.locked).toBe(false);
+      expect(layers.VisibleLayer.visible).toBe(true);
+    });
+
     it("marks layer as frozen when bit 1 is set in code 70", () => {
       const scanner = createScanner(
         "0", "TABLE",
@@ -195,7 +221,8 @@ describe("parseTables", () => {
 
       expect(layers.Layer2.visible).toBe(false);
       expect(layers.Layer2.colorIndex).toBe(5);
-      expect(layers.Layer2.frozen).toBe(true);
+      // flags=2 = "frozen by default in new viewports" only, not currently frozen
+      expect(layers.Layer2.frozen).toBe(false);
     });
   });
 
@@ -389,6 +416,79 @@ describe("parseTables", () => {
       expect(styles.Heading.fixedHeight).toBe(5.0);
       expect(styles.Heading.widthFactor).toBe(0.8);
     });
+
+    it("stores STYLE handle (code 5) uppercase for DIMTXSTY cross-reference", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "STYLE",
+        "70", "1",
+        "0", "STYLE",
+        "5", "2a3",            // entity handle (mixed case → uppercased)
+        "2", "Standard",
+        "3", "arial.ttf",
+        "41", "0.8",           // widthFactor
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+      const styles = tables.style.styles as Record<string, IStyle>;
+      expect(styles.Standard.handle).toBe("2A3");
+      expect(styles.Standard.widthFactor).toBe(0.8);
+    });
+
+    it("extracts bold/italic flags from ACAD XDATA 1071 (bits 25/24)", () => {
+      // Mirrors the encoding produced by AutoCAD:
+      //   "Arial Bold.ttf"        → 1071 = 33554466 = 0x02000022 (bold)
+      //   "Arial Italic.ttf"      → 1071 = 16777250 = 0x01000022 (italic)
+      //   "Arial Bold Italic.ttf" → 1071 = 50331682 = 0x03000022 (bold+italic)
+      //   "Arial.ttf"             → 1071 = 34       = 0x00000022 (neither)
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "STYLE",
+        "70", "4",
+        "0", "STYLE",
+        "2", "arial",
+        "3", "Arial.ttf",
+        "1001", "ACAD",
+        "1000", "Arial",
+        "1071", "34",
+        "0", "STYLE",
+        "2", "arial b",
+        "3", "Arial Bold.ttf",
+        "1001", "ACAD",
+        "1000", "Arial",
+        "1071", "33554466",
+        "0", "STYLE",
+        "2", "arial i",
+        "3", "Arial Italic.ttf",
+        "1001", "ACAD",
+        "1000", "Arial",
+        "1071", "16777250",
+        "0", "STYLE",
+        "2", "arial bi",
+        "3", "Arial Bold Italic.ttf",
+        "1001", "ACAD",
+        "1000", "Arial",
+        "1071", "50331682",
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+      const styles = tables.style.styles as Record<string, IStyle>;
+
+      expect(styles["arial"].bold).toBeUndefined();
+      expect(styles["arial"].italic).toBeUndefined();
+      expect(styles["arial b"].bold).toBe(true);
+      expect(styles["arial b"].italic).toBeUndefined();
+      expect(styles["arial i"].bold).toBeUndefined();
+      expect(styles["arial i"].italic).toBe(true);
+      expect(styles["arial bi"].bold).toBe(true);
+      expect(styles["arial bi"].italic).toBe(true);
+    });
   });
 
   // ── STYLE alongside other tables ──────────────────────────────────
@@ -529,6 +629,117 @@ describe("parseTables", () => {
       expect(dimStyles.ARCHARR.dimasz).toBe(0.15625);
       expect(dimStyles.ARCHARR.dimtxt).toBe(0.1875);
       expect(dimStyles.ARCHARR.dimclrt).toBe(1);
+    });
+
+    it("parses DIMSTYLE with dimclrd (code 176) and dimclre (code 177) for line colors", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "DIMSTYLE",
+        "70", "1",
+        "0", "DIMSTYLE",
+        "2", "stil1",
+        "176", "5",            // DIMCLRD — dimension line color (blue)
+        "177", "5",            // DIMCLRE — extension line color (blue)
+        "178", "7",            // DIMCLRT — text color
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const dimStyles = tables.dimStyle.dimStyles as Record<string, IDimStyle>;
+      expect(dimStyles.stil1.dimclrd).toBe(5);
+      expect(dimStyles.stil1.dimclre).toBe(5);
+      expect(dimStyles.stil1.dimclrt).toBe(7);
+    });
+
+    it("parses DIMTXSTY (code 340) — handle of dimension text STYLE", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "DIMSTYLE",
+        "70", "1",
+        "0", "DIMSTYLE",
+        "2", "ISO-25",
+        "340", "2a3",          // DIMTXSTY — text style handle (mixed case → uppercased)
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const dimStyles = tables.dimStyle.dimStyles as Record<string, IDimStyle>;
+      expect(dimStyles["ISO-25"].dimtxstyHandle).toBe("2A3");
+    });
+
+    it("parses DIMSTYLE with dimtoh (code 73) and dimtih (code 74)", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "DIMSTYLE",
+        "70", "1",
+        "0", "DIMSTYLE",
+        "2", "stil1",
+        "73", "0",  // DIMTOH — text outside is aligned with line
+        "74", "0",  // DIMTIH — text inside is aligned with line
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const dimStyles = tables.dimStyle.dimStyles as Record<string, IDimStyle>;
+      expect(dimStyles.stil1.dimtoh).toBe(0);
+      expect(dimStyles.stil1.dimtih).toBe(0);
+    });
+
+    it("parses DIMSTYLE DIMTAD (77), DIMGAP (147), DIMTMOVE (279), DIMUPT (288), DIMATFIT (289)", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "DIMSTYLE",
+        "70", "1",
+        "0", "DIMSTYLE",
+        "2", "stil1",
+        "77", "1",        // DIMTAD — text above line
+        "147", "0.7",     // DIMGAP — gap between dim line and text
+        "279", "1",       // DIMTMOVE — add leader when text moved
+        "288", "0",       // DIMUPT — default text position
+        "289", "3",       // DIMATFIT — auto-fit (best)
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const dimStyles = tables.dimStyle.dimStyles as Record<string, IDimStyle>;
+      expect(dimStyles.stil1.dimtad).toBe(1);
+      expect(dimStyles.stil1.dimgap).toBe(0.7);
+      expect(dimStyles.stil1.dimtmove).toBe(1);
+      expect(dimStyles.stil1.dimupt).toBe(0);
+      expect(dimStyles.stil1.dimatfit).toBe(3);
+    });
+
+    it("parses DIMSTYLE with dimadec (code 179) for angular precision", () => {
+      const scanner = createScanner(
+        "0", "TABLE",
+        "2", "DIMSTYLE",
+        "70", "1",
+        "0", "DIMSTYLE",
+        "2", "stil1",
+        "271", "2",            // DIMDEC — linear precision
+        "179", "1",            // DIMADEC — angular precision
+        "0", "ENDTAB",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const tables = parseTables(scanner);
+
+      const dimStyles = tables.dimStyle.dimStyles as Record<string, IDimStyle>;
+      expect(dimStyles.stil1.dimdec).toBe(2);
+      expect(dimStyles.stil1.dimadec).toBe(1);
     });
   });
 

@@ -23,6 +23,18 @@ export const hatchArcRadians = (startDeg: number, endDeg: number, ccw: boolean):
 };
 
 /**
+ * Convert hatch elliptic-arc edge angles (codes 50/51) from DXF degrees to radians.
+ * HATCH edge type 3 stores start/end angles in degrees per the DXF spec convention
+ * for codes 50/51, unlike the ELLIPSE entity which uses radians (codes 41/42).
+ * CW edges are negated for the same reason as hatchArcRadians().
+ */
+export const hatchEllipseRadians = (startDeg: number, endDeg: number, ccw: boolean): [number, number] => {
+  const toRad = Math.PI / 180;
+  if (ccw) return [startDeg * toRad, endDeg * toRad];
+  return [-startDeg * toRad, -endDeg * toRad];
+};
+
+/**
  * Compute arc/ellipse sweep for hatch boundary edges.
  * Applies the ccw flag to determine CW/CCW direction, then fixes
  * near-full circles (> 350°) that result from DXF exporters setting
@@ -61,10 +73,11 @@ const getEdgeStartPoint = (edge: HatchEdge): { x: number; y: number } => {
       y: edge.center.y + edge.radius * Math.sin(startRad),
     };
   } else if (edge.type === "ellipse") {
+    const [startRad, endRad] = hatchEllipseRadians(edge.startAngle, edge.endAngle, edge.ccw);
     const pts = generateEllipsePoints(
       edge.center.x, edge.center.y, 0,
       edge.majorAxisEndPoint.x, edge.majorAxisEndPoint.y,
-      edge.axisRatio, edge.startAngle, edge.endAngle,
+      edge.axisRatio, startRad, endRad,
       edge.ccw, 1,
     );
     return pts.length > 0 ? { x: pts[0].x, y: pts[0].y } : { x: 0, y: 0 };
@@ -270,10 +283,11 @@ export const addEdgeToPath = (shapePath: THREE.ShapePath, edge: HatchEdge): void
       !edge.ccw, // THREE.js: aClockwise=true means CW, DXF ccw=true means CCW
     );
   } else if (edge.type === "ellipse") {
+    const [startRad, endRad] = hatchEllipseRadians(edge.startAngle, edge.endAngle, edge.ccw);
     const pts = generateEllipsePoints(
       edge.center.x, edge.center.y, 0,
       edge.majorAxisEndPoint.x, edge.majorAxisEndPoint.y,
-      edge.axisRatio, edge.startAngle, edge.endAngle,
+      edge.axisRatio, startRad, endRad,
       edge.ccw,
     );
     for (let i = 1; i < pts.length; i++) {
@@ -352,10 +366,11 @@ export const boundaryPathToLinePoints = (bp: HatchBoundaryPath): THREE.Vector3[]
           );
         }
       } else if (edge.type === "ellipse") {
+        const [startRad, endRad] = hatchEllipseRadians(edge.startAngle, edge.endAngle, edge.ccw);
         const ePts = generateEllipsePoints(
           edge.center.x, edge.center.y, 0,
           edge.majorAxisEndPoint.x, edge.majorAxisEndPoint.y,
-          edge.axisRatio, edge.startAngle, edge.endAngle,
+          edge.axisRatio, startRad, endRad,
           edge.ccw,
         );
         // Skip first point if points already exist (to avoid duplicates at edge junctions)
@@ -431,13 +446,12 @@ export const boundaryPathToPoint2DArray = (bp: HatchBoundaryPath): Point2D[] => 
         const rotation = Math.atan2(majorY, majorX);
         const cosR = Math.cos(rotation);
         const sinR = Math.sin(rotation);
-        let startAngle = edge.startAngle;
-        let endAngle = edge.endAngle;
+        // HATCH edge angles are in degrees per DXF code 50/51 convention
+        let [startAngle, endAngle] = hatchEllipseRadians(edge.startAngle, edge.endAngle, edge.ccw);
         const isFullEllipse =
           Math.abs(endAngle - startAngle - 2 * Math.PI) < EPSILON ||
           Math.abs(endAngle - startAngle) < EPSILON;
         if (isFullEllipse) { startAngle = 0; endAngle = 2 * Math.PI; }
-        // Ellipse angles are already in radians
         const sweepAngle = hatchArcSweep(startAngle, endAngle, edge.ccw);
         const segments = Math.max(
           MIN_ARC_SEGMENTS,

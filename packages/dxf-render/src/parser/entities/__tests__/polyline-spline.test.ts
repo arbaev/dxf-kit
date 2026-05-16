@@ -304,6 +304,32 @@ describe("parseLWPolyline", () => {
     expect(entity.vertices[1].bulge).toBeUndefined();
   });
 
+  // -- Vertex identifier (code 91) interleaved with vertices ------------------
+
+  it("ignores per-vertex identifier (code 91) without truncating vertices", () => {
+    const { scanner, group } = createScannerAt(
+      "0", "LWPOLYLINE",
+      "8", "Layer1",
+      "90", "3",
+      "70", "0",
+      "10", "0.0",
+      "20", "0.0",
+      "10", "5.0",
+      "20", "5.0",
+      "91", "6",
+      "10", "10.0",
+      "20", "0.0",
+      "0", "ENDSEC",
+      "0", "EOF",
+    );
+
+    const entity = parseLWPolyline(scanner, group) as ILWPolylineEntity;
+
+    expect(entity.vertices).toHaveLength(3);
+    expect(entity.vertices[2].x).toBe(10);
+    expect(entity.vertices[2].y).toBe(0);
+  });
+
   // -- With elevation ---------------------------------------------------------
 
   it("parses lwpolyline with elevation (code 38)", () => {

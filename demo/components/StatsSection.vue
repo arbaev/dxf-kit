@@ -21,8 +21,8 @@ interface Stat {
 }
 
 const stats: Stat[] = [
-  { value: 21, label: "entity types", sub: "LINE · ARC · SPLINE · HATCH · INSERT · MTEXT · …" },
-  { value: 945, label: "tests", sub: "100% green CI on every push" },
+  { value: 22, label: "entity types", sub: "LINE · ARC · SPLINE · HATCH · INSERT · MTEXT · REGION · …" },
+  { value: 1141, label: "tests", sub: "100% green CI on every push" },
   { value: 25, label: "hatch patterns", sub: "ANSI31 · ANSI32 · ANSI33 · GRASS · NET · …" },
   { value: 7, label: "dimension types", sub: "linear · aligned · radial · diametric · angular · ordinate · 3-pt" },
   { value: 6, label: "AA modes", sub: "MSAA · SMAA · FXAA · TAA · SSAA · none" },

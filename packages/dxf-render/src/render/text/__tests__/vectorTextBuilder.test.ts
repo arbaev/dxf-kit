@@ -8,7 +8,7 @@ import {
   HAlign,
   VAlign,
 } from "../vectorTextBuilder";
-import type { MTextLine } from "../mtextParser";
+import type { MTextLine, MTextRun } from "../mtextParser";
 import { loadDefaultFont } from "../fontManager";
 import { clearGlyphCache } from "../glyphCache";
 import type { Font } from "opentype.js";
@@ -84,6 +84,41 @@ function mp(overrides: Partial<Parameters<typeof addMTextToCollector>[0]> & { co
     posX: 0, posY: 0, posZ: 0,
     ...overrides,
   };
+}
+
+/** Helper to build a single-run MTextLine for tests. */
+function line(
+  text: string,
+  opts: {
+    color?: string;
+    height?: number;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    overline?: boolean;
+    strikethrough?: boolean;
+    fontFamily?: string;
+    stackedTop?: string;
+    stackedBottom?: string;
+    leftMargin?: number;
+    firstIndent?: number;
+  } = {},
+): MTextLine {
+  const run: MTextRun = { text };
+  if (opts.color !== undefined) run.color = opts.color;
+  if (opts.height !== undefined) run.height = opts.height;
+  if (opts.bold) run.bold = true;
+  if (opts.italic) run.italic = true;
+  if (opts.underline) run.underline = true;
+  if (opts.overline) run.overline = true;
+  if (opts.strikethrough) run.strikethrough = true;
+  if (opts.fontFamily) run.fontFamily = opts.fontFamily;
+  const ml: MTextLine = { runs: text === "" ? [] : [run] };
+  if (opts.stackedTop !== undefined) ml.stackedTop = opts.stackedTop;
+  if (opts.stackedBottom !== undefined) ml.stackedBottom = opts.stackedBottom;
+  if (opts.leftMargin !== undefined) ml.leftMargin = opts.leftMargin;
+  if (opts.firstIndent !== undefined) ml.firstIndent = opts.firstIndent;
+  return ml;
 }
 
 /** Helper to create a DimensionTextParams object with defaults */
@@ -356,7 +391,7 @@ describe("vectorTextBuilder", () => {
   describe("addMTextToCollector — basic", () => {
     it("produces mesh data for multiline text", () => {
       const c = new MockCollector();
-      const lines: MTextLine[] = [{ text: "Line one" }, { text: "Line two" }];
+      const lines: MTextLine[] = [line("Line one"), line("Line two")];
       addMTextToCollector(mp({ collector: c as any, font, lines }));
       expect(c.meshCalls.length).toBe(2);
       expect(c.totalVertices).toBeGreaterThan(0);
@@ -370,14 +405,14 @@ describe("vectorTextBuilder", () => {
 
     it("single line works like addTextToCollector", () => {
       const c = new MockCollector();
-      addMTextToCollector(mp({ collector: c as any, font, lines: [{ text: "Hello" }] }));
+      addMTextToCollector(mp({ collector: c as any, font, lines: [line("Hello")] }));
       expect(c.meshCalls.length).toBe(1);
       expect(c.totalVertices).toBeGreaterThan(0);
     });
 
     it("all z-coordinates match posZ", () => {
       const c = new MockCollector();
-      addMTextToCollector(mp({ collector: c as any, font, lines: [{ text: "A" }, { text: "B" }], posZ: 7 }));
+      addMTextToCollector(mp({ collector: c as any, font, lines: [line("A"), line("B")], posZ: 7 }));
       for (const call of c.meshCalls) {
         for (let i = 2; i < call.vertices.length; i += 3) {
           expect(call.vertices[i]).toBe(7);
@@ -387,7 +422,7 @@ describe("vectorTextBuilder", () => {
 
     it("produces nothing for zero height", () => {
       const c = new MockCollector();
-      addMTextToCollector(mp({ collector: c as any, font, lines: [{ text: "Hello" }], defaultHeight: 0 }));
+      addMTextToCollector(mp({ collector: c as any, font, lines: [line("Hello")], defaultHeight: 0 }));
       expect(c.meshCalls.length).toBe(0);
     });
   });
@@ -395,7 +430,7 @@ describe("vectorTextBuilder", () => {
   describe("addMTextToCollector — attachment points", () => {
     it("TOP_LEFT (1): text extends below and right of position", () => {
       const c = new MockCollector();
-      const lines: MTextLine[] = [{ text: "AB" }, { text: "CD" }];
+      const lines: MTextLine[] = [line("AB"), line("CD")];
       addMTextToCollector(mp({ collector: c as any, font, lines, posX: 50, posY: 50, attachmentPoint: 1 }));
       const b = c.getBounds();
       expect(b.xMin).toBeGreaterThanOrEqual(48);
@@ -404,7 +439,7 @@ describe("vectorTextBuilder", () => {
 
     it("BOTTOM_RIGHT (9): text extends above and left of position", () => {
       const c = new MockCollector();
-      const lines: MTextLine[] = [{ text: "AB" }, { text: "CD" }];
+      const lines: MTextLine[] = [line("AB"), line("CD")];
       addMTextToCollector(mp({ collector: c as any, font, lines, posX: 50, posY: 50, attachmentPoint: 9 }));
       const b = c.getBounds();
       expect(b.xMax).toBeLessThanOrEqual(52);
@@ -413,7 +448,7 @@ describe("vectorTextBuilder", () => {
 
     it("MIDDLE_CENTER (5): text is centered around position", () => {
       const c = new MockCollector();
-      const lines: MTextLine[] = [{ text: "AB" }, { text: "CD" }];
+      const lines: MTextLine[] = [line("AB"), line("CD")];
       addMTextToCollector(mp({ collector: c as any, font, lines, posX: 50, posY: 50, attachmentPoint: 5 }));
       const b = c.getBounds();
       const midX = (b.xMin + b.xMax) / 2;
@@ -427,8 +462,8 @@ describe("vectorTextBuilder", () => {
     it("lines with different colors produce separate addMesh calls", () => {
       const c = new MockCollector();
       const lines: MTextLine[] = [
-        { text: "Red line", color: "#ff0000" },
-        { text: "Blue line", color: "#0000ff" },
+        line("Red line", { color: "#ff0000" }),
+        line("Blue line", { color: "#0000ff" }),
       ];
       addMTextToCollector(mp({ collector: c as any, font, lines }));
       const colors = c.meshCalls.map(call => call.color);
@@ -438,8 +473,114 @@ describe("vectorTextBuilder", () => {
 
     it("lines without color use default entity color", () => {
       const c = new MockCollector();
-      addMTextToCollector(mp({ collector: c as any, font, lines: [{ text: "Default" }], color: "#abcdef" }));
+      addMTextToCollector(mp({ collector: c as any, font, lines: [line("Default")], color: "#abcdef" }));
       expect(c.meshCalls[0].color).toBe("#abcdef");
+    });
+  });
+
+  describe("addMTextToCollector — multi-run lines (inline scoping)", () => {
+    it("two runs with different colors produce two mesh calls with those colors", () => {
+      // Simulates `Profil rama{\C252; Profile frame}` after parsing.
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{
+        runs: [
+          { text: "Profil rama" },
+          { text: " Profile frame", color: "#848484" },
+        ],
+      }];
+      addMTextToCollector(mp({ collector: c as any, font, lines, color: "#000000" }));
+      const colors = c.meshCalls.map((call) => call.color);
+      expect(colors).toContain("#000000"); // first run falls back to entity color
+      expect(colors).toContain("#848484"); // second run uses its scoped color
+    });
+
+    it("multi-run line places runs sequentially along X without overlap", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{
+        runs: [
+          { text: "AA", color: "#ff0000" },
+          { text: "BB", color: "#00ff00" },
+        ],
+      }];
+      addMTextToCollector(mp({ collector: c as any, font, lines, posX: 0, attachmentPoint: 1 }));
+      // Bounds of the red call (run 1) must end before the green call (run 2) starts
+      const red = c.meshCalls.find((call) => call.color === "#ff0000");
+      const green = c.meshCalls.find((call) => call.color === "#00ff00");
+      expect(red).toBeDefined();
+      expect(green).toBeDefined();
+      const xMax = (verts: number[]) => {
+        let m = -Infinity;
+        for (let i = 0; i < verts.length; i += 3) if (verts[i] > m) m = verts[i];
+        return m;
+      };
+      const xMin = (verts: number[]) => {
+        let m = Infinity;
+        for (let i = 0; i < verts.length; i += 3) if (verts[i] < m) m = verts[i];
+        return m;
+      };
+      // Allow tiny float slack: red ends roughly where green starts
+      expect(xMin(green!.vertices)).toBeGreaterThan(xMax(red!.vertices) - 0.5);
+    });
+
+    it("overline emits a line segment in addition to the glyph mesh", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{ runs: [{ text: "X", overline: true }] }];
+      addMTextToCollector(mp({ collector: c as any, font, lines }));
+      expect(c.lineCalls.length).toBe(1);
+    });
+
+    it("strikethrough emits a line segment in addition to the glyph mesh", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{ runs: [{ text: "X", strikethrough: true }] }];
+      addMTextToCollector(mp({ collector: c as any, font, lines }));
+      expect(c.lineCalls.length).toBe(1);
+    });
+
+    it("underline still works through the new run pathway", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{ runs: [{ text: "X", underline: true }] }];
+      addMTextToCollector(mp({ collector: c as any, font, lines }));
+      expect(c.lineCalls.length).toBe(1);
+    });
+
+    it("run-level widthFactor stretches the horizontal extent", () => {
+      const c1 = new MockCollector();
+      const c2 = new MockCollector();
+      addMTextToCollector(mp({ collector: c1 as any, font, lines: [{ runs: [{ text: "MM" }] }] }));
+      addMTextToCollector(mp({ collector: c2 as any, font, lines: [{ runs: [{ text: "MM", widthFactor: 2 }] }] }));
+      const w1 = c1.getBounds().xMax - c1.getBounds().xMin;
+      const w2 = c2.getBounds().xMax - c2.getBounds().xMin;
+      expect(w2).toBeGreaterThan(w1 * 1.8);
+    });
+
+    it("run-level widthFactor pushes the next run further along X", () => {
+      const c = new MockCollector();
+      const lines: MTextLine[] = [{
+        runs: [
+          { text: "MM", color: "#ff0000", widthFactor: 2 },
+          { text: "MM", color: "#00ff00" },
+        ],
+      }];
+      addMTextToCollector(mp({ collector: c as any, font, lines, posX: 0, attachmentPoint: 1 }));
+      const red = c.meshCalls.find((call) => call.color === "#ff0000")!;
+      const green = c.meshCalls.find((call) => call.color === "#00ff00")!;
+      // The green run starts after the stretched red run, so its xMin must be
+      // noticeably larger than for an unstretched two-glyph string.
+      const xMinGreen = Math.min(...green.vertices.filter((_, i) => i % 3 === 0));
+      const xMaxRed = Math.max(...red.vertices.filter((_, i) => i % 3 === 0));
+      expect(xMinGreen).toBeGreaterThan(xMaxRed - 0.5);
+    });
+
+    it("run-level obliqueAngle shears glyph X by Y", () => {
+      const c0 = new MockCollector();
+      const cSlant = new MockCollector();
+      addMTextToCollector(mp({ collector: c0 as any, font, lines: [{ runs: [{ text: "I" }] }] }));
+      addMTextToCollector(mp({ collector: cSlant as any, font, lines: [{ runs: [{ text: "I", obliqueAngle: 30 }] }] }));
+      // Sheared text has a wider xMax than upright text (since top of glyph
+      // shifts right by tan(30°) × glyphHeight ≈ 0.577 × h).
+      const w0 = c0.getBounds().xMax - c0.getBounds().xMin;
+      const wSlant = cSlant.getBounds().xMax - cSlant.getBounds().xMin;
+      expect(wSlant).toBeGreaterThan(w0);
     });
   });
 
@@ -447,8 +588,8 @@ describe("vectorTextBuilder", () => {
     it("different line heights render at different sizes", () => {
       const cSmall = new MockCollector();
       const cLarge = new MockCollector();
-      addMTextToCollector(mp({ collector: cSmall as any, font, lines: [{ text: "A", height: 5 }] }));
-      addMTextToCollector(mp({ collector: cLarge as any, font, lines: [{ text: "A", height: 20 }] }));
+      addMTextToCollector(mp({ collector: cSmall as any, font, lines: [line("A", { height: 5 })] }));
+      addMTextToCollector(mp({ collector: cLarge as any, font, lines: [line("A", { height: 20 })] }));
       const hSmall = cSmall.getBounds().yMax - cSmall.getBounds().yMin;
       const hLarge = cLarge.getBounds().yMax - cLarge.getBounds().yMin;
       expect(hLarge).toBeGreaterThan(hSmall * 2);
@@ -458,7 +599,7 @@ describe("vectorTextBuilder", () => {
   describe("addMTextToCollector — word wrapping", () => {
     it("long text with width constraint produces multiple lines", () => {
       const c = new MockCollector();
-      const lines: MTextLine[] = [{ text: "Hello World Test" }];
+      const lines: MTextLine[] = [line("Hello World Test")];
       const helloWidth = measureTextWidth(font, "Hello World", 10);
       addMTextToCollector(mp({ collector: c as any, font, lines, width: helloWidth * 0.8, attachmentPoint: 1 }));
       expect(c.meshCalls.length).toBeGreaterThan(1);
@@ -466,14 +607,14 @@ describe("vectorTextBuilder", () => {
 
     it("short text stays single line when width is large enough", () => {
       const c = new MockCollector();
-      addMTextToCollector(mp({ collector: c as any, font, lines: [{ text: "Hi" }], width: 1000, attachmentPoint: 1 }));
+      addMTextToCollector(mp({ collector: c as any, font, lines: [line("Hi")], width: 1000, attachmentPoint: 1 }));
       expect(c.meshCalls.length).toBe(1);
     });
 
     it("width=0 or undefined skips wrapping", () => {
       const c1 = new MockCollector();
       const c2 = new MockCollector();
-      const lines: MTextLine[] = [{ text: "Hello World Test" }];
+      const lines: MTextLine[] = [line("Hello World Test")];
       addMTextToCollector(mp({ collector: c1 as any, font, lines, width: 0, attachmentPoint: 1 }));
       addMTextToCollector(mp({ collector: c2 as any, font, lines, attachmentPoint: 1 }));
       expect(c1.meshCalls.length).toBe(1);
@@ -484,7 +625,7 @@ describe("vectorTextBuilder", () => {
   describe("addMTextToCollector — stacked text", () => {
     it("line with stackedTop/stackedBottom renders extra geometry", () => {
       const c = new MockCollector();
-      const lines: MTextLine[] = [{ text: "Main", stackedTop: "1", stackedBottom: "2" }];
+      const lines: MTextLine[] = [line("Main", { stackedTop: "1", stackedBottom: "2" })];
       addMTextToCollector(mp({ collector: c as any, font, lines }));
       expect(c.meshCalls.length).toBeGreaterThanOrEqual(3);
       expect(c.totalVertices).toBeGreaterThan(0);
@@ -492,7 +633,7 @@ describe("vectorTextBuilder", () => {
 
     it("stacked text without main text still renders fractions", () => {
       const c = new MockCollector();
-      const lines: MTextLine[] = [{ text: "", stackedTop: "1", stackedBottom: "2" }];
+      const lines: MTextLine[] = [line("", { stackedTop: "1", stackedBottom: "2" })];
       addMTextToCollector(mp({ collector: c as any, font, lines }));
       expect(c.meshCalls.length).toBeGreaterThanOrEqual(2);
     });
@@ -502,7 +643,7 @@ describe("vectorTextBuilder", () => {
     it("90° rotation changes text direction", () => {
       const c0 = new MockCollector();
       const c90 = new MockCollector();
-      const lines: MTextLine[] = [{ text: "ABC" }];
+      const lines: MTextLine[] = [line("ABC")];
       addMTextToCollector(mp({ collector: c0 as any, font, lines, rotation: 0 }));
       addMTextToCollector(mp({ collector: c90 as any, font, lines, rotation: Math.PI / 2 }));
       const b0 = c0.getBounds();
@@ -513,7 +654,7 @@ describe("vectorTextBuilder", () => {
 
     it("multiline rotation positions lines perpendicular to text direction", () => {
       const c = new MockCollector();
-      const lines: MTextLine[] = [{ text: "A" }, { text: "B" }];
+      const lines: MTextLine[] = [line("A"), line("B")];
       addMTextToCollector(mp({ collector: c as any, font, lines, rotation: Math.PI / 2, attachmentPoint: 1 }));
       const b = c.getBounds();
       const w = b.xMax - b.xMin;
@@ -527,8 +668,8 @@ describe("vectorTextBuilder", () => {
       // With narrow column width, tab lines must NOT be wrapped — tabs define layout.
       const cTabs = new MockCollector();
       const cNoTabs = new MockCollector();
-      const linesWithTabs: MTextLine[] = [{ text: "AB\tCD\t\t" }, { text: "EF" }];
-      const linesNoTabs: MTextLine[] = [{ text: "AB CD" }, { text: "EF" }];
+      const linesWithTabs: MTextLine[] = [line("AB\tCD\t\t"), line("EF")];
+      const linesNoTabs: MTextLine[] = [line("AB CD"), line("EF")];
       addMTextToCollector(mp({ collector: cTabs as any, font, lines: linesWithTabs, width: 50, attachmentPoint: 1 }));
       addMTextToCollector(mp({ collector: cNoTabs as any, font, lines: linesNoTabs, width: 50, attachmentPoint: 1 }));
       // Both have 2 visual lines — tab lines are not split by word wrap
@@ -541,8 +682,8 @@ describe("vectorTextBuilder", () => {
       const cTab = new MockCollector();
       const cSpaces = new MockCollector();
       // Tab stop is font-proportional, so A\tB places B much further than "A  B"
-      addMTextToCollector(mp({ collector: cTab as any, font, lines: [{ text: "A\tB" }] }));
-      addMTextToCollector(mp({ collector: cSpaces as any, font, lines: [{ text: "A  B" }] }));
+      addMTextToCollector(mp({ collector: cTab as any, font, lines: [line("A\tB")] }));
+      addMTextToCollector(mp({ collector: cSpaces as any, font, lines: [line("A  B")] }));
       const bTab = cTab.getBounds();
       const bSpaces = cSpaces.getBounds();
       expect(bTab.xMax - bTab.xMin).toBeGreaterThan(bSpaces.xMax - bSpaces.xMin);
@@ -552,8 +693,8 @@ describe("vectorTextBuilder", () => {
       const cTabs = new MockCollector();
       const cNoTabs = new MockCollector();
       // Very wide column (1000 units) — trailing tabs stripped, same visual result
-      const linesWithTabs: MTextLine[] = [{ text: "AB\tCD\t" }, { text: "EF" }];
-      const linesNoTabs: MTextLine[] = [{ text: "AB\tCD" }, { text: "EF" }];
+      const linesWithTabs: MTextLine[] = [line("AB\tCD\t"), line("EF")];
+      const linesNoTabs: MTextLine[] = [line("AB\tCD"), line("EF")];
       addMTextToCollector(mp({ collector: cTabs as any, font, lines: linesWithTabs, width: 1000, attachmentPoint: 1 }));
       addMTextToCollector(mp({ collector: cNoTabs as any, font, lines: linesNoTabs, width: 1000, attachmentPoint: 1 }));
       const bTabs = cTabs.getBounds();
@@ -563,7 +704,7 @@ describe("vectorTextBuilder", () => {
 
     it("tabs without column width are expanded to spaces (no crash)", () => {
       const c = new MockCollector();
-      addMTextToCollector(mp({ collector: c as any, font, lines: [{ text: "X-00\tREFRIGERATOR\t\t" }] }));
+      addMTextToCollector(mp({ collector: c as any, font, lines: [line("X-00\tREFRIGERATOR\t\t")] }));
       expect(c.meshCalls.length).toBeGreaterThan(0);
     });
 
@@ -571,7 +712,7 @@ describe("vectorTextBuilder", () => {
       // Tab-containing lines skip word wrap regardless of width constraint
       const cNarrow = new MockCollector();
       const cWide = new MockCollector();
-      const lines: MTextLine[] = [{ text: "A\tB\t" }, { text: "X" }];
+      const lines: MTextLine[] = [line("A\tB\t"), line("X")];
       addMTextToCollector(mp({ collector: cNarrow as any, font, lines: [...lines], width: 81, attachmentPoint: 1 }));
       addMTextToCollector(mp({ collector: cWide as any, font, lines: [...lines], width: 1000, attachmentPoint: 1 }));
       const bNarrow = cNarrow.getBounds();
@@ -614,6 +755,32 @@ describe("vectorTextBuilder", () => {
       addDimensionTextToCollector(dp({ collector: c1 as any, font, rawText: "\\fArial;25.40" }));
       addDimensionTextToCollector(dp({ collector: c2 as any, font }));
       expect(c1.totalVertices).toBe(c2.totalVertices);
+    });
+
+    it("widthFactor=0.8 makes dim text ~20% narrower (height unchanged)", () => {
+      // Wired through DIMSTYLE.DIMTXSTY → STYLE.widthFactor (DXF code 41).
+      // Horizontal advance scales by widthFactor; cap height stays the same.
+      const baseline = new MockCollector();
+      const narrow = new MockCollector();
+      addDimensionTextToCollector(dp({ collector: baseline as any, font, hAlign: "left" }));
+      addDimensionTextToCollector(dp({ collector: narrow as any, font, hAlign: "left", widthFactor: 0.8 }));
+
+      const bb = baseline.getBounds();
+      const bn = narrow.getBounds();
+      const widthBase = bb.xMax - bb.xMin;
+      const widthNarrow = bn.xMax - bn.xMin;
+      expect(widthNarrow).toBeCloseTo(widthBase * 0.8, 0);
+
+      // Vertical extent unchanged (widthFactor is horizontal-only)
+      const heightBase = bb.yMax - bb.yMin;
+      const heightNarrow = bn.yMax - bn.yMin;
+      expect(heightNarrow).toBeCloseTo(heightBase, 1);
+    });
+
+    it("measureDimensionTextWidth scales by widthFactor", () => {
+      const wBase = measureDimensionTextWidth(font, "25.40", 10);
+      const wNarrow = measureDimensionTextWidth(font, "25.40", 10, 0.8);
+      expect(wNarrow).toBeCloseTo(wBase * 0.8, 1);
     });
   });
 

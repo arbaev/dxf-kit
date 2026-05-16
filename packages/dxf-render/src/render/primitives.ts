@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { Font } from "opentype.js";
-import type { DxfLayer, DxfLineType, DxfStyle, DxfDimStyle } from "@/types/dxf";
+import type { DxfLayer, DxfLineType, DxfStyle, DxfDimStyle, DxfMLeaderStyle } from "@/types/dxf";
 import { MaterialCacheStore } from "./materialCache";
 import { isThemeAdaptiveColor } from "@/utils/colorResolver";
 import { applyLinetypePattern, type PatternGeometry } from "@/utils/linetypeResolver";
@@ -8,7 +8,6 @@ import {
   EPSILON,
   CIRCLE_SEGMENTS,
   MIN_ARC_SEGMENTS,
-  ARROW_BASE_WIDTH_DIVISOR,
   DEGREES_TO_RADIANS_DIVISOR,
   POINT_MARKER_SIZE,
   LINETYPE_DOT_SIZE,
@@ -42,6 +41,14 @@ export interface DimensionContext {
   dimVars: import("./dimensions").DimVars;
   dimStyles?: Record<string, DxfDimStyle>;
   headerDimlunit?: number;
+  headerDimdec?: number;
+  headerDimadec?: number;
+  headerDimzin?: number;
+  headerDimtad?: number;
+  headerDimtih?: number;
+  headerDimtoh?: number;
+  headerDimgap?: number;
+  headerDimtmove?: number;
   blockHandleToName?: Map<string, string>;
 }
 
@@ -57,8 +64,18 @@ export interface RenderContext extends ColorContext, LinetypeContext {
   pointDisplaySize?: number; // Computed PDSIZE in drawing units
   dimVars?: import("./dimensions").DimVars; // Resolved dimension variables
   dimStyles?: Record<string, DxfDimStyle>; // DIMSTYLE table for dimension formatting
+  mLeaderStyles?: Record<string, DxfMLeaderStyle>; // MLEADERSTYLE objects keyed by handle (uppercase)
   headerDimlunit?: number; // $DIMLUNIT from header (fallback for dimension formatting)
+  headerDimdec?: number; // $DIMDEC from header (fallback for decimal places / architectural fraction precision)
+  headerDimadec?: number; // $DIMADEC from header (fallback for angular dimension decimal places)
+  headerDimzin?: number; // $DIMZIN from header (fallback for zero-suppression flags)
+  headerDimtad?: number; // $DIMTAD from header (text vertical position relative to dim line)
+  headerDimtih?: number; // $DIMTIH from header (text inside arc/dim — aligned or horizontal)
+  headerDimtoh?: number; // $DIMTOH from header (text outside arc/dim — aligned or horizontal)
+  headerDimgap?: number; // $DIMGAP from header (gap between dim line and text, break-radius around text)
+  headerDimtmove?: number; // $DIMTMOVE from header (text movement strategy when user moves text)
   blockHandleToName?: Map<string, string>; // BLOCK_RECORD handle → name (for DIMBLK resolution)
+  styleHandleToName?: Map<string, string>; // STYLE handle → name (for DIMTXSTY resolution)
   xlineClipSize?: number; // Half-length for clipping XLINE/RAY to drawing extents
   originOffset?: { x: number; y: number; z: number }; // Subtracted from coords for Float32 precision
 }
@@ -247,79 +264,6 @@ export const createBulgeArc = (
   }
 
   return points;
-};
-
-/**
- * Create an arrow (triangle) for dimension lines.
- * Direction is computed as normalized vector from `from` to `tip`.
- */
-export const createArrow = (
-  from: THREE.Vector3,
-  tip: THREE.Vector3,
-  size: number,
-  material: THREE.Material,
-): THREE.Mesh => {
-  const dx = tip.x - from.x;
-  const dy = tip.y - from.y;
-  const len = Math.sqrt(dx * dx + dy * dy);
-  const dirX = len > EPSILON ? dx / len : 1;
-  const dirY = len > EPSILON ? dy / len : 0;
-
-  const width = size / ARROW_BASE_WIDTH_DIVISOR;
-
-  const perpX = dirY;
-  const perpY = -dirX;
-
-  const base1 = new THREE.Vector3(
-    tip.x - dirX * size + perpX * width,
-    tip.y - dirY * size + perpY * width,
-    tip.z,
-  );
-
-  const base2 = new THREE.Vector3(
-    tip.x - dirX * size - perpX * width,
-    tip.y - dirY * size - perpY * width,
-    tip.z,
-  );
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(
-      [tip.x, tip.y, tip.z, base1.x, base1.y, base1.z, base2.x, base2.y, base2.z],
-      3,
-    ),
-  );
-  geometry.setIndex([0, 1, 2]);
-
-  return new THREE.Mesh(geometry, material);
-};
-
-/**
- * Create an architectural tick mark (oblique stroke at 45°) for dimension lines.
- * Models the _ArchTick block: a line from (-0.5,-0.5) to (0.5,0.5), scaled by `size` (DIMASZ)
- * and rotated by `dimAngle`.
- */
-export const createTick = (
-  point: THREE.Vector3,
-  size: number,
-  dimAngle: number,
-  material: THREE.LineBasicMaterial,
-): THREE.LineSegments => {
-  // _ArchTick block local endpoint: (0.5, 0.5) scaled by size
-  const half = size * 0.5;
-  // Rotate local endpoint by dimAngle
-  const cosA = Math.cos(dimAngle);
-  const sinA = Math.sin(dimAngle);
-  const dx = half * cosA - half * sinA;
-  const dy = half * sinA + half * cosA;
-  const verts = new Float32Array([
-    point.x - dx, point.y - dy, point.z,
-    point.x + dx, point.y + dy, point.z,
-  ]);
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(verts, 3));
-  return new THREE.LineSegments(geometry, material);
 };
 
 export const setLayerName = (obj: THREE.Object3D | THREE.Object3D[], layerName: string) => {

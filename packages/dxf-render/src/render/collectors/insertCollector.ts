@@ -13,7 +13,7 @@ import {
   instantiateBlockTemplate,
   addSharedBlockInstance,
 } from "../blockTemplateCache";
-import { resolveEntityFont } from "../text/fontClassifier";
+import { resolveEntityFont, resolveStyleFlags } from "../text/fontClassifier";
 import { replaceSpecialChars } from "../text/mtextParser";
 import {
   addTextToCollector,
@@ -72,21 +72,30 @@ function renderAttribs(
   colorCtx: RenderContext,
   collector: GeometryCollector,
   insertLayer: string,
+  insertColor: string,
 ): void {
   for (const attrib of attribs) {
     if (attrib.invisible) continue;
     const text = attrib.text;
     if (!text) continue;
 
-    const attribColor = resolveEntityColor(attrib, colorCtx.layers, colorCtx.blockColor);
+    // Pass insertColor as blockColor: it lets ByBlock (colorIndex=0) and
+    // layer "0" (ByLayer) both resolve to the parent INSERT's effective color.
+    const attribColor = resolveEntityColor(attrib, colorCtx.layers, insertColor);
     const textHeight = attrib.textHeight || colorCtx.defaultTextHeight;
+    const hAlign = attrib.horizontalJustification ?? HAlign.LEFT;
+    const isFitOrAligned = hAlign === HAlign.FIT || hAlign === HAlign.ALIGNED;
 
     const hasJustification =
       (attrib.horizontalJustification && attrib.horizontalJustification > 0) ||
       (attrib.verticalJustification && attrib.verticalJustification > 0);
-    const posCoord = hasJustification && attrib.endPoint
-      ? attrib.endPoint
-      : attrib.startPoint;
+    // FIT/ALIGNED use startPoint as origin and endPoint as the second alignment
+    // point; other justified modes anchor at endPoint (DXF spec).
+    const posCoord = isFitOrAligned
+      ? attrib.startPoint
+      : hasJustification && attrib.endPoint
+        ? attrib.endPoint
+        : attrib.startPoint;
     if (!posCoord) continue;
 
     const attribMatrix = buildOcsMatrix(attrib.extrusionDirection);
@@ -95,16 +104,31 @@ function renderAttribs(
       attribMatrix,
     );
 
+    let endX: number | undefined;
+    let endY: number | undefined;
+    if (isFitOrAligned && attrib.endPoint) {
+      const ep = transformOcsPoint(
+        new THREE.Vector3(attrib.endPoint.x, attrib.endPoint.y, attrib.endPoint.z || 0),
+        attribMatrix,
+      );
+      endX = ep.x;
+      endY = ep.y;
+    }
+
     const rotation = attrib.rotation ? degreesToRadians(attrib.rotation) : 0;
     const attribFont = resolveEntityFont(attrib.textStyle, colorCtx.styles, colorCtx.serifFont, colorCtx.font!);
+    const attribStyleFlags = resolveStyleFlags(attrib.textStyle, colorCtx.styles);
     addTextToCollector({
       collector, layer: insertLayer, color: attribColor, font: attribFont,
       text: replaceSpecialChars(text), height: textHeight,
       posX: attribPos.x, posY: attribPos.y, posZ: attribPos.z, rotation,
-      hAlign: attrib.horizontalJustification ?? HAlign.LEFT,
+      hAlign,
       vAlign: attrib.verticalJustification ?? VAlign.BASELINE,
-      widthFactor: attrib.scale,
+      widthFactor: attrib.scale ?? attribStyleFlags.widthFactor,
+      endPosX: endX, endPosY: endY,
       obliqueAngle: attrib.obliqueAngle,
+      bold: attribStyleFlags.bold,
+      italic: attribStyleFlags.italic,
     });
   }
 }
@@ -132,6 +156,66 @@ function addFallbackObjects(
     obj.userData.layerName = entityLayer;
     fallbackGroup.add(obj);
   }
+}
+
+// ─── DIMENSION dispatch (pre-rendered block vs DIMSTYLE) ──────────────
+
+/**
+ * Render a DIMENSION entity. If the entity has a non-empty pre-rendered
+ * associated block (`entity.block`, the WYSIWYG geometry stashed by
+ * AutoCAD / Revit / Civil3D into `*D###` / `DIMBLOCKn-…`), materialise that
+ * block as a synthetic identity-transform INSERT and recurse through
+ * `collectInsertEntity` — the caller's `worldMatrix` propagates intact, so
+ * dim's that live inside an outer scaled / rotated block still land correctly.
+ *
+ * Falls back to `collectDimensionEntity` (the DIMSTYLE-synthesizing path) when
+ * the dim has no block or the block is empty (typical for QCAD / DXF files
+ * that omit the rendered geometry).
+ *
+ * Shared by the top-level dispatch in `createDXFScene.ts` and both paths
+ * (template / slow) inside `collectInsertEntity` for nested DIMENSIONs.
+ */
+export async function processDimensionEntity(
+  entity: DxfEntity,
+  dxf: DxfData,
+  colorCtx: RenderContext,
+  collector: GeometryCollector,
+  entityLayer: string,
+  worldMatrix: THREE.Matrix4 | null,
+  fallbackGroup: THREE.Group,
+  depth: number,
+  yieldState: YieldState,
+  blockTemplates: Map<string, BlockTemplate> | undefined,
+  sharedBlockGeos: Map<string, SharedBlockGeo> | undefined,
+  collectEntityFn: CollectEntityFn,
+  processEntityFn?: ProcessEntityFn,
+): Promise<void> {
+  if (!isDimensionEntity(entity)) return;
+  const dimBlock = entity.block && dxf.blocks ? dxf.blocks[entity.block] : undefined;
+  if (dimBlock?.entities?.length) {
+    const syntheticInsert = {
+      type: "INSERT",
+      name: entity.block!,
+      position: { x: 0, y: 0, z: 0 },
+      xScale: 1,
+      yScale: 1,
+      zScale: 1,
+      rotation: 0,
+      columnCount: 1,
+      rowCount: 1,
+      layer: entity.layer,
+      colorIndex: entity.colorIndex,
+      color: entity.color,
+      handle: entity.handle,
+    } as DxfEntity;
+    await collectInsertEntity(
+      syntheticInsert, dxf, colorCtx, collector, entityLayer, worldMatrix,
+      fallbackGroup, depth, yieldState, blockTemplates, sharedBlockGeos,
+      collectEntityFn, processEntityFn,
+    );
+    return;
+  }
+  collectDimensionEntity(entity, dxf, colorCtx, collector, entityLayer, worldMatrix ?? undefined);
 }
 
 // ─── Main INSERT collector ────────────────────────────────────────────
@@ -252,7 +336,11 @@ export async function collectInsertEntity(
           continue;
         }
         if (entity.type === "DIMENSION" && isDimensionEntity(entity)) {
-          collectDimensionEntity(entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix);
+          await processDimensionEntity(
+            entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix,
+            fallbackGroup, depth + 1, yieldState, blockTemplates, sharedBlockGeos,
+            collectEntityFn, processEntityFn,
+          );
           continue;
         }
         if (entity.type === "LEADER" || entity.type === "MULTILEADER" || entity.type === "MLEADER") {
@@ -272,7 +360,7 @@ export async function collectInsertEntity(
 
     // Handle ATTRIBs for template path (only for first array instance)
     if (row === 0 && col === 0 && insertEntity.attribs && insertEntity.attribs.length > 0) {
-      renderAttribs(insertEntity.attribs, colorCtx, collector, insertLayer);
+      renderAttribs(insertEntity.attribs, colorCtx, collector, insertLayer, insertColor);
     }
 
     continue;
@@ -304,7 +392,11 @@ export async function collectInsertEntity(
         continue;
       }
       if (entity.type === "DIMENSION" && isDimensionEntity(entity)) {
-        collectDimensionEntity(entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix);
+        await processDimensionEntity(
+          entity, dxf, blockColorCtx, collector, entityLayer, worldMatrix,
+          fallbackGroup, depth + 1, yieldState, blockTemplates, sharedBlockGeos,
+          collectEntityFn, processEntityFn,
+        );
         continue;
       }
       if (entity.type === "LEADER" || entity.type === "MULTILEADER" || entity.type === "MLEADER") {
@@ -330,7 +422,7 @@ export async function collectInsertEntity(
 
   // Handle ATTRIB entities (only for first array instance)
   if (row === 0 && col === 0 && insertEntity.attribs && insertEntity.attribs.length > 0) {
-    renderAttribs(insertEntity.attribs, colorCtx, collector, insertLayer);
+    renderAttribs(insertEntity.attribs, colorCtx, collector, insertLayer, insertColor);
   }
 
   } // for col

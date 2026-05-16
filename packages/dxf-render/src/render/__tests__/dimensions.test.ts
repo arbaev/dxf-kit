@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import * as THREE from "three";
 import {
   formatDimNumber,
   formatArchitectural,
@@ -10,6 +11,8 @@ import {
   resolveDimVarsFromHeader,
   applyDimStyleVars,
   mergeEntityDimVars,
+  createLinearDimensionLines,
+  createRotatedDimensionLines,
   DEFAULT_DIM_VARS,
 } from "../dimensions";
 import type { DxfDimensionEntity, DxfDimStyle } from "@/types/dxf";
@@ -58,6 +61,250 @@ describe("formatDimNumber", () => {
 
   it("rounds very small values beyond 4 decimal places to zero", () => {
     expect(formatDimNumber(0.00001)).toBe("0");
+  });
+
+  // ─── DIMDEC / DIMZIN ───────────────────────────────────────────────
+
+  it("honors explicit DIMDEC for decimal places", () => {
+    // 60.49747752399162 with DIMDEC=2 rounds to "60.50" then strips trailing → "60.5"
+    expect(formatDimNumber(60.49747752399162, 2)).toBe("60.5");
+    expect(formatDimNumber(60.49747752399162, 0)).toBe("60");
+    expect(formatDimNumber(60.49747752399162, 6)).toBe("60.497478");
+  });
+
+  it("keeps trailing zeros when DIMZIN bit 8 is unset", () => {
+    // DIMZIN=0 → include trailing zeros in decimal mode
+    expect(formatDimNumber(60.5, 2, 0)).toBe("60.50");
+    expect(formatDimNumber(60.0, 2, 0)).toBe("60.00");
+  });
+
+  it("strips trailing zeros when DIMZIN bit 8 is set", () => {
+    expect(formatDimNumber(60.5, 2, 8)).toBe("60.5");
+    expect(formatDimNumber(60.0, 2, 8)).toBe("60");
+  });
+
+  it("strips leading zero when DIMZIN bit 4 is set", () => {
+    // 0.50 with DIMZIN bit 4 → ".50"; with bit 4 | bit 8 (=12) → ".5"
+    expect(formatDimNumber(0.5, 2, 4)).toBe(".50");
+    expect(formatDimNumber(0.5, 2, 12)).toBe(".5");
+    // Negative numbers keep their sign before the dot
+    expect(formatDimNumber(-0.5, 2, 12)).toBe("-.5");
+  });
+});
+
+// =====================================================================
+// extractDimensionData — DIMDEC/DIMZIN integration
+// =====================================================================
+
+describe("extractDimensionData — formatting", () => {
+  const baseEntity = {
+    type: "DIMENSION" as const,
+    dimensionType: 0,
+    actualMeasurement: 60.49747752399162,
+    anchorPoint: { x: 0, y: 0, z: 0 },
+    middleOfText: { x: 0, y: 5, z: 0 },
+    linearOrAngularPoint1: { x: -5, y: 10, z: 0 },
+    linearOrAngularPoint2: { x: -5, y: 0, z: 0 },
+    angle: 90,
+  };
+
+  it("honors DIMDEC=2 + DIMZIN=8 for decimal dimensions (60.4974... → 60.5)", () => {
+    const data = extractDimensionData(baseEntity as any, undefined, { dimlunit: 2, dimdec: 2, dimzin: 8 });
+    expect(data?.dimensionText).toBe("60.5");
+  });
+
+  it("keeps trailing zeros with DIMZIN=0 (60.4974... → 60.50)", () => {
+    const data = extractDimensionData(baseEntity as any, undefined, { dimlunit: 2, dimdec: 2, dimzin: 0 });
+    expect(data?.dimensionText).toBe("60.50");
+  });
+
+  it("falls back to 4 decimals when DIMDEC is not provided", () => {
+    const data = extractDimensionData(baseEntity as any, undefined, undefined);
+    expect(data?.dimensionText).toBe("60.4975");
+  });
+});
+
+// =====================================================================
+// createLinearDimensionLines / createRotatedDimensionLines — outside arrows
+// =====================================================================
+
+describe("dimension lines — outside-arrow auto-flip", () => {
+  // Read the tip of an arrow Mesh (first 3 floats of position buffer).
+  const arrowTip = (obj: THREE.Object3D): [number, number] => {
+    const mesh = obj as THREE.Mesh;
+    const pos = (mesh.geometry as THREE.BufferGeometry).getAttribute("position");
+    const arr = pos.array as Float32Array;
+    return [arr[0], arr[1]];
+  };
+
+  // Read the two endpoints of a Line.
+  const lineEnds = (obj: THREE.Object3D): { x: number[]; y: number[] } => {
+    const line = obj as THREE.Line;
+    const pos = (line.geometry as THREE.BufferGeometry).getAttribute("position");
+    const arr = pos.array as Float32Array;
+    return { x: [arr[0], arr[3]], y: [arr[1], arr[4]] };
+  };
+
+  const lineMat = new THREE.LineBasicMaterial();
+  const extMat = new THREE.LineDashedMaterial();
+  const arrowMat = new THREE.MeshBasicMaterial();
+  const dv = { ...DEFAULT_DIM_VARS, arrowSize: 2 };
+  const baseParams = {
+    dimLineMaterial: lineMat,
+    extensionLineMaterial: extMat,
+    arrowMaterial: arrowMat,
+    dv,
+  };
+
+  it("keeps arrows inward when dim length is well above the threshold", () => {
+    // 10 > 2.5 * 2 = 5 → no flip
+    const objs = createLinearDimensionLines({
+      ...baseParams,
+      point1: { x: 0, y: 0 },
+      point2: { x: 10, y: 0 },
+      anchorPoint: { x: 5, y: 0 },
+      isHorizontal: true,
+    });
+    const arrows = objs.filter((o) => o instanceof THREE.Mesh) as THREE.Mesh[];
+    expect(arrows).toHaveLength(2);
+    // Arrow tips at min/max (0 and 10), the original (inside) layout
+    const tipXs = arrows.map((a) => arrowTip(a)[0]).sort((a, b) => a - b);
+    expect(tipXs[0]).toBeCloseTo(0, 5);
+    expect(tipXs[1]).toBeCloseTo(10, 5);
+    // Dim line stays between min/max
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    const dimLine = lines[0];
+    const { x } = lineEnds(dimLine);
+    expect(Math.min(...x)).toBeCloseTo(0, 5);
+    expect(Math.max(...x)).toBeCloseTo(10, 5);
+  });
+
+  it("flips arrows outward when dim length is below 2.5 × arrowSize", () => {
+    // 4 < 2.5 * 2 = 5 → flip; dim line extended by arrowSize + tail (= 2 + 2 = 4) per side
+    const objs = createLinearDimensionLines({
+      ...baseParams,
+      point1: { x: 0, y: 0 },
+      point2: { x: 4, y: 0 },
+      anchorPoint: { x: 2, y: 0 },
+      isHorizontal: true,
+    });
+    const arrows = objs.filter((o) => o instanceof THREE.Mesh) as THREE.Mesh[];
+    expect(arrows).toHaveLength(2);
+    // Tips still at measurement endpoints (0 and 4); the difference is direction.
+    const tipXs = arrows.map((a) => arrowTip(a)[0]).sort((a, b) => a - b);
+    expect(tipXs[0]).toBeCloseTo(0, 5);
+    expect(tipXs[1]).toBeCloseTo(4, 5);
+    // Dim line extends from -4 to 8 (arrowSize + tail on each side)
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    const dimLine = lines[0];
+    const { x } = lineEnds(dimLine);
+    expect(Math.min(...x)).toBeCloseTo(-4, 5);
+    expect(Math.max(...x)).toBeCloseTo(8, 5);
+  });
+
+  it("flips arrows for a vertical rotated dimension below the threshold", () => {
+    // Vertical dim, length 4 < 5 → flip
+    const objs = createRotatedDimensionLines({
+      ...baseParams,
+      point1: { x: -5, y: 0 },
+      point2: { x: -5, y: 4 },
+      anchorPoint: { x: 0, y: 2 },
+      angleRad: Math.PI / 2,
+    });
+    const arrows = objs.filter((o) => o instanceof THREE.Mesh) as THREE.Mesh[];
+    expect(arrows).toHaveLength(2);
+    // Tips at y=0 and y=4 (the foot points along the vertical dim line at x=0)
+    const tipYs = arrows.map((a) => arrowTip(a)[1]).sort((a, b) => a - b);
+    expect(tipYs[0]).toBeCloseTo(0, 5);
+    expect(tipYs[1]).toBeCloseTo(4, 5);
+    // Dim line extends from y=-4 to y=8 (arrowSize=2 + tail=2 per side)
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    // Find the dim line (the one along x=0; extension lines are perpendicular)
+    const dimLine = lines.find((l) => {
+      const { x } = lineEnds(l);
+      return Math.abs(x[0]) < 0.1 && Math.abs(x[1]) < 0.1;
+    });
+    expect(dimLine).toBeDefined();
+    const { y } = lineEnds(dimLine!);
+    expect(Math.min(...y)).toBeCloseTo(-4, 5);
+    expect(Math.max(...y)).toBeCloseTo(8, 5);
+  });
+
+  it("flips arrows at the boundary case (just below the threshold)", () => {
+    // 4.99 < 5 → flip
+    const objs = createLinearDimensionLines({
+      ...baseParams,
+      point1: { x: 0, y: 0 },
+      point2: { x: 4.99, y: 0 },
+      anchorPoint: { x: 2.5, y: 0 },
+      isHorizontal: true,
+    });
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    const { x } = lineEnds(lines[0]);
+    // Extended by arrowSize + tail = 4 on each side
+    expect(Math.min(...x)).toBeCloseTo(-4, 5);
+    expect(Math.max(...x)).toBeCloseTo(8.99, 5);
+  });
+
+  it("dim line extends past the arrow base by tail = arrowSize", () => {
+    // arrowSize=2 → arrow base sits at min-2 / max+2; dim line ends at min-4 / max+4.
+    // The tail is the segment between base and dim-line end (length = arrowSize).
+    const objs = createLinearDimensionLines({
+      ...baseParams,
+      point1: { x: 0, y: 0 },
+      point2: { x: 4, y: 0 },
+      anchorPoint: { x: 2, y: 0 },
+      isHorizontal: true,
+    });
+    const arrows = objs.filter((o) => o instanceof THREE.Mesh) as THREE.Mesh[];
+    // Read each arrow's two base vertices (positions 1 and 2 in the buffer)
+    const baseXs: number[] = [];
+    for (const m of arrows) {
+      const arr = (m.geometry as THREE.BufferGeometry).getAttribute("position").array as Float32Array;
+      // arrow has 3 vertices: tip (0..2), base1 (3..5), base2 (6..8). Both base xs are equal.
+      baseXs.push(arr[3]);
+    }
+    baseXs.sort((a, b) => a - b);
+    expect(baseXs[0]).toBeCloseTo(-2, 5); // min - arrowSize
+    expect(baseXs[1]).toBeCloseTo(6, 5); // max + arrowSize
+
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    const { x } = lineEnds(lines[0]);
+    // Tail of length arrowSize=2 past each base: min-4 .. max+4
+    expect(Math.min(...x) - baseXs[0]).toBeCloseTo(-2, 5);
+    expect(Math.max(...x) - baseXs[1]).toBeCloseTo(2, 5);
+  });
+
+  it("does not flip when ticks are enabled (ticks do not collide)", () => {
+    const objs = createLinearDimensionLines({
+      ...baseParams,
+      point1: { x: 0, y: 0 },
+      point2: { x: 4, y: 0 },
+      anchorPoint: { x: 2, y: 0 },
+      isHorizontal: true,
+      dv: { ...dv, arrowKind: "tick" as const, tickSize: 2 },
+    });
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    // Dim line stays between min/max (no extension)
+    const { x } = lineEnds(lines[0]);
+    expect(Math.min(...x)).toBeCloseTo(0, 5);
+    expect(Math.max(...x)).toBeCloseTo(4, 5);
+  });
+
+  it("does not flip when arrowKind=dot-small (symmetric, no collision)", () => {
+    const objs = createLinearDimensionLines({
+      ...baseParams,
+      point1: { x: 0, y: 0 },
+      point2: { x: 4, y: 0 },
+      anchorPoint: { x: 2, y: 0 },
+      isHorizontal: true,
+      dv: { ...dv, arrowKind: "dot-small" as const },
+    });
+    const lines = objs.filter((o) => o instanceof THREE.Line) as THREE.Line[];
+    // Dim line stays between min/max — dots sit at the endpoints, no flip
+    const { x } = lineEnds(lines[0]);
+    expect(Math.min(...x)).toBeCloseTo(0, 5);
+    expect(Math.max(...x)).toBeCloseTo(4, 5);
   });
 });
 
@@ -391,28 +638,52 @@ describe("resolveDimVarsFromHeader", () => {
     expect(dv.extLineGap).toBe(5);  // 1 * 5
   });
 
-  it("sets useTicks=true when $DIMTSZ > 0", () => {
+  it("sets arrowKind=tick when $DIMTSZ > 0", () => {
     const dv = resolveDimVarsFromHeader({ "$DIMTSZ": 2.5 });
-    expect(dv.useTicks).toBe(true);
+    expect(dv.arrowKind).toBe("tick");
     expect(dv.tickSize).toBe(2.5);
   });
 
-  it("sets useTicks=false when $DIMTSZ is 0", () => {
+  it("defaults arrowKind to closed-filled when $DIMTSZ is 0", () => {
     const dv = resolveDimVarsFromHeader({ "$DIMTSZ": 0 });
-    expect(dv.useTicks).toBe(false);
+    expect(dv.arrowKind).toBe("closed-filled");
     expect(dv.tickSize).toBe(0);
   });
 
-  it("sets useTicks=false when $DIMTSZ is absent", () => {
+  it("defaults arrowKind to closed-filled when $DIMTSZ is absent", () => {
     const dv = resolveDimVarsFromHeader({});
-    expect(dv.useTicks).toBe(false);
+    expect(dv.arrowKind).toBe("closed-filled");
     expect(dv.tickSize).toBe(0);
   });
 
   it("scales $DIMTSZ by $DIMSCALE", () => {
     const dv = resolveDimVarsFromHeader({ "$DIMTSZ": 1.5, "$DIMSCALE": 4 });
-    expect(dv.useTicks).toBe(true);
+    expect(dv.arrowKind).toBe("tick");
     expect(dv.tickSize).toBe(6);
+  });
+
+  it("resolves $DIMBLK=_DotSmall to arrowKind=dot-small", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMBLK": "_DotSmall" });
+    expect(dv.arrowKind).toBe("dot-small");
+    expect(dv.tickSize).toBe(0);
+  });
+
+  it("resolves $DIMBLK=_ArchTick to arrowKind=tick", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMBLK": "_ArchTick" });
+    expect(dv.arrowKind).toBe("tick");
+    // No explicit DIMTSZ → tick size follows arrowSize
+    expect(dv.tickSize).toBe(dv.arrowSize);
+  });
+
+  it("$DIMTSZ > 0 wins over $DIMBLK", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMTSZ": 2, "$DIMBLK": "_DotSmall" });
+    expect(dv.arrowKind).toBe("tick");
+    expect(dv.tickSize).toBe(2);
+  });
+
+  it("falls back to closed-filled for unknown $DIMBLK", () => {
+    const dv = resolveDimVarsFromHeader({ "$DIMBLK": "MyCustomArrow" });
+    expect(dv.arrowKind).toBe("closed-filled");
   });
 });
 
@@ -652,6 +923,49 @@ describe("formatArchitectural", () => {
   it("handles negative fractional value", () => {
     expect(formatArchitectural(-6.5)).toBe("-6\\S1/2;\"");
   });
+
+  // DIMDEC overrides — fraction denominator = 2^DIMDEC
+  it("uses 1/8\" precision when DIMDEC=3 (AEC AutoCAD default)", () => {
+    // 73.33503 → 6'-1.33503"; with denom=8 → 0.33503*8=2.68 → round to 3 → 3/8
+    expect(formatArchitectural(73.33503010082154, undefined, 3)).toBe("6'-1\\S3/8;\"");
+  });
+
+  it("uses 1/16\" precision when DIMDEC=4 (default)", () => {
+    // Same value with denom=16 → 0.33503*16=5.36 → round to 5 → 5/16
+    expect(formatArchitectural(73.33503010082154, undefined, 4)).toBe("6'-1\\S5/16;\"");
+  });
+
+  it("uses 1/4\" precision when DIMDEC=2", () => {
+    // 9.3 → fracPart=0.3; denom=4 → 0.3*4=1.2 → round to 1 → 1/4
+    expect(formatArchitectural(9.3, undefined, 2)).toBe("9\\S1/4;\"");
+  });
+
+  it("uses 1/2\" precision when DIMDEC=1", () => {
+    // 9.3 → fracPart=0.3; denom=2 → 0.3*2=0.6 → round to 1 → 1/2
+    expect(formatArchitectural(9.3, undefined, 1)).toBe("9\\S1/2;\"");
+  });
+
+  it("rounds to whole inches when DIMDEC=0", () => {
+    expect(formatArchitectural(9.3, undefined, 0)).toBe("9\"");
+    expect(formatArchitectural(9.7, undefined, 0)).toBe("10\"");
+    expect(formatArchitectural(11.7, undefined, 0)).toBe("1'");
+  });
+
+  it("uses 1/32\" precision when DIMDEC=5", () => {
+    // 6 + 1/32 = 6.03125
+    expect(formatArchitectural(6.03125, undefined, 5)).toBe("6\\S1/32;\"");
+  });
+
+  it("clamps absurdly large DIMDEC to safe upper bound", () => {
+    // DIMDEC=99 should not produce nonsense — clamped to 8 (1/256)
+    // 6 + 1/256 = 6.00390625, with denom=256 → fracPart*256=1 → 1/256
+    expect(formatArchitectural(6.00390625, undefined, 99)).toBe("6\\S1/256;\"");
+  });
+
+  it("falls back to 1/16\" when dimdec is undefined", () => {
+    // Identical to the no-dimdec case — backward compatibility check
+    expect(formatArchitectural(6.0625)).toBe(formatArchitectural(6.0625, undefined, 4));
+  });
 });
 
 // =====================================================================
@@ -707,6 +1021,20 @@ describe("extractDimensionData with DIMLUNIT=4", () => {
     const data = extractDimensionData(entity, DEFAULT_DIM_VARS, { dimlunit: 4 });
     expect(data).not.toBeNull();
     expect(data!.dimensionText).toBe("custom");
+  });
+
+  it("honors DIMDEC=3 → 1/8\" precision (AEC AutoCAD default)", () => {
+    // Regression: AEC Plan Elev Sample, handle D9B071D01A0BB051, actualMeasurement 73.33503010082154
+    // DIMSTYLE DIM96 has DIMDEC=3 → fraction denominator 2^3=8 → 3/8 (was 5/16 with hardcoded 16)
+    const entity = makeDimEntity({
+      linearOrAngularPoint1: { x: 0, y: 0, z: 0 },
+      linearOrAngularPoint2: { x: 0, y: 73.33503010082154, z: 0 },
+      anchorPoint: { x: 5, y: 0, z: 0 },
+      actualMeasurement: 73.33503010082154,
+    });
+    const data = extractDimensionData(entity, DEFAULT_DIM_VARS, { dimlunit: 4, dimdec: 3 });
+    expect(data).not.toBeNull();
+    expect(data!.dimensionText).toBe("6'-1\\S3/8;\"");
   });
 });
 

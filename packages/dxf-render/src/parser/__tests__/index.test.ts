@@ -13,6 +13,16 @@ describe("parseDxf", () => {
     expect(() => parseDxf("")).toThrow("Empty file");
   });
 
+  // ── 1b. Binary DXF → clear "not supported" error ─────────────────────
+
+  it("throws a clear error when input starts with the AutoCAD Binary DXF sentinel", () => {
+    // Real Binary DXF preamble: "AutoCAD Binary DXF\r\n\x1A\0" followed by binary tokens.
+    // We pass the prefix as-is — the scanner would otherwise read garbled token codes
+    // and fail with a cryptic mojibake message.
+    const binaryPrefix = "AutoCAD Binary DXF\r\n\x1A\0\x00\x00\x00SECTION\x00";
+    expect(() => parseDxf(binaryPrefix)).toThrow(/Binary DXF format is not supported/);
+  });
+
   // ── 2. Minimal valid DXF (EOF only) ──────────────────────────────────
 
   it("returns DxfData with empty entities for a minimal DXF containing only EOF", () => {
@@ -293,6 +303,89 @@ describe("parseDxf", () => {
 
       expect(result.entities).toHaveLength(1);
       expect(result.entities[0].type).toBe("LINE");
+    });
+  });
+
+  // ── 11. REGION ↔ HATCH boundary linking (post-parse step) ───────────
+
+  describe("links REGION to its HATCH boundary", () => {
+    it("attaches contourBoundary in ENTITIES section", () => {
+      const dxfText = buildDxf(
+        "0", "SECTION",
+        "2", "ENTITIES",
+        "0", "HATCH",
+        "5", "150",
+        "8", "Hatch",
+        "2", "ANSI31",
+        "70", "0",
+        "91", "1",
+        "92", "1",
+        "93", "1",
+        "72", "1",
+        "10", "0.0",
+        "20", "0.0",
+        "11", "10.0",
+        "21", "0.0",
+        "97", "1",
+        "330", "151",
+        "0", "REGION",
+        "5", "151",
+        "8", "Profil kontura",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const result = parseDxf(dxfText);
+      const region = result.entities.find((e) => e.type === "REGION");
+      expect(region).toBeDefined();
+      const r = region as { contourBoundary?: unknown[] };
+      expect(r.contourBoundary).toBeDefined();
+      expect(r.contourBoundary).toHaveLength(1);
+    });
+
+    it("attaches contourBoundary inside a BLOCK", () => {
+      const dxfText = buildDxf(
+        "0", "SECTION",
+        "2", "BLOCKS",
+        "0", "BLOCK",
+        "8", "0",
+        "2", "MyBlock",
+        "70", "0",
+        "10", "0.0",
+        "20", "0.0",
+        "3", "MyBlock",
+        "1", "",
+        "0", "HATCH",
+        "5", "250",
+        "8", "Hatch",
+        "2", "ANSI31",
+        "70", "0",
+        "91", "1",
+        "92", "1",
+        "93", "1",
+        "72", "1",
+        "10", "0.0",
+        "20", "0.0",
+        "11", "1.0",
+        "21", "0.0",
+        "97", "1",
+        "330", "251",
+        "0", "REGION",
+        "5", "251",
+        "8", "BlockRegion",
+        "0", "ENDBLK",
+        "5", "FF",
+        "0", "ENDSEC",
+        "0", "EOF",
+      );
+
+      const result = parseDxf(dxfText);
+      expect(result.blocks?.MyBlock).toBeDefined();
+      const blockEntities = result.blocks!.MyBlock.entities;
+      const region = blockEntities.find((e) => e.type === "REGION") as { contourBoundary?: unknown[] };
+      expect(region).toBeDefined();
+      expect(region.contourBoundary).toBeDefined();
+      expect(region.contourBoundary).toHaveLength(1);
     });
   });
 });

@@ -28,9 +28,9 @@ import {
   computePointDisplaySize,
   collectTextOrMText,
   collectAttdefEntity,
-  collectDimensionEntity,
   collectLeaderEntity,
   collectInsertEntity,
+  processDimensionEntity,
   type YieldState,
 } from "./collectors";
 
@@ -52,12 +52,14 @@ const COLLECTABLE_TYPES = new Set([
   "LINE", "CIRCLE", "ARC", "ELLIPSE",
   "LWPOLYLINE", "POLYLINE", "SPLINE",
   "POINT", "SOLID", "3DFACE", "HATCH",
-  "MLINE", "XLINE", "RAY",
+  "MLINE", "XLINE", "RAY", "REGION",
 ]);
 
-/** Recognized but non-renderable entity types — silently skipped */
+/** Recognized but non-renderable entity types — silently skipped.
+ *  REGION is here too: it goes through `collectEntity` first (drawn via a HATCH-borrowed
+ *  boundary when available); REGIONs without an associated HATCH fall back here. */
 const NON_RENDERABLE_TYPES = new Set([
-  "VIEWPORT", "IMAGE", "WIPEOUT", "3DSOLID",
+  "VIEWPORT", "IMAGE", "WIPEOUT", "3DSOLID", "REGION",
 ]);
 
 /** Yield control to the browser so the UI stays responsive */
@@ -168,9 +170,19 @@ export async function createThreeObjectsFromDXF(
     }
   }
 
-  // DIMSTYLE table and header $DIMLUNIT for architectural dimension formatting
+  // DIMSTYLE table and header $DIMLUNIT/$DIMDEC for architectural dimension formatting
   const dimStyles = dxf.tables?.dimStyle?.dimStyles;
+  // MLEADERSTYLE objects (from OBJECTS section, keyed by handle) for MULTILEADER color fallback
+  const mLeaderStyles = dxf.objects?.mLeaderStyles;
   const headerDimlunit = dxf.header?.$DIMLUNIT;
+  const headerDimdec = dxf.header?.$DIMDEC;
+  const headerDimadec = dxf.header?.$DIMADEC;
+  const headerDimzin = dxf.header?.$DIMZIN;
+  const headerDimtad = dxf.header?.$DIMTAD;
+  const headerDimtih = dxf.header?.$DIMTIH;
+  const headerDimtoh = dxf.header?.$DIMTOH;
+  const headerDimgap = dxf.header?.$DIMGAP;
+  const headerDimtmove = dxf.header?.$DIMTMOVE;
 
   // Build handle -> name map from BLOCK_RECORD for DIMBLK resolution
   let blockHandleToName: Map<string, string> | undefined;
@@ -179,6 +191,16 @@ export async function createThreeObjectsFromDXF(
     blockHandleToName = new Map();
     for (const rec of Object.values(blockRecords)) {
       if (rec.handle) blockHandleToName.set(rec.handle, rec.name);
+    }
+  }
+
+  // Build handle -> name map from STYLE for DIMTXSTY (DIMSTYLE code 340) resolution
+  let styleHandleToName: Map<string, string> | undefined;
+  const styleRecords = dxf.tables?.style?.styles;
+  if (styleRecords) {
+    styleHandleToName = new Map();
+    for (const rec of Object.values(styleRecords)) {
+      if (rec.handle) styleHandleToName.set(rec.handle.toUpperCase(), rec.name);
     }
   }
 
@@ -200,8 +222,18 @@ export async function createThreeObjectsFromDXF(
     defaultTextHeight,
     mirrText,
     dimStyles,
+    mLeaderStyles,
     headerDimlunit,
+    headerDimdec,
+    headerDimadec,
+    headerDimzin,
+    headerDimtad,
+    headerDimtih,
+    headerDimtoh,
+    headerDimgap,
+    headerDimtmove,
     blockHandleToName,
+    styleHandleToName,
   };
 
   // Compute clip size for XLINE/RAY from drawing extents
@@ -329,9 +361,15 @@ export async function createThreeObjectsFromDXF(
         continue;
       }
 
-      // Vector text: collect DIMENSION directly (lines decomposed, text via collector)
+      // Vector text: collect DIMENSION directly (lines decomposed, text via collector).
+      // Routes through the pre-rendered block path when entity.block is non-empty,
+      // falling back to the DIMSTYLE-synthesizing path otherwise.
       if (entity.type === "DIMENSION" && isDimensionEntity(entity)) {
-        collectDimensionEntity(entity, dxf, colorCtx, collector, layer);
+        await processDimensionEntity(
+          entity, dxf, colorCtx, collector, layer, null,
+          group, 0, yieldState, blockTemplates, sharedBlockGeos,
+          collectEntity, undefined,
+        );
         continue;
       }
 
@@ -366,6 +404,13 @@ export async function createThreeObjectsFromDXF(
   for (const obj of mergedObjects) {
     group.add(obj);
   }
+
+  // The renderer has sortObjects=false, so Three.js iterates children in array order.
+  // Sort children by renderOrder (stable in ES2019+) so fills draw first, then outlines,
+  // then text/arrow overlays — regardless of when each object joined the group during
+  // entity processing. Without this, INSERT block outlines added via the shared-geometry
+  // fast path end up hidden under HATCH meshes that arrive later from flush().
+  group.children.sort((a, b) => a.renderOrder - b.renderOrder);
 
   const totalIssues = errors.length + unsupportedTypes.length;
   if (totalIssues > 0) {

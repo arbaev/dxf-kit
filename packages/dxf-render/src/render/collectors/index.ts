@@ -12,6 +12,7 @@ import { collectFace } from "./faceCollector";
 import { collectHatch } from "./hatchCollector";
 import { collectMline } from "./mlineCollector";
 import { collectXline } from "./xlineCollector";
+import { collectRegion } from "./regionCollector";
 
 type EntityCollectorFn = (p: CollectEntityParams) => boolean;
 
@@ -31,6 +32,7 @@ const entityCollectors: Record<string, EntityCollectorFn> = {
   MLINE: collectMline,
   XLINE: collectXline,
   RAY: collectXline,
+  REGION: collectRegion,
 };
 
 /**
@@ -56,6 +58,7 @@ export { collectDimensionEntity } from "./dimensionCollector";
 export { collectLeaderEntity, catmullRomSpline } from "./leaderCollector";
 export {
   collectInsertEntity,
+  processDimensionEntity,
   MAX_RECURSION_DEPTH,
   type YieldState,
   type ProcessEntityFn,

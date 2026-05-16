@@ -46,6 +46,106 @@ const aciGraySentinel = (colorIndex: number): string | null => {
 };
 
 /**
+ * Map an ACI (AutoCAD Color Index, 1-255) to a color string.
+ * Indices 7/255 and 250/251 return theme-adaptive sentinels — the rest
+ * are converted directly to hex from the ACI palette. Use this anywhere
+ * an ACI index is the source of a color so the theme switch keeps working.
+ */
+export function aciToColor(colorIndex: number): string {
+  if (colorIndex === 7 || colorIndex === 255) return ACI7_COLOR;
+  const gray = aciGraySentinel(colorIndex);
+  if (gray) return gray;
+  return rgbNumberToHex(ACI_PALETTE[colorIndex]);
+}
+
+/**
+ * AcCmEntityColor color method (high byte of a 32-bit packed CmColor value).
+ * Used by MLEADER codes 90/91/93 and MLEADERSTYLE codes 91/93/94.
+ */
+export type CmColorMethod =
+  | "byLayer"     // 0xC0
+  | "byBlock"     // 0xC1
+  | "byColor"     // 0xC2 — RGB in low 24 bits
+  | "byACI"       // 0xC3 — ACI index in low byte
+  | "byPen"       // 0xC4
+  | "foreground"  // 0xC5
+  | "none"        // 0xC8
+  | "unknown";
+
+export interface DecodedCmColor {
+  method: CmColorMethod;
+  /** ACI index (1..255), only set when method === "byACI". */
+  aci?: number;
+  /** RGB packed as 0xRRGGBB, only set when method === "byColor". */
+  rgb?: number;
+}
+
+/**
+ * Decode a 32-bit AcCmEntityColor value. The high byte encodes the color
+ * method; the meaning of the low 24 bits depends on the method.
+ *
+ * Common source: MLEADER entity-level code 91 (LeaderLineColor), CONTEXT_DATA
+ * code 90 (TextColor), MLEADERSTYLE codes 91/93/94. Returns null for invalid
+ * inputs (non-finite numbers).
+ */
+export function decodeCmEntityColor(raw: number | undefined): DecodedCmColor | null {
+  if (raw === undefined || !Number.isFinite(raw)) return null;
+  const u = raw < 0 ? raw + 0x100000000 : raw;
+  const hi = (u >>> 24) & 0xFF;
+  switch (hi) {
+    case 0xC0: return { method: "byLayer" };
+    case 0xC1: return { method: "byBlock" };
+    case 0xC2: return { method: "byColor", rgb: u & 0xFFFFFF };
+    case 0xC3: return { method: "byACI", aci: u & 0xFF };
+    case 0xC4: return { method: "byPen" };
+    case 0xC5: return { method: "foreground" };
+    case 0xC8: return { method: "none" };
+    default:   return { method: "unknown" };
+  }
+}
+
+/** Convert a decoded CmEntityColor to a renderable color string, or null
+ *  if the method requires falling back to layer/block (byLayer, byBlock,
+ *  byPen, foreground, none, unknown). */
+function cmColorToRenderable(dec: DecodedCmColor | null): string | null {
+  if (!dec) return null;
+  if (dec.method === "byACI" && dec.aci !== undefined && dec.aci >= 1 && dec.aci <= 255) {
+    return aciToColor(dec.aci);
+  }
+  if (dec.method === "byColor" && dec.rgb !== undefined) {
+    return rgbNumberToHex(dec.rgb);
+  }
+  return null;
+}
+
+/**
+ * Resolve a MULTILEADER line or text color following AutoCAD precedence:
+ *   1. Entity-level CmEntityColor — when the matching PropertyOverrideFlag
+ *      bit is set (caller decides via `overrideActive`).
+ *   2. MLEADERSTYLE CmEntityColor — when entity override is absent.
+ *   3. Existing ByLayer/ByBlock resolution via resolveEntityColor.
+ *
+ * byLayer/byBlock methods in either CmEntityColor fall through to step 3 so
+ * the regular layer/block inheritance still applies.
+ */
+export function resolveMLeaderColor(
+  entityRaw: number | undefined,
+  overrideActive: boolean,
+  styleRaw: number | undefined,
+  entity: DxfEntity,
+  layers: Record<string, DxfLayer>,
+  blockColor?: string,
+): string {
+  if (overrideActive) {
+    const c = cmColorToRenderable(decodeCmEntityColor(entityRaw));
+    if (c) return c;
+  }
+  const c = cmColorToRenderable(decodeCmEntityColor(styleRaw));
+  if (c) return c;
+  return resolveEntityColor(entity, layers, blockColor);
+}
+
+/**
  * Resolve entity color following AutoCAD priority rules:
  * trueColor (code 420) > colorIndex (code 62) > layerColor
  *
@@ -71,37 +171,27 @@ export function resolveEntityColor(
     if (trueColor !== undefined) {
       return rgbNumberToHex(trueColor);
     }
-    // ACI 7 and 255 are white in palette, rendered as black on light / white on dark
-    if (colorIndex === 7 || colorIndex === 255) {
-      return ACI7_COLOR;
-    }
-    // Dark ACI grays: theme-adaptive sentinels
-    const graySentinel = aciGraySentinel(colorIndex);
-    if (graySentinel) return graySentinel;
-    return rgbNumberToHex(ACI_PALETTE[colorIndex]);
+    return aciToColor(colorIndex);
   }
 
   // ByLayer (colorIndex === 256, unset, or other)
   const layerName = entity.layer;
+
+  // Special case: an entity on layer "0" inside a BLOCK (or an ATTRIB attached
+  // to an INSERT) inherits its parent INSERT's effective color. AutoCAD treats
+  // layer "0" inside blocks as a sentinel for "use the inserter's color".
+  if ((!layerName || layerName === "0") && blockColor !== undefined) {
+    return blockColor;
+  }
+
   if (layerName && layers[layerName]) {
     const layer = layers[layerName];
     // layer.color is an ACI palette RGB value (from getAcadColor), not trueColor
     if (layer.color !== undefined && layer.color !== 0) {
-      const layerColorIndex = layer.colorIndex;
-      if (layerColorIndex === 7 || layerColorIndex === 255) {
-        return ACI7_COLOR;
-      }
-      const layerGraySentinel = aciGraySentinel(layerColorIndex);
-      if (layerGraySentinel) return layerGraySentinel;
-      return rgbNumberToHex(layer.color);
+      return aciToColor(layer.colorIndex);
     }
     if (layer.colorIndex >= 1 && layer.colorIndex <= 255) {
-      if (layer.colorIndex === 7 || layer.colorIndex === 255) {
-        return ACI7_COLOR;
-      }
-      const layerGraySentinel = aciGraySentinel(layer.colorIndex);
-      if (layerGraySentinel) return layerGraySentinel;
-      return rgbNumberToHex(ACI_PALETTE[layer.colorIndex]);
+      return aciToColor(layer.colorIndex);
     }
   }
 
