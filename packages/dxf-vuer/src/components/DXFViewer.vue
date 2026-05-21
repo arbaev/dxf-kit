@@ -34,7 +34,39 @@
       </div>
     </div>
 
-    <div v-if="hasDXFData" class="dxfk-overlay-grid">
+    <template v-if="hasDXFData && showRulers">
+      <Ruler
+        orientation="horizontal"
+        :camera="rulerCamera"
+        :controls="rulerControls"
+        :origin-offset="rulerOriginOffset"
+        :cursor-world="cursorWorld"
+        :is-cursor-visible="isCursorVisible"
+        :units-scale="rulerUnitsScale"
+        :dark-theme="darkTheme"
+        :class="classes?.rulerHorizontal"
+      />
+      <Ruler
+        orientation="vertical"
+        :camera="rulerCamera"
+        :controls="rulerControls"
+        :origin-offset="rulerOriginOffset"
+        :cursor-world="cursorWorld"
+        :is-cursor-visible="isCursorVisible"
+        :units-scale="rulerUnitsScale"
+        :dark-theme="darkTheme"
+        :class="classes?.rulerVertical"
+      />
+      <div
+        class="dxfk-ruler-corner"
+        :class="[{ 'dxfk-dark': darkTheme }, classes?.rulerCorner]"
+        aria-hidden="true"
+      >
+        {{ rulerUnitsLabel }}
+      </div>
+    </template>
+
+    <div v-if="hasDXFData" class="dxfk-overlay-grid" :class="{ 'dxfk-overlay-grid--with-rulers': showRulers }">
       <div
         v-for="pos in overlayPositions"
         :key="pos"
@@ -232,7 +264,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick, toRaw } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick, toRaw, markRaw } from "vue";
 import * as THREE from "three";
 import { useDXFRenderer } from "../composables/useDXFRenderer";
 import { useLayers } from "../composables/useLayers";
@@ -241,11 +273,12 @@ import { usePicking, type PickingEvent } from "../composables/usePicking";
 import { useHighlight } from "../composables/useHighlight";
 import { useKeyboardNavigation } from "../composables/useKeyboardNavigation";
 import type { DxfData, DxfLayer, PickingEntry, EntityAssociation } from "dxf-render";
-import { getZoomBox, getZoomBoxForLayer } from "dxf-render";
-import type { OverlayPosition, ViewerClasses } from "../types";
+import { getZoomBox, getZoomBoxForLayer, getUnitsToMmFactor } from "dxf-render";
+import type { OverlayPosition, ViewerClasses, RulerUnits } from "../types";
 import type { AntialiasingMode } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
 import ViewerToolbar from "./ViewerToolbar.vue";
+import Ruler from "./Ruler.vue";
 
 const overlayPositions: OverlayPosition[] = [
   "top-left", "top-center", "top-right",
@@ -283,6 +316,8 @@ interface Props {
   persistLayersKey?: string;
   keyboardNavigation?: boolean;
   classes?: ViewerClasses;
+  showRulers?: boolean;
+  rulerUnits?: RulerUnits;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -316,6 +351,8 @@ const props = withDefaults(defineProps<Props>(), {
   persistLayersKey: "",
   keyboardNavigation: true,
   classes: () => ({}),
+  showRulers: false,
+  rulerUnits: "mm",
 });
 
 interface Emits {
@@ -333,6 +370,14 @@ const emit = defineEmits<Emits>();
 
 const dxfContainer = ref<HTMLDivElement | null>(null);
 const isFullscreen = ref(false);
+
+// Refs used to feed live camera/controls into the Ruler component once Three.js
+// is initialised. Kept non-reactive on the inside via `markRaw`-friendly usage.
+const rulerCamera = ref<THREE.OrthographicCamera | null>(null);
+const rulerControls = ref<{
+  addEventListener: (type: string, listener: () => void) => void;
+  removeEventListener: (type: string, listener: () => void) => void;
+} | null>(null);
 
 const {
   isLoading,
@@ -480,7 +525,7 @@ const cursorY = ref(0);
 const isCursorVisible = ref(false);
 
 const handleMouseMove = (e: MouseEvent) => {
-  if (!props.showCoordinates) return;
+  if (!props.showCoordinates && !props.showRulers) return;
   const container = dxfContainer.value;
   const camera = getCamera();
   if (!container || !camera) return;
@@ -569,6 +614,42 @@ const hasDXFData = computed(() => {
 // Reference to data loaded via loadDXFFromText so watch does not reload them
 let lastLoadedDxf: DxfData | null = null;
 
+// Tracks the currently loaded DXF so rulers can read $INSUNITS reactively
+// (lastLoadedDxf is a plain let-binding and won't trigger reactivity).
+const loadedDxfRef = ref<DxfData | null>(null);
+
+const activeDxf = computed<DxfData | null>(() => props.dxfData ?? loadedDxfRef.value);
+
+// Scale factor applied to world coords to produce the value rendered on rulers.
+// "dxf-units" — no conversion. "mm"/"inch" — go through $INSUNITS; when the file
+// is Unitless ($INSUNITS=0) we treat one DXF unit as one millimetre 1:1.
+const rulerUnitsScale = computed<number>(() => {
+  if (props.rulerUnits === "dxf-units") return 1;
+  const insUnits = activeDxf.value?.header?.$INSUNITS ?? 0;
+  const toMm = insUnits === 0 ? 1 : getUnitsToMmFactor(insUnits) || 1;
+  return props.rulerUnits === "inch" ? toMm / 25.4 : toMm;
+});
+
+const rulerUnitsLabel = computed<string>(() => {
+  if (props.rulerUnits === "mm") return "mm";
+  if (props.rulerUnits === "inch") return "in";
+  return "—";
+});
+
+// Reactive snapshot of the scene's originOffset. `getOriginOffset()` returns a
+// non-reactive object that changes only when a new DXF is rendered, so we mirror
+// it into a ref and refresh after every successful displayDXF() call.
+const rulerOriginOffset = ref({ x: 0, y: 0 });
+
+const refreshRulerOriginOffset = () => {
+  const oo = getOriginOffset();
+  if (rulerOriginOffset.value.x !== oo.x || rulerOriginOffset.value.y !== oo.y) {
+    rulerOriginOffset.value = { x: oo.x, y: oo.y };
+  }
+};
+
+const cursorWorld = computed(() => ({ x: cursorX.value, y: cursorY.value }));
+
 const handleResetView = () => {
   resetView();
   emit("reset-view");
@@ -632,12 +713,14 @@ const loadDXFFromText = async (dxfText: string) => {
     const dxf = await parseDXFAsync(dxfText);
 
     lastLoadedDxf = dxf;
+    loadedDxfRef.value = dxf;
 
     loadingPhase.value = "rendering";
     const unsupportedEntities = await displayDXF(dxf, props.darkTheme, props.fontUrl);
     initLayersFromDXF(dxf, props.darkTheme);
     applyLayerVisibility(visibleLayerNames.value);
     setupPickingForDxf(dxf);
+    refreshRulerOriginOffset();
     emit("dxf-loaded", true);
     emit("dxf-data", dxf);
 
@@ -656,11 +739,13 @@ const loadDXFFromData = async (dxfData: DxfData) => {
   clearError();
   isLoading.value = true;
   loadingPhase.value = "rendering";
+  loadedDxfRef.value = dxfData;
   try {
     const unsupportedEntities = await displayDXF(dxfData, props.darkTheme, props.fontUrl);
     initLayersFromDXF(dxfData, props.darkTheme);
     applyLayerVisibility(visibleLayerNames.value);
     setupPickingForDxf(dxfData);
+    refreshRulerOriginOffset();
     emit("dxf-loaded", true);
     emit("dxf-data", dxfData);
 
@@ -816,6 +901,13 @@ onMounted(() => {
       initThreeJS(dxfContainer.value, { enableControls: true, aaMode: props.antialiasing });
       attachPickingIfReady();
 
+      const cam = getCamera();
+      rulerCamera.value = cam ? markRaw(cam) : null;
+      const ctrls = getControls();
+      rulerControls.value = ctrls
+        ? markRaw(ctrls as unknown as NonNullable<typeof rulerControls.value>)
+        : null;
+
       const renderer = getRenderer();
       if (renderer && props.keyboardNavigation) {
         keyboardNav.attach(renderer.domElement);
@@ -894,6 +986,39 @@ defineExpose({
   padding: var(--dxfk-spacing-sm, 8px);
   gap: var(--dxfk-spacing-sm, 8px);
   pointer-events: none;
+}
+
+/* Reserve space along the top and left edges for the rulers so overlay
+   elements don't sit on top of them. */
+.dxfk-overlay-grid--with-rulers {
+  padding-top: calc(var(--dxfk-ruler-size, 24px) + var(--dxfk-spacing-sm, 8px));
+  padding-left: calc(var(--dxfk-ruler-size, 24px) + var(--dxfk-spacing-sm, 8px));
+}
+
+.dxfk-ruler-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--dxfk-ruler-size, 24px);
+  height: var(--dxfk-ruler-size, 24px);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: var(--dxfk-ruler-text, #333);
+  background-color: var(--dxfk-ruler-bg, #fafafa);
+  border-right: 1px solid var(--dxfk-ruler-tick, #999);
+  border-bottom: 1px solid var(--dxfk-ruler-tick, #999);
+  pointer-events: none;
+  user-select: none;
+}
+
+.dxfk-ruler-corner.dxfk-dark {
+  --dxfk-ruler-bg: #1f1f1f;
+  --dxfk-ruler-text: #ddd;
+  --dxfk-ruler-tick: #888;
 }
 
 .dxfk-overlay-cell {

@@ -7,6 +7,16 @@ export type OverlayPosition =
   | "bottom-right";
 
 /**
+ * Units displayed on the rulers.
+ *
+ * - `"dxf-units"` — raw DXF values, no conversion (badge: "—").
+ * - `"mm"` — converts via `$INSUNITS`; when the file is Unitless ($INSUNITS=0)
+ *   the raw values are treated as millimeters 1:1.
+ * - `"inch"` — same conversion path as `"mm"`, then divided by 25.4.
+ */
+export type RulerUnits = "dxf-units" | "mm" | "inch";
+
+/**
  * Headless UI-style class map for DXFViewer's named UI parts.
  *
  * Each entry is concatenated onto the corresponding built-in `.dxfk-*` class on
@@ -38,4 +48,10 @@ export interface ViewerClasses {
   dropOverlay?: string;
   /** Empty-state overlay (no DXF loaded) — applied to its `.dxfk-message-overlay`. */
   emptyStateOverlay?: string;
+  /** Horizontal ruler — applied to `.dxfk-ruler-h`. */
+  rulerHorizontal?: string;
+  /** Vertical ruler — applied to `.dxfk-ruler-v`. */
+  rulerVertical?: string;
+  /** Ruler corner badge (top-left, shows units label) — applied to `.dxfk-ruler-corner`. */
+  rulerCorner?: string;
 }

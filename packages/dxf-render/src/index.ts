@@ -2,7 +2,7 @@
 export { parseDxf } from "./parser";
 export { parseDxfAsync, terminateParserWorker } from "./parseDxfAsync";
 export { collectDXFStatistics } from "./utils/dxfStatistics";
-export { getInsUnitsScale } from "./utils/insUnitsScale";
+export { getInsUnitsScale, getUnitsToMmFactor } from "./utils/insUnitsScale";
 
 // Renderer
 export { createThreeObjectsFromDXF, type CreateDXFSceneOptions } from "./render/createDXFScene";

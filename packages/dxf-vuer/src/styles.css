@@ -22,4 +22,11 @@
   --dxfk-spacing-sm: 8px;
   --dxfk-spacing-md: 16px;
   --dxfk-spacing-lg: 24px;
+
+  /* Ruler appearance. */
+  --dxfk-ruler-size: 24px;
+  --dxfk-ruler-bg: #fafafa;
+  --dxfk-ruler-text: #333;
+  --dxfk-ruler-tick: #999;
+  --dxfk-ruler-cursor: #1040b0;
 }

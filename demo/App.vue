@@ -201,6 +201,8 @@
           :highlight-on-hover="highlightOnHover"
           :highlight-associated="highlightAssociated"
           :overlay-position="pickingPosition"
+          :show-rulers="showRulers"
+          :ruler-units="rulerUnits"
           @dxf-data="handleDXFData"
           @unsupported-entities="handleUnsupportedEntities"
           @error="handleError"
@@ -271,18 +273,39 @@
             <header class="settings-cell-header">
               <span class="settings-cell-title">Display</span>
             </header>
-            <label class="aa-row">
-              <span class="aa-label">Antialiasing</span>
-              <select v-model="aaMode" class="aa-select">
-                <option value="none">None</option>
-                <option value="msaa">MSAA (hardware, default)</option>
-                <option value="smaa">SMAA</option>
-                <option value="fxaa">FXAA</option>
-                <option value="taa">TAA (jittered, idle-only)</option>
-                <option value="ssaa">SSAA (high quality, slow)</option>
-              </select>
-            </label>
-            <p class="settings-cell-hint">{{ aaDescription }}</p>
+            <div class="display-split">
+              <div class="display-col">
+                <label class="aa-row">
+                  <span class="aa-label">Antialiasing</span>
+                  <select v-model="aaMode" class="aa-select">
+                    <option value="none">None</option>
+                    <option value="msaa">MSAA (hardware, default)</option>
+                    <option value="smaa">SMAA</option>
+                    <option value="fxaa">FXAA</option>
+                    <option value="taa">TAA (jittered, idle-only)</option>
+                    <option value="ssaa">SSAA (high quality, slow)</option>
+                  </select>
+                </label>
+                <p class="settings-cell-hint">{{ aaDescription }}</p>
+              </div>
+              <div class="display-col">
+                <label class="picking-label">
+                  <input type="checkbox" v-model="showRulers" />
+                  <span>Show rulers</span>
+                </label>
+                <label class="aa-row">
+                  <span class="aa-label">Units</span>
+                  <select v-model="rulerUnits" class="aa-select" :disabled="!showRulers">
+                    <option value="dxf-units">DXF units (raw)</option>
+                    <option value="mm">Millimeters</option>
+                    <option value="inch">Inches</option>
+                  </select>
+                </label>
+                <p class="settings-cell-hint">
+                  Horizontal + vertical rulers in model-space coordinates. Adaptive tick step.
+                </p>
+              </div>
+            </div>
           </div>
 
           <div class="settings-cell">
@@ -571,6 +594,8 @@ const resetSettings = () => {
   showFullscreenButton.value = true;
   showExportButton.value = true;
   showLayerPanel.value = true;
+  showRulers.value = true;
+  rulerUnits.value = "mm";
   fileNamePosition.value = "top-left";
   toolbarPosition.value = "top-right";
   coordinatesPosition.value = "bottom-left";
@@ -590,6 +615,8 @@ const showResetButton = ref(true);
 const showFullscreenButton = ref(true);
 const showExportButton = ref(true);
 const showLayerPanel = ref(true);
+const showRulers = ref(true);
+const rulerUnits = ref<"dxf-units" | "mm" | "inch">("mm");
 
 // Overlay positions
 const overlayPositions: OverlayPosition[] = [
@@ -1005,6 +1032,27 @@ const resetView = () => {
 .settings-cell:nth-child(3),
 .settings-cell:nth-child(4) {
   border-top-color: var(--border-color);
+}
+
+.display-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  min-width: 0;
+}
+
+.display-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding-right: 8px;
+}
+
+.display-col + .display-col {
+  padding-right: 0;
+  padding-left: 8px;
+  border-left: 1px solid var(--border-color);
 }
 
 .settings-cell-header {

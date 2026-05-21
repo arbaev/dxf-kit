@@ -86,8 +86,12 @@ async function loadFile(file) {
 | `keyboardNavigation`   | `boolean`          | `true`            | Enable keyboard pan/zoom (arrow keys, `+`/`-`, `0`). Listener fires only when the canvas is focused                                                                     |
 | `persistLayersKey`     | `string`           | `""`              | When set, layer visibility is persisted to `localStorage` under `${persistLayersKey}:${fileName \|\| "default"}`. Empty string disables persistence                     |
 | `classes`              | `ViewerClasses`    | `{}`              | Headless UI-style class map. Each key adds a class onto the matching `.dxfk-*` root element (e.g. `{ toolbar: 'my-toolbar' }`). See [Customizing styles](#customizing-styles) |
+| `showRulers`           | `boolean`          | `false`           | Show horizontal + vertical rulers along the top/left edges of the canvas with adaptive tick density, cursor marker, and a corner unit badge                              |
+| `rulerUnits`           | `RulerUnits`       | `"mm"`            | Units displayed on ruler tick labels. `"mm"`/`"inch"` convert via `$INSUNITS`; on a Unitless file (`$INSUNITS=0`) raw values are treated as the chosen unit 1:1          |
 
 `OverlayPosition` = `"top-left"` | `"top-center"` | `"top-right"` | `"bottom-left"` | `"bottom-center"` | `"bottom-right"`
+
+`RulerUnits` = `"dxf-units"` | `"mm"` | `"inch"`
 
 `AntialiasingMode` = `"msaa"` | `"smaa"` | `"fxaa"` | `"taa"` | `"ssaa"` | `"none"`
 
@@ -406,6 +410,60 @@ Set `persistLayersKey` to enable per-file persistence in `localStorage`:
 
 Hidden layer names are stored under `${persistLayersKey}:${fileName || "default"}`. Different files keep separate visibility configurations. Stored names that no longer exist in the current DXF are silently ignored, so changing files between sessions is safe. Frozen layers are never persisted (they're already hidden by DXF flags).
 
+## Rulers
+
+Set `showRulers` to render a horizontal ruler along the top edge of the canvas and a vertical ruler along the left edge. Both stay synchronized with pan / zoom, ticks adapt density based on the current zoom level, and a cursor marker (a line in `--dxfk-ruler-cursor`) tracks the mouse position on both axes.
+
+```vue
+<DXFViewer
+  :dxf-data="dxfData"
+  :show-rulers="true"
+  ruler-units="mm"
+/>
+```
+
+The 24×24 top-left corner shows the active unit label (`mm` / `in` / `—`).
+
+### `rulerUnits`
+
+| Value         | Conversion                                                                                                 |
+| ------------- | ---------------------------------------------------------------------------------------------------------- |
+| `"dxf-units"` | None — raw DXF values, corner badge shows `—`                                                              |
+| `"mm"` (default) | `value × UNITS_TO_MM[$INSUNITS]`; for a Unitless file (`$INSUNITS = 0`) raw values are treated as mm 1:1 |
+| `"inch"`      | Same as `"mm"`, then divided by 25.4                                                                       |
+
+### Caveats
+
+- **Unitless files (`$INSUNITS = 0`)** — the conversion factor is unknown, so `mm` / `inch` fall back to 1:1. Switching between the three modes changes the corner label but the numbers stay identical. If you know the intended unit out-of-band, just pick the right `rulerUnits` and the badge will read correctly.
+- **Ruler ticks ≠ dimension labels.** The rulers show the actual coordinates of the geometry. Dimension entities (DIMENSION / MULTILEADER) can carry a `DIMLFAC` multiplier and may display measured lengths that don't equal the geometric distance. The discrepancy is a property of the DXF file, not a ruler bug.
+- The cursor marker uses the same NDC → world math as `showCoordinates`, so the marker position always agrees with the X/Y readout in the coordinates overlay.
+
+### Styling
+
+CSS custom properties (override in `:root` or under `.dxfk-dark`):
+
+| Variable                  | Default (light) | Default (dark) | Purpose                                   |
+| ------------------------- | --------------- | -------------- | ----------------------------------------- |
+| `--dxfk-ruler-size`       | `24px`          | `24px`         | Thickness of both rulers + corner badge   |
+| `--dxfk-ruler-bg`         | `#fafafa`       | `#1f1f1f`      | Ruler background                          |
+| `--dxfk-ruler-text`       | `#333`          | `#ddd`         | Tick label color                          |
+| `--dxfk-ruler-tick`       | `#999`          | `#888`         | Tick lines + inner separator              |
+| `--dxfk-ruler-cursor`     | `#1040b0`       | `#ffaa00`      | Cursor marker line                        |
+
+Hook classes (low-specificity, safe to override with plain CSS or Tailwind `@apply`):
+
+| Class                  | Element                                                       |
+| ---------------------- | ------------------------------------------------------------- |
+| `.dxfk-ruler-h`        | Horizontal ruler container (top edge of canvas)               |
+| `.dxfk-ruler-v`        | Vertical ruler container (left edge of canvas)                |
+| `.dxfk-ruler-corner`   | 24×24 corner badge showing the unit label                     |
+
+For per-instance class injection, use the `rulerHorizontal` / `rulerVertical` / `rulerCorner` keys in [`classes`](#3-classes-prop-headless-ui-style).
+
+### Layout impact
+
+When `showRulers` is on, the overlay grid receives `padding-top: 24px; padding-left: 24px` so existing overlays (file name, coordinates, debug, toolbar) don't sit underneath the rulers. The canvas itself stays full-size — picking, coordinates, and all NDC math are unchanged. The rulers are just overlays painted on top.
+
 ## Customizing styles
 
 `dxf-vuer` exposes three layers of style customization, ordered from least to most invasive. Pick the one that matches your toolchain.
@@ -461,7 +519,10 @@ Stable hook classes:
 | `.dxfk-loading-overlay`        | Loading screen                                               |
 | `.dxfk-error-overlay`          | Error screen                                                 |
 | `.dxfk-drop-overlay`           | Drag-and-drop target                                         |
-| `.dxfk-dark`                   | Modifier — added to `.dxfk-viewer` / `.dxfk-toolbar` / `.dxfk-layer-panel` when `darkTheme` is on |
+| `.dxfk-ruler-h`                | Horizontal ruler (top edge of canvas) — gated by `showRulers`|
+| `.dxfk-ruler-v`                | Vertical ruler (left edge of canvas) — gated by `showRulers` |
+| `.dxfk-ruler-corner`           | 24×24 badge in the top-left corner showing the unit label    |
+| `.dxfk-dark`                   | Modifier — added to `.dxfk-viewer` / `.dxfk-toolbar` / `.dxfk-layer-panel` / `.dxfk-ruler-*` when `darkTheme` is on |
 
 These class names are part of the public API — they won't change between patch / minor versions.
 
@@ -516,6 +577,9 @@ Available keys (`ViewerClasses` interface, all optional):
 | `errorOverlay`       | `.dxfk-error-overlay`                        |
 | `dropOverlay`        | `.dxfk-drop-overlay`                         |
 | `emptyStateOverlay`  | Empty-state `.dxfk-message-overlay`          |
+| `rulerHorizontal`    | `.dxfk-ruler-h`                              |
+| `rulerVertical`      | `.dxfk-ruler-v`                              |
+| `rulerCorner`        | `.dxfk-ruler-corner`                         |
 
 Standalone components (`FileUploader`, `UnsupportedEntities`, `DXFStatistics`, `LayerPanel`, `ViewerToolbar`) accept a regular `class` attribute thanks to Vue's class fallthrough — no separate `classes` prop is needed when you compose them yourself:
 

@@ -50,3 +50,16 @@ export function getInsUnitsScale(drawingUnits: number, blockUnits: number): numb
 
   return UNITS_TO_MM[blockUnits] / UNITS_TO_MM[drawingUnits];
 }
+
+/**
+ * Returns the factor that converts one drawing unit to millimeters,
+ * based on the DXF $INSUNITS code (0–20).
+ *
+ * Returns 0 for code 0 (Unitless) — callers should decide how to handle
+ * unitless drawings (typically by treating raw values as the desired unit).
+ * Returns 0 for out-of-range codes too.
+ */
+export function getUnitsToMmFactor(insUnits: number): number {
+  if (insUnits < 0 || insUnits >= UNITS_TO_MM.length) return 0;
+  return UNITS_TO_MM[insUnits];
+}
