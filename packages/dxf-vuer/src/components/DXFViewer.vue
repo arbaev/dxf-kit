@@ -148,6 +148,13 @@
           @hide-all="handleHideAllLayers"
         />
 
+        <PropertiesPanel
+          v-if="showPropertiesPanel && propertiesPanelPosition === pos"
+          :class="classes?.propertiesPanel"
+          :event="selectedEntity"
+          :dark-theme="darkTheme"
+        />
+
         <slot
           v-if="overlayPosition === pos && $slots.overlay"
           name="overlay"
@@ -277,6 +284,7 @@ import { getZoomBox, getZoomBoxForLayer, getUnitsToMmFactor } from "dxf-render";
 import type { OverlayPosition, ViewerClasses, RulerUnits } from "../types";
 import type { AntialiasingMode } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
+import PropertiesPanel from "./PropertiesPanel.vue";
 import ViewerToolbar from "./ViewerToolbar.vue";
 import Ruler from "./Ruler.vue";
 
@@ -298,6 +306,7 @@ interface Props {
   showFileName?: boolean;
   showExportButton?: boolean;
   showLayerPanel?: boolean;
+  showPropertiesPanel?: boolean;
   allowDrop?: boolean;
   darkTheme?: boolean;
   fontUrl?: string;
@@ -307,6 +316,7 @@ interface Props {
   coordinatesPosition?: OverlayPosition;
   debugPosition?: OverlayPosition;
   layerPanelPosition?: OverlayPosition;
+  propertiesPanelPosition?: OverlayPosition;
   overlayPosition?: OverlayPosition;
   pickingEnabled?: boolean;
   highlightOnHover?: boolean;
@@ -333,6 +343,7 @@ const props = withDefaults(defineProps<Props>(), {
   showFileName: true,
   showExportButton: false,
   showLayerPanel: true,
+  showPropertiesPanel: false,
   allowDrop: false,
   darkTheme: false,
   fontUrl: "",
@@ -342,6 +353,7 @@ const props = withDefaults(defineProps<Props>(), {
   coordinatesPosition: "bottom-left",
   debugPosition: "bottom-center",
   layerPanelPosition: "bottom-right",
+  propertiesPanelPosition: "top-left",
   overlayPosition: "top-center",
   pickingEnabled: false,
   highlightOnHover: true,
@@ -416,6 +428,10 @@ const picking = usePicking();
 const highlightCtl = useHighlight();
 let lastDxfForPicking: DxfData | null = null;
 
+// Currently selected entity surfaced to the built-in PropertiesPanel.
+// External listeners on `entity-click` continue to work independently.
+const selectedEntity = ref<PickingEvent | null>(null);
+
 const setupPickingForDxf = (dxf: DxfData): void => {
   if (!props.pickingEnabled) return;
   const scene = getScene();
@@ -432,6 +448,7 @@ const teardownPicking = (): void => {
   highlightCtl.dispose();
   picking.removePickingData(getScene());
   lastDxfForPicking = null;
+  selectedEntity.value = null;
 };
 
 const handleEntityHover = (event: PickingEvent | null): void => {
@@ -462,6 +479,7 @@ const collectHighlightEntries = (event: PickingEvent): PickingEntry[] => {
 };
 
 const handleEntityClick = (event: PickingEvent): void => {
+  selectedEntity.value = event;
   emit("entity-click", event);
 };
 
@@ -707,6 +725,7 @@ const handleLoadError = (error: unknown, fallbackMsg: string) => {
 
 const loadDXFFromText = async (dxfText: string) => {
   clearError();
+  selectedEntity.value = null;
   isLoading.value = true;
   try {
     loadingPhase.value = "parsing";
@@ -737,6 +756,7 @@ const loadDXFFromText = async (dxfText: string) => {
 
 const loadDXFFromData = async (dxfData: DxfData) => {
   clearError();
+  selectedEntity.value = null;
   isLoading.value = true;
   loadingPhase.value = "rendering";
   loadedDxfRef.value = dxfData;
@@ -952,6 +972,7 @@ defineExpose({
   getRenderer,
   highlight,
   clearHighlight,
+  clearSelection: () => { selectedEntity.value = null; },
   getAssociations,
   findAssociationsByHandle,
   zoomToEntity,

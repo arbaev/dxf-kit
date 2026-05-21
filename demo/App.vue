@@ -187,6 +187,7 @@
           :show-zoom-level="showZoomLevel"
           :show-debug-info="showDebugInfo"
           :show-layer-panel="showLayerPanel"
+          :show-properties-panel="showPropertiesPanel"
           :allow-drop="true"
           :auto-fit="true"
           :file-name-position="fileNamePosition"
@@ -194,6 +195,7 @@
           :coordinates-position="coordinatesPosition"
           :debug-position="debugPosition"
           :layer-panel-position="layerPanelPosition"
+          :properties-panel-position="propertiesPanelPosition"
           :dark-theme="isDark"
           :antialiasing="aaMode"
           :picking-enabled="pickingEnabled"
@@ -594,6 +596,7 @@ const resetSettings = () => {
   showFullscreenButton.value = true;
   showExportButton.value = true;
   showLayerPanel.value = true;
+  showPropertiesPanel.value = true;
   showRulers.value = true;
   rulerUnits.value = "mm";
   fileNamePosition.value = "top-left";
@@ -601,6 +604,7 @@ const resetSettings = () => {
   coordinatesPosition.value = "bottom-left";
   debugPosition.value = "bottom-center";
   layerPanelPosition.value = "bottom-right";
+  propertiesPanelPosition.value = "top-left";
   pickingPosition.value = "top-center";
   activeKindFilter.value = null;
   clearAssociationHighlight();
@@ -615,6 +619,7 @@ const showResetButton = ref(true);
 const showFullscreenButton = ref(true);
 const showExportButton = ref(true);
 const showLayerPanel = ref(true);
+const showPropertiesPanel = ref(true);
 const showRulers = ref(true);
 const rulerUnits = ref<"dxf-units" | "mm" | "inch">("mm");
 
@@ -633,6 +638,7 @@ const toolbarPosition = ref<OverlayPosition>("top-right");
 const coordinatesPosition = ref<OverlayPosition>("bottom-left");
 const debugPosition = ref<OverlayPosition>("bottom-center");
 const layerPanelPosition = ref<OverlayPosition>("bottom-right");
+const propertiesPanelPosition = ref<OverlayPosition>("top-left");
 const pickingPosition = ref<OverlayPosition>("top-center");
 
 interface OverlayRow {
@@ -685,6 +691,13 @@ const overlayRows: OverlayRow[] = [
     setPosition: (p) => (layerPanelPosition.value = p),
     isVisible: () => showLayerPanel.value,
     setVisible: (v) => (showLayerPanel.value = v),
+  },
+  {
+    label: "Properties panel",
+    getPosition: () => propertiesPanelPosition.value,
+    setPosition: (p) => (propertiesPanelPosition.value = p),
+    isVisible: () => showPropertiesPanel.value,
+    setVisible: (v) => (showPropertiesPanel.value = v),
   },
   {
     label: "Entity picking",

@@ -34,6 +34,8 @@ export interface ViewerClasses {
   toolbar?: string;
   /** Layer panel root — applied to `.dxfk-layer-panel`. */
   layerPanel?: string;
+  /** Properties panel root — applied to `.dxfk-properties-panel`. */
+  propertiesPanel?: string;
   /** File name overlay — applied to `.dxfk-file-name-overlay`. */
   fileNameOverlay?: string;
   /** Cursor coordinates / zoom overlay — applied to `.dxfk-coordinates-overlay`. */

@@ -3,6 +3,7 @@ import "./styles.css";
 // Vue components
 export { default as DXFViewer } from "./components/DXFViewer.vue";
 export { default as LayerPanel } from "./components/LayerPanel.vue";
+export { default as PropertiesPanel } from "./components/PropertiesPanel.vue";
 export { default as FileUploader } from "./components/FileUploader.vue";
 export { default as UnsupportedEntities } from "./components/UnsupportedEntities.vue";
 export { default as DXFStatistics } from "./components/DXFStatistics.vue";
@@ -17,6 +18,11 @@ export { useHighlight } from "./composables/useHighlight";
 
 // Types
 export type { OverlayPosition, ViewerClasses, RulerUnits } from "./types";
+export {
+  getEntityProperties,
+  type PropertyRow,
+  type PropertySection,
+} from "./utils/entityProperties";
 
 // Re-export everything from dxf-render (backward compatibility)
 export * from "dxf-render";
