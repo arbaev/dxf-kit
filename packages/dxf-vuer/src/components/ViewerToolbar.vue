@@ -1,8 +1,13 @@
 <template>
-  <div class="viewer-toolbar" role="toolbar" aria-label="DXF viewer toolbar">
+  <div
+    class="dxfk-toolbar"
+    :class="{ 'dxfk-dark': darkTheme }"
+    role="toolbar"
+    aria-label="DXF viewer toolbar"
+  >
     <button
       v-if="showExportButton"
-      class="toolbar-button"
+      class="dxfk-toolbar-button"
       @click="$emit('export')"
       title="Export PNG"
       aria-label="Export current view as PNG"
@@ -24,7 +29,7 @@
     </button>
     <button
       v-if="showResetButton"
-      class="toolbar-button"
+      class="dxfk-toolbar-button"
       @click="$emit('reset-view')"
       title="Fit to View"
       aria-label="Reset camera and fit drawing to view"
@@ -48,7 +53,7 @@
     </button>
     <button
       v-if="showFullscreenButton"
-      class="toolbar-button"
+      class="dxfk-toolbar-button"
       @click="$emit('toggle-fullscreen')"
       :title="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'"
       :aria-label="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
@@ -97,6 +102,7 @@ interface Props {
   showResetButton?: boolean;
   showFullscreenButton?: boolean;
   isFullscreen?: boolean;
+  darkTheme?: boolean;
 }
 
 withDefaults(defineProps<Props>(), {
@@ -104,6 +110,7 @@ withDefaults(defineProps<Props>(), {
   showResetButton: false,
   showFullscreenButton: true,
   isFullscreen: false,
+  darkTheme: false,
 });
 
 defineEmits<{
@@ -114,20 +121,20 @@ defineEmits<{
 </script>
 
 <style scoped>
-.viewer-toolbar {
+.dxfk-toolbar {
   display: flex;
   gap: 4px;
   pointer-events: auto;
 }
 
-.toolbar-button {
+.dxfk-toolbar-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--dxf-vuer-spacing-sm, 8px);
-  color: var(--dxf-vuer-text-color, #212121);
-  border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
-  border-radius: var(--dxf-vuer-border-radius, 4px);
+  padding: var(--dxfk-spacing-sm, 8px);
+  color: var(--dxfk-text-color, #212121);
+  border: 1px solid var(--dxfk-border-color, #e0e0e0);
+  border-radius: var(--dxfk-border-radius, 4px);
   transition: all 0.2s;
   user-select: none;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -135,20 +142,26 @@ defineEmits<{
   cursor: pointer;
 }
 
-.toolbar-button:hover {
-  border-color: rgb(from var(--dxf-vuer-primary-color, #1040b0) r g b / 0.5);
+.dxfk-toolbar-button:hover {
+  border-color: rgb(from var(--dxfk-primary-color, #1040b0) r g b / 0.5);
 }
 
-.toolbar-button:active {
+.dxfk-toolbar-button:active {
   transform: scale(0.94);
 }
 
+.dxfk-toolbar.dxfk-dark .dxfk-toolbar-button {
+  background-color: rgba(30, 30, 30, 0.95);
+  border-color: #444;
+  color: #e0e0e0;
+}
+
 @media (max-width: 768px) {
-  .toolbar-button {
+  .dxfk-toolbar-button {
     padding: 6px;
   }
 
-  .toolbar-button svg {
+  .dxfk-toolbar-button svg {
     width: 18px;
     height: 18px;
   }

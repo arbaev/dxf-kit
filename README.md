@@ -92,6 +92,7 @@ async function loadFile(file) {
 - **Accessibility** — ARIA roles/labels on toolbar, layer panel, status/error overlays; respects `prefers-reduced-motion`
 - **Overlay positioning** — 6-cell grid system for positioning UI overlays (toolbar, coordinates, layers, etc.)
 - **Customizable UI** — 6 named slots (`#toolbar`, `#toolbar-extra`, `#loading`, `#error`, `#empty-state`, `#overlay`) with scoped data
+- **Customizable styling** — stable `.dxfk-*` hook classes with low specificity (Tailwind `@apply`-friendly), Headless UI-style `classes` prop, `--dxfk-*` CSS custom properties
 - **Error display** — parse/render/fetch errors shown in the viewer with retry support
 - **Debug overlay** — FPS, draw calls, lines, triangles
 - **Zoom level** — percentage display relative to fit-to-view

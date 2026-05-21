@@ -1,22 +1,25 @@
 /*
- * dxf-vuer CSS custom properties.
+ * dxf-kit CSS custom properties.
  * Consumers can override via :root or a wrapper container.
  * Example:
  *   :root {
- *     --dxf-vuer-primary-color: #ff6600;
- *     --dxf-vuer-border-radius: 8px;
+ *     --dxfk-primary-color: #ff6600;
+ *     --dxfk-border-radius: 8px;
  *   }
+ *
+ * The `--dxfk-*` prefix is intentionally framework-neutral so future wrappers
+ * (dxf-react, web-component) can share the same variable surface.
  */
 :root {
-  --dxf-vuer-primary-color: #1040b0;
-  --dxf-vuer-error-color: #f44336;
-  --dxf-vuer-bg-color: #fafafa;
-  --dxf-vuer-text-color: #212121;
-  --dxf-vuer-text-secondary: #757575;
-  --dxf-vuer-border-color: #e0e0e0;
-  --dxf-vuer-border-radius: 4px;
-  --dxf-vuer-spacing-xs: 4px;
-  --dxf-vuer-spacing-sm: 8px;
-  --dxf-vuer-spacing-md: 16px;
-  --dxf-vuer-spacing-lg: 24px;
+  --dxfk-primary-color: #1040b0;
+  --dxfk-error-color: #f44336;
+  --dxfk-bg-color: #fafafa;
+  --dxfk-text-color: #212121;
+  --dxfk-text-secondary: #757575;
+  --dxfk-border-color: #e0e0e0;
+  --dxfk-border-radius: 4px;
+  --dxfk-spacing-xs: 4px;
+  --dxfk-spacing-sm: 8px;
+  --dxfk-spacing-md: 16px;
+  --dxfk-spacing-lg: 24px;
 }

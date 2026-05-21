@@ -85,6 +85,7 @@ async function loadFile(file) {
 | `highlightColor`       | `string`           | `"#ffaa00"`       | Color used by the built-in hover highlight                                                                                                                              |
 | `keyboardNavigation`   | `boolean`          | `true`            | Enable keyboard pan/zoom (arrow keys, `+`/`-`, `0`). Listener fires only when the canvas is focused                                                                     |
 | `persistLayersKey`     | `string`           | `""`              | When set, layer visibility is persisted to `localStorage` under `${persistLayersKey}:${fileName \|\| "default"}`. Empty string disables persistence                     |
+| `classes`              | `ViewerClasses`    | `{}`              | Headless UI-style class map. Each key adds a class onto the matching `.dxfk-*` root element (e.g. `{ toolbar: 'my-toolbar' }`). See [Customizing styles](#customizing-styles) |
 
 `OverlayPosition` = `"top-left"` | `"top-center"` | `"top-right"` | `"bottom-left"` | `"bottom-center"` | `"bottom-right"`
 
@@ -120,7 +121,7 @@ async function loadFile(file) {
 <!-- Add a custom button to the toolbar -->
 <DXFViewer :dxf-data="dxfData">
   <template #toolbar-extra>
-    <button class="toolbar-button" @click="print">Print</button>
+    <button class="dxfk-toolbar-button" @click="print">Print</button>
   </template>
 </DXFViewer>
 
@@ -405,6 +406,148 @@ Set `persistLayersKey` to enable per-file persistence in `localStorage`:
 
 Hidden layer names are stored under `${persistLayersKey}:${fileName || "default"}`. Different files keep separate visibility configurations. Stored names that no longer exist in the current DXF are silently ignored, so changing files between sessions is safe. Frozen layers are never persisted (they're already hidden by DXF flags).
 
+## Customizing styles
+
+`dxf-vuer` exposes three layers of style customization, ordered from least to most invasive. Pick the one that matches your toolchain.
+
+### 1. CSS custom properties
+
+All built-in styles use `--dxfk-*` custom properties with inline `var(..., fallback)` so the components work without importing `dxf-vuer/style.css`. To recolor or rescale globally, override on `:root` or any wrapper container:
+
+```css
+:root {
+  --dxfk-primary-color: #ff6600;
+  --dxfk-border-radius: 8px;
+  --dxfk-bg-color: #fafafa;
+}
+```
+
+Available variables:
+
+| Variable                    | Default     | Used for                                                |
+| --------------------------- | ----------- | ------------------------------------------------------- |
+| `--dxfk-primary-color`      | `#1040b0`   | Spinner, progress bar, drop zone border, focus rings    |
+| `--dxfk-error-color`        | `#f44336`   | Error icon                                              |
+| `--dxfk-bg-color`           | `#fafafa`   | Viewer background, DXFStatistics background             |
+| `--dxfk-text-color`         | `#212121`   | Primary text                                            |
+| `--dxfk-text-secondary`     | `#757575`   | Muted text, labels, captions                            |
+| `--dxfk-border-color`       | `#e0e0e0`   | Borders, dividers                                       |
+| `--dxfk-border-radius`      | `4px`       | All rounded corners                                     |
+| `--dxfk-spacing-xs/sm/md/lg`| `4/8/16/24` | Internal paddings/margins                               |
+
+### 2. Hook classes
+
+Every overlay and component root carries a stable `.dxfk-*` class with **single-class selectors only** (no nesting, low specificity), so you can override them with one declaration and they play nicely with Tailwind `@apply` or scoped global styles.
+
+Stable hook classes:
+
+| Class                          | Element                                                      |
+| ------------------------------ | ------------------------------------------------------------ |
+| `.dxfk-viewer`                 | Root container of `DXFViewer`                                |
+| `.dxfk-toolbar`                | Root of `ViewerToolbar`                                      |
+| `.dxfk-toolbar-button`         | Each button inside the toolbar                               |
+| `.dxfk-layer-panel`            | Root of `LayerPanel`                                         |
+| `.dxfk-layer-panel-header`     | Layer panel header (the collapsible bar)                     |
+| `.dxfk-layer-panel-action`     | All / None buttons                                           |
+| `.dxfk-layer-filter`           | Layer filter `<input>`                                       |
+| `.dxfk-layer-item`             | One row per layer                                            |
+| `.dxfk-file-uploader`          | Root of `FileUploader`                                       |
+| `.dxfk-file-uploader-button`   | Upload button inside `FileUploader`                          |
+| `.dxfk-statistics`             | Root of `DXFStatistics`                                      |
+| `.dxfk-unsupported`            | Root of `UnsupportedEntities` (amber warning palette)        |
+| `.dxfk-file-name-overlay`      | File name display                                            |
+| `.dxfk-coordinates-overlay`    | Cursor X/Y + zoom overlay                                    |
+| `.dxfk-debug-overlay`          | FPS / draw calls / triangles overlay                         |
+| `.dxfk-loading-overlay`        | Loading screen                                               |
+| `.dxfk-error-overlay`          | Error screen                                                 |
+| `.dxfk-drop-overlay`           | Drag-and-drop target                                         |
+| `.dxfk-dark`                   | Modifier — added to `.dxfk-viewer` / `.dxfk-toolbar` / `.dxfk-layer-panel` when `darkTheme` is on |
+
+These class names are part of the public API — they won't change between patch / minor versions.
+
+Plain CSS:
+
+```css
+.dxfk-toolbar-button {
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+```
+
+Tailwind `@apply` works because the default selectors have specificity `0,1,0`:
+
+```css
+.dxfk-toolbar {
+  @apply gap-2 rounded-xl bg-white/90 backdrop-blur;
+}
+.dxfk-toolbar-button {
+  @apply border-slate-200 shadow-md hover:border-blue-500;
+}
+```
+
+### 3. `classes` prop (Headless UI-style)
+
+For utility-CSS workflows (Tailwind / UnoCSS) or for per-instance namespacing without writing global selectors, pass a `classes` map. Each key concatenates onto the matching `.dxfk-*` root element:
+
+```vue
+<DXFViewer
+  :dxf-data="dxfData"
+  :classes="{
+    root: 'rounded-2xl shadow-xl',
+    toolbar: 'gap-2',
+    layerPanel: 'bg-white/95 backdrop-blur',
+    loadingOverlay: 'bg-slate-900/60',
+    errorOverlay: 'bg-rose-50/95'
+  }"
+/>
+```
+
+Available keys (`ViewerClasses` interface, all optional):
+
+| Key                  | Maps to                                      |
+| -------------------- | -------------------------------------------- |
+| `root`               | `.dxfk-viewer`                               |
+| `toolbar`            | `.dxfk-toolbar` (the default `ViewerToolbar`)|
+| `layerPanel`         | `.dxfk-layer-panel`                          |
+| `fileNameOverlay`    | `.dxfk-file-name-overlay`                    |
+| `coordinatesOverlay` | `.dxfk-coordinates-overlay`                  |
+| `debugOverlay`       | `.dxfk-debug-overlay`                        |
+| `loadingOverlay`     | `.dxfk-loading-overlay`                      |
+| `errorOverlay`       | `.dxfk-error-overlay`                        |
+| `dropOverlay`        | `.dxfk-drop-overlay`                         |
+| `emptyStateOverlay`  | Empty-state `.dxfk-message-overlay`          |
+
+Standalone components (`FileUploader`, `UnsupportedEntities`, `DXFStatistics`, `LayerPanel`, `ViewerToolbar`) accept a regular `class` attribute thanks to Vue's class fallthrough — no separate `classes` prop is needed when you compose them yourself:
+
+```vue
+<ViewerToolbar class="my-toolbar" />
+<LayerPanel class="my-layers" :layers="layers" />
+```
+
+### Migration from v2.x
+
+In v3.0 every public class was renamed from `dxf-*` / `viewer-*` / `layer-*` to a unified `.dxfk-*` prefix, and CSS variables moved from `--dxf-vuer-*` to `--dxfk-*`. The prefix is framework-neutral so future `dxf-react` / web-component wrappers share the same surface. Rename one-to-one in your overrides:
+
+| v2.x                       | v3.0                            |
+| -------------------------- | ------------------------------- |
+| `--dxf-vuer-primary-color` | `--dxfk-primary-color`          |
+| `--dxf-vuer-bg-color`      | `--dxfk-bg-color`               |
+| `--dxf-vuer-spacing-md`    | `--dxfk-spacing-md` _(etc.)_    |
+| `.dxf-viewer`              | `.dxfk-viewer`                  |
+| `.viewer-toolbar`          | `.dxfk-toolbar`                 |
+| `.toolbar-button`          | `.dxfk-toolbar-button`          |
+| `.layer-panel`             | `.dxfk-layer-panel`             |
+| `.layer-panel-header`      | `.dxfk-layer-panel-header`      |
+| `.layer-item`              | `.dxfk-layer-item`              |
+| `.action-btn` (All / None) | `.dxfk-layer-panel-action`      |
+| `.file-uploader`           | `.dxfk-file-uploader`           |
+| `.file-button`             | `.dxfk-file-uploader-button`    |
+| `.dxf-statistics`          | `.dxfk-statistics`              |
+| `.unsupported-entities`    | `.dxfk-unsupported`             |
+| `.dark-theme`              | `.dxfk-dark`                    |
+
+Dark-theme styling no longer relies on `::v-deep` / `:deep()` reaching into `ViewerToolbar` / `LayerPanel` — those components now receive `darkTheme` as a prop and own their dark styles locally. If you previously wrote `.dark-theme :deep(.toolbar-button) { … }`, target `.dxfk-toolbar-button.dxfk-toolbar.dxfk-dark` directly (or just `.dxfk-toolbar.dxfk-dark .dxfk-toolbar-button`) and `:deep()` is no longer needed.
+
 ## Composables
 
 | Composable              | Description                                                                                                                                                                                         |
@@ -427,7 +570,11 @@ import { parseDxf, createThreeObjectsFromDXF, resolveEntityColor } from "dxf-vue
 
 For the full API of parser and renderer, see the [dxf-render documentation](https://www.npmjs.com/package/dxf-render).
 
-## Migration from v1.x
+## Migration
+
+See [Customizing styles → Migration from v2.x](#migration-from-v2x) for the v3.0 class/variable rename. The `Migration from v1.x` note below applies only to projects upgrading directly from v1 — most projects already past v1.
+
+### Migration from v1.x
 
 Most imports work unchanged. Key changes:
 

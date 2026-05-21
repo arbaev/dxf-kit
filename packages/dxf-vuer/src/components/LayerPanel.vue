@@ -1,12 +1,14 @@
 <template>
   <div
-    class="layer-panel"
-    :class="{ collapsed: !isExpanded }"
+    class="dxfk-layer-panel"
+    :class="[
+      { 'dxfk-layer-panel--collapsed': !isExpanded, 'dxfk-dark': darkTheme }
+    ]"
     role="region"
     aria-label="Layer visibility panel"
   >
     <div
-      class="layer-panel-header"
+      class="dxfk-layer-panel-header"
       role="button"
       tabindex="0"
       :aria-expanded="isExpanded"
@@ -15,9 +17,9 @@
       @keydown.enter.prevent="isExpanded = !isExpanded"
       @keydown.space.prevent="isExpanded = !isExpanded"
     >
-      <span class="layer-panel-title">Layers ({{ layers.length }})</span>
+      <span class="dxfk-layer-panel-title">Layers ({{ layers.length }})</span>
       <button
-        class="collapse-btn"
+        class="dxfk-layer-panel-collapse"
         :title="isExpanded ? 'Collapse' : 'Expand'"
         :aria-label="isExpanded ? 'Collapse' : 'Expand'"
         tabindex="-1"
@@ -26,36 +28,36 @@
       </button>
     </div>
 
-    <div v-if="isExpanded" class="layer-panel-body">
-      <div class="layer-panel-actions">
-        <button @click.stop="$emit('show-all')" class="action-btn" aria-label="Show all layers">All</button>
-        <button @click.stop="$emit('hide-all')" class="action-btn" aria-label="Hide all layers">None</button>
+    <div v-if="isExpanded" class="dxfk-layer-panel-body">
+      <div class="dxfk-layer-panel-actions">
+        <button @click.stop="$emit('show-all')" class="dxfk-layer-panel-action" aria-label="Show all layers">All</button>
+        <button @click.stop="$emit('hide-all')" class="dxfk-layer-panel-action" aria-label="Hide all layers">None</button>
       </div>
 
-      <div v-if="layers.length > 5" class="layer-filter-wrapper">
+      <div v-if="layers.length > 5" class="dxfk-layer-filter-wrapper">
         <input
           v-model="filter"
           type="text"
-          class="layer-filter"
+          class="dxfk-layer-filter"
           placeholder="Filter layers…"
           aria-label="Filter layers by name"
           @click.stop
         />
         <button
           v-if="filter"
-          class="layer-filter-clear"
+          class="dxfk-layer-filter-clear"
           aria-label="Clear filter"
           @click.stop="filter = ''"
         >×</button>
       </div>
 
-      <div class="layer-list">
-        <div v-if="filteredLayers.length === 0" class="layer-empty">No layers match "{{ filter }}"</div>
+      <div class="dxfk-layer-list">
+        <div v-if="filteredLayers.length === 0" class="dxfk-layer-empty">No layers match "{{ filter }}"</div>
         <div
           v-for="layer in filteredLayers"
           :key="layer.name"
-          class="layer-item"
-          :class="{ hidden: !layer.visible, frozen: layer.frozen }"
+          class="dxfk-layer-item"
+          :class="{ 'dxfk-layer-item--hidden': !layer.visible, 'dxfk-layer-item--frozen': layer.frozen }"
           role="button"
           :tabindex="layer.frozen ? -1 : 0"
           :aria-pressed="layer.visible"
@@ -68,7 +70,7 @@
           <!-- Frozen: snowflake icon -->
           <svg
             v-if="layer.frozen"
-            class="state-icon frozen-icon"
+            class="dxfk-layer-icon-frozen"
             width="16"
             height="16"
             viewBox="0 0 24 24"
@@ -89,7 +91,7 @@
           <!-- Visible: eye open -->
           <svg
             v-else-if="layer.visible"
-            class="eye-icon"
+            class="dxfk-layer-icon-eye"
             width="16"
             height="16"
             viewBox="0 0 24 24"
@@ -103,7 +105,7 @@
           <!-- Hidden: eye off -->
           <svg
             v-else
-            class="eye-icon off"
+            class="dxfk-layer-icon-eye dxfk-layer-icon-eye--off"
             width="16"
             height="16"
             viewBox="0 0 24 24"
@@ -118,7 +120,7 @@
           <!-- Locked indicator (shown when not frozen) -->
           <svg
             v-if="layer.locked && !layer.frozen"
-            class="state-icon lock-icon"
+            class="dxfk-layer-icon-lock"
             width="12"
             height="12"
             viewBox="0 0 24 24"
@@ -130,9 +132,9 @@
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
 
-          <span class="color-swatch" :style="{ backgroundColor: layer.color }"></span>
-          <span class="layer-name" :title="layer.name">{{ layer.name }}</span>
-          <span class="layer-count">{{ layer.entityCount }}</span>
+          <span class="dxfk-layer-swatch" :style="{ backgroundColor: layer.color }"></span>
+          <span class="dxfk-layer-name" :title="layer.name">{{ layer.name }}</span>
+          <span class="dxfk-layer-count">{{ layer.entityCount }}</span>
         </div>
       </div>
     </div>
@@ -145,9 +147,12 @@ import type { LayerState } from "../composables/useLayers";
 
 interface Props {
   layers: LayerState[];
+  darkTheme?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  darkTheme: false,
+});
 
 defineEmits<{
   (e: "toggle-layer", layerName: string): void;
@@ -166,10 +171,10 @@ const filteredLayers = computed(() => {
 </script>
 
 <style scoped>
-.layer-panel {
+.dxfk-layer-panel {
   background-color: rgba(255, 255, 255, 0.95);
-  border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
-  border-radius: var(--dxf-vuer-border-radius, 4px);
+  border: 1px solid var(--dxfk-border-color, #e0e0e0);
+  border-radius: var(--dxfk-border-radius, 4px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   max-height: 50vh;
   display: flex;
@@ -179,100 +184,100 @@ const filteredLayers = computed(() => {
   pointer-events: auto;
 }
 
-.layer-panel.collapsed {
+.dxfk-layer-panel--collapsed {
   max-height: none;
 }
 
-.layer-panel-header {
+.dxfk-layer-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
   cursor: pointer;
   user-select: none;
-  border-bottom: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
+  border-bottom: 1px solid var(--dxfk-border-color, #e0e0e0);
   flex-shrink: 0;
 }
 
-.collapsed .layer-panel-header {
+.dxfk-layer-panel--collapsed .dxfk-layer-panel-header {
   border-bottom: none;
 }
 
-.layer-panel-title {
+.dxfk-layer-panel-title {
   font-size: 12px;
   font-weight: 600;
-  color: var(--dxf-vuer-text-color, #212121);
+  color: var(--dxfk-text-color, #212121);
 }
 
-.collapse-btn {
+.dxfk-layer-panel-collapse {
   background: none;
   border: none;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  color: var(--dxf-vuer-text-secondary, #757575);
+  color: var(--dxfk-text-secondary, #757575);
   padding: 0 4px;
   line-height: 1;
 }
 
-.layer-panel-body {
+.dxfk-layer-panel-body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-.layer-panel-actions {
+.dxfk-layer-panel-actions {
   display: flex;
   gap: 4px;
   padding: 4px 10px;
-  border-bottom: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
+  border-bottom: 1px solid var(--dxfk-border-color, #e0e0e0);
   flex-shrink: 0;
 }
 
-.action-btn {
+.dxfk-layer-panel-action {
   padding: 2px 8px;
   font-size: 11px;
   background: none;
-  border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
+  border: 1px solid var(--dxfk-border-color, #e0e0e0);
   border-radius: 3px;
   cursor: pointer;
-  color: var(--dxf-vuer-text-secondary, #757575);
+  color: var(--dxfk-text-secondary, #757575);
   transition: all 0.15s;
 }
 
-.action-btn:hover {
-  border-color: var(--dxf-vuer-primary-color, #1040b0);
-  color: var(--dxf-vuer-primary-color, #1040b0);
+.dxfk-layer-panel-action:hover {
+  border-color: var(--dxfk-primary-color, #1040b0);
+  color: var(--dxfk-primary-color, #1040b0);
 }
 
-.layer-filter-wrapper {
+.dxfk-layer-filter-wrapper {
   position: relative;
   padding: 4px 10px;
-  border-bottom: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
+  border-bottom: 1px solid var(--dxfk-border-color, #e0e0e0);
   flex-shrink: 0;
 }
 
-.layer-filter {
+.dxfk-layer-filter {
   width: 100%;
   padding: 3px 22px 3px 6px;
   font-size: 11px;
-  border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
+  border: 1px solid var(--dxfk-border-color, #e0e0e0);
   border-radius: 3px;
   background: white;
-  color: var(--dxf-vuer-text-color, #212121);
+  color: var(--dxfk-text-color, #212121);
   outline: none;
   box-sizing: border-box;
 }
 
-.layer-filter:focus {
-  border-color: var(--dxf-vuer-primary-color, #1040b0);
+.dxfk-layer-filter:focus {
+  border-color: var(--dxfk-primary-color, #1040b0);
 }
 
-.layer-filter::placeholder {
-  color: var(--dxf-vuer-text-secondary, #757575);
+.dxfk-layer-filter::placeholder {
+  color: var(--dxfk-text-secondary, #757575);
 }
 
-.layer-filter-clear {
+.dxfk-layer-filter-clear {
   position: absolute;
   right: 14px;
   top: 50%;
@@ -285,28 +290,28 @@ const filteredLayers = computed(() => {
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
-  color: var(--dxf-vuer-text-secondary, #757575);
+  color: var(--dxfk-text-secondary, #757575);
 }
 
-.layer-filter-clear:hover {
-  color: var(--dxf-vuer-text-color, #212121);
+.dxfk-layer-filter-clear:hover {
+  color: var(--dxfk-text-color, #212121);
 }
 
-.layer-empty {
+.dxfk-layer-empty {
   padding: 8px 10px;
   font-size: 11px;
   font-style: italic;
-  color: var(--dxf-vuer-text-secondary, #757575);
+  color: var(--dxfk-text-secondary, #757575);
   text-align: center;
 }
 
-.layer-list {
+.dxfk-layer-list {
   overflow-y: auto;
   max-height: 300px;
   padding: 2px 0;
 }
 
-.layer-item {
+.dxfk-layer-item {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -316,41 +321,39 @@ const filteredLayers = computed(() => {
   font-size: 12px;
 }
 
-.layer-item:hover {
+.dxfk-layer-item:hover {
   background-color: rgba(0, 0, 0, 0.04);
 }
 
-.layer-item.hidden {
+.dxfk-layer-item--hidden {
   opacity: 0.5;
 }
 
-.layer-item.frozen {
+.dxfk-layer-item--frozen {
   opacity: 0.35;
   cursor: not-allowed;
 }
 
-.eye-icon {
+.dxfk-layer-icon-eye {
   flex-shrink: 0;
-  color: var(--dxf-vuer-text-color, #212121);
+  color: var(--dxfk-text-color, #212121);
 }
 
-.eye-icon.off {
-  color: var(--dxf-vuer-text-secondary, #757575);
+.dxfk-layer-icon-eye--off {
+  color: var(--dxfk-text-secondary, #757575);
 }
 
-.state-icon {
+.dxfk-layer-icon-frozen {
   flex-shrink: 0;
-}
-
-.frozen-icon {
   color: #5ba3d9;
 }
 
-.lock-icon {
-  color: var(--dxf-vuer-text-secondary, #757575);
+.dxfk-layer-icon-lock {
+  flex-shrink: 0;
+  color: var(--dxfk-text-secondary, #757575);
 }
 
-.color-swatch {
+.dxfk-layer-swatch {
   flex-shrink: 0;
   width: 12px;
   height: 12px;
@@ -358,28 +361,85 @@ const filteredLayers = computed(() => {
   border: 1px solid rgba(0, 0, 0, 0.15);
 }
 
-.layer-name {
+.dxfk-layer-name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--dxf-vuer-text-color, #212121);
+  color: var(--dxfk-text-color, #212121);
 }
 
-.layer-count {
+.dxfk-layer-count {
   flex-shrink: 0;
   font-size: 11px;
-  color: var(--dxf-vuer-text-secondary, #757575);
+  color: var(--dxfk-text-secondary, #757575);
+}
+
+/* Dark theme — applied when the panel root carries `.dxfk-dark`. */
+.dxfk-layer-panel.dxfk-dark {
+  background-color: rgba(30, 30, 30, 0.95);
+  border-color: #444;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-panel-header {
+  border-bottom-color: #444;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-panel-title {
+  color: #e0e0e0;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-panel-collapse {
+  color: #aaa;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-panel-actions {
+  border-bottom-color: #444;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-panel-action {
+  border-color: #555;
+  color: #aaa;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-panel-action:hover {
+  border-color: #6b8fd4;
+  color: #6b8fd4;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-item:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-icon-eye {
+  color: #e0e0e0;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-icon-eye--off {
+  color: #666;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-name {
+  color: #e0e0e0;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-count {
+  color: #888;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-swatch {
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 @media (max-width: 768px) {
-  .layer-panel {
+  .dxfk-layer-panel {
     min-width: 150px;
     max-width: 200px;
     max-height: 40%;
   }
 
-  .layer-list {
+  .dxfk-layer-list {
     max-height: 200px;
   }
 }

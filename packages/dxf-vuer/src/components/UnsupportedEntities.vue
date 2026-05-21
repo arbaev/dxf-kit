@@ -1,7 +1,8 @@
 <template>
-  <div v-if="entities.length > 0" class="unsupported-entities">
-    <div class="warning-header">
+  <div v-if="entities.length > 0" class="dxfk-unsupported">
+    <div class="dxfk-unsupported-header">
       <svg
+        class="dxfk-unsupported-icon"
         width="20"
         height="20"
         viewBox="0 0 24 24"
@@ -15,23 +16,23 @@
         <line x1="12" y1="9" x2="12" y2="14" />
         <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
       </svg>
-      <span class="warning-title">Unsupported Elements ({{ entities.length }})</span>
-      <button class="toggle-button" @click="isExpanded = !isExpanded">
+      <span class="dxfk-unsupported-title">Unsupported Elements ({{ entities.length }})</span>
+      <button class="dxfk-unsupported-toggle" @click="isExpanded = !isExpanded">
         {{ isExpanded ? "Hide" : "Show" }}
       </button>
     </div>
 
     <transition name="expand">
-      <div v-if="isExpanded" class="entities-list">
-        <div v-for="(entity, index) in entities" :key="index" class="entity-item">
-          <span class="entity-bullet">&#8226;</span>
-          <span class="entity-text">{{ entity }}</span>
+      <div v-if="isExpanded" class="dxfk-unsupported-list">
+        <div v-for="(entity, index) in entities" :key="index" class="dxfk-unsupported-item">
+          <span class="dxfk-unsupported-bullet">&#8226;</span>
+          <span class="dxfk-unsupported-text">{{ entity }}</span>
         </div>
       </div>
     </transition>
 
-    <div class="warning-footer">
-      <span class="warning-note">
+    <div class="dxfk-unsupported-footer">
+      <span class="dxfk-unsupported-note">
         &#8505;&#65039; These elements will not be displayed on the drawing
       </span>
     </div>
@@ -51,86 +52,87 @@ const isExpanded = ref(true);
 </script>
 
 <style scoped>
-.unsupported-entities {
+/* Intentional warning palette (amber). Override .dxfk-unsupported to recolor. */
+.dxfk-unsupported {
   background-color: #fff3cd;
   border: 2px solid #ffc107;
-  border-radius: var(--dxf-vuer-border-radius, 4px);
-  padding: var(--dxf-vuer-spacing-md, 16px);
-  margin: var(--dxf-vuer-spacing-md, 16px);
+  border-radius: var(--dxfk-border-radius, 4px);
+  padding: var(--dxfk-spacing-md, 16px);
+  margin: var(--dxfk-spacing-md, 16px);
 }
 
-.warning-header {
+.dxfk-unsupported-header {
   display: flex;
   align-items: center;
-  gap: var(--dxf-vuer-spacing-sm, 8px);
-  margin-bottom: var(--dxf-vuer-spacing-sm, 8px);
+  gap: var(--dxfk-spacing-sm, 8px);
+  margin-bottom: var(--dxfk-spacing-sm, 8px);
 }
 
-.warning-header svg {
+.dxfk-unsupported-icon {
   flex-shrink: 0;
   color: #ff9800;
 }
 
-.warning-title {
+.dxfk-unsupported-title {
   flex: 1;
   font-weight: 600;
   color: #856404;
   font-size: 14px;
 }
 
-.toggle-button {
+.dxfk-unsupported-toggle {
   padding: 4px 12px;
   font-size: 12px;
   background-color: white;
   border: 1px solid #ffc107;
-  border-radius: var(--dxf-vuer-border-radius, 4px);
+  border-radius: var(--dxfk-border-radius, 4px);
   color: #856404;
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s;
 }
 
-.toggle-button:hover {
+.dxfk-unsupported-toggle:hover {
   background-color: #ffc107;
   color: white;
 }
 
-.entities-list {
+.dxfk-unsupported-list {
   max-height: 200px;
   overflow-y: auto;
-  margin-top: var(--dxf-vuer-spacing-sm, 8px);
-  padding: var(--dxf-vuer-spacing-sm, 8px);
+  margin-top: var(--dxfk-spacing-sm, 8px);
+  padding: var(--dxfk-spacing-sm, 8px);
   background-color: white;
-  border-radius: var(--dxf-vuer-border-radius, 4px);
+  border-radius: var(--dxfk-border-radius, 4px);
   border: 1px solid #ffc107;
 }
 
-.entity-item {
+.dxfk-unsupported-item {
   display: flex;
   align-items: flex-start;
-  gap: var(--dxf-vuer-spacing-sm, 8px);
+  gap: var(--dxfk-spacing-sm, 8px);
   padding: 4px 0;
   font-size: 13px;
   color: #856404;
 }
 
-.entity-bullet {
+.dxfk-unsupported-bullet {
   flex-shrink: 0;
   font-weight: bold;
 }
 
-.entity-text {
+.dxfk-unsupported-text {
   flex: 1;
   word-break: break-word;
 }
 
-.warning-footer {
-  margin-top: var(--dxf-vuer-spacing-sm, 8px);
-  padding-top: var(--dxf-vuer-spacing-sm, 8px);
+.dxfk-unsupported-footer {
+  margin-top: var(--dxfk-spacing-sm, 8px);
+  padding-top: var(--dxfk-spacing-sm, 8px);
   border-top: 1px solid #ffc107;
 }
 
-.warning-note {
+.dxfk-unsupported-note {
   font-size: 12px;
   color: #856404;
   font-style: italic;
@@ -149,39 +151,39 @@ const isExpanded = ref(true);
   opacity: 0;
 }
 
-.entities-list::-webkit-scrollbar {
+.dxfk-unsupported-list::-webkit-scrollbar {
   width: 6px;
 }
 
-.entities-list::-webkit-scrollbar-track {
+.dxfk-unsupported-list::-webkit-scrollbar-track {
   background: #fff3cd;
   border-radius: 3px;
 }
 
-.entities-list::-webkit-scrollbar-thumb {
+.dxfk-unsupported-list::-webkit-scrollbar-thumb {
   background: #ffc107;
   border-radius: 3px;
 }
 
-.entities-list::-webkit-scrollbar-thumb:hover {
+.dxfk-unsupported-list::-webkit-scrollbar-thumb:hover {
   background: #ff9800;
 }
 
 @media (max-width: 768px) {
-  .unsupported-entities {
-    padding: var(--dxf-vuer-spacing-sm, 8px);
-    margin: var(--dxf-vuer-spacing-sm, 8px);
+  .dxfk-unsupported {
+    padding: var(--dxfk-spacing-sm, 8px);
+    margin: var(--dxfk-spacing-sm, 8px);
   }
 
-  .warning-title {
+  .dxfk-unsupported-title {
     font-size: 13px;
   }
 
-  .entity-item {
+  .dxfk-unsupported-item {
     font-size: 12px;
   }
 
-  .entities-list {
+  .dxfk-unsupported-list {
     max-height: 150px;
   }
 }

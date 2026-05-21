@@ -1106,12 +1106,12 @@ const resetView = () => {
   margin-bottom: var(--spacing-sm);
 }
 
-.upload-area :deep(.file-uploader) {
+.upload-area :deep(.dxfk-file-uploader) {
   max-width: none;
   flex: none;
 }
 
-.upload-area :deep(.file-button) {
+.upload-area :deep(.dxfk-file-uploader-button) {
   background: var(--primary-color);
   color: white;
   border: none;
@@ -1123,7 +1123,7 @@ const resetView = () => {
   backdrop-filter: none;
 }
 
-.upload-area :deep(.file-button:hover) {
+.upload-area :deep(.dxfk-file-uploader-button:hover) {
   background: #3a7bc8;
   box-shadow: 0 4px 12px rgba(74, 144, 217, 0.4);
 }

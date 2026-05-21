@@ -1,8 +1,8 @@
 <template>
   <div
     ref="dxfContainer"
-    class="dxf-viewer"
-    :class="{ 'dark-theme': darkTheme }"
+    class="dxfk-viewer"
+    :class="[{ 'dxfk-dark': darkTheme }, classes?.root]"
     role="region"
     aria-label="DXF drawing viewer"
     :aria-busy="isLoading"
@@ -12,9 +12,10 @@
     @dragleave="handleDragLeave"
     @drop.prevent="handleDrop"
   >
-    <div v-if="!webGLSupported" class="message-overlay">
-      <div class="message-content error">
+    <div v-if="!webGLSupported" class="dxfk-message-overlay">
+      <div class="dxfk-message-content">
         <svg
+          class="dxfk-message-icon dxfk-message-icon--error"
           width="48"
           height="48"
           viewBox="0 0 24 24"
@@ -28,19 +29,23 @@
           <line x1="12" y1="9" x2="12" y2="14" />
           <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
         </svg>
-        <div class="message-title">WebGL Not Supported</div>
-        <div class="message-text">Update your browser or enable hardware acceleration</div>
+        <div class="dxfk-message-title">WebGL Not Supported</div>
+        <div class="dxfk-message-text">Update your browser or enable hardware acceleration</div>
       </div>
     </div>
 
-    <div v-if="hasDXFData" class="overlay-grid">
+    <div v-if="hasDXFData" class="dxfk-overlay-grid">
       <div
         v-for="pos in overlayPositions"
         :key="pos"
-        class="overlay-cell"
-        :class="`cell-${pos}`"
+        class="dxfk-overlay-cell"
+        :class="`dxfk-overlay-cell--${pos}`"
       >
-        <div v-if="fileNamePosition === pos && showFileName && fileName" class="file-name-overlay">
+        <div
+          v-if="fileNamePosition === pos && showFileName && fileName"
+          class="dxfk-file-name-overlay"
+          :class="classes?.fileNameOverlay"
+        >
           {{ fileName }}
         </div>
 
@@ -50,10 +55,12 @@
           v-bind="{ resetView: handleResetView, exportToPNG, toggleFullscreen, isFullscreen }"
         >
           <ViewerToolbar
+            :class="classes?.toolbar"
             :show-export-button="showExportButton"
             :show-reset-button="showResetButton"
             :show-fullscreen-button="showFullscreenButton"
             :is-fullscreen="isFullscreen"
+            :dark-theme="darkTheme"
             @export="exportToPNG"
             @reset-view="handleResetView"
             @toggle-fullscreen="toggleFullscreen"
@@ -64,27 +71,35 @@
           </ViewerToolbar>
         </slot>
 
-        <div v-if="coordinatesPosition === pos && (showCoordinates || showZoomLevel)" class="coordinates-overlay">
+        <div
+          v-if="coordinatesPosition === pos && (showCoordinates || showZoomLevel)"
+          class="dxfk-coordinates-overlay"
+          :class="classes?.coordinatesOverlay"
+        >
           <template v-if="showCoordinates">
-            <div class="coord-row">
-              <span class="coord-label">X:</span>
-              <span class="coord-value" :class="{ 'coord-value--na': !isCursorVisible }">
+            <div class="dxfk-coord-row">
+              <span class="dxfk-coord-label">X:</span>
+              <span class="dxfk-coord-value" :class="{ 'dxfk-coord-value--na': !isCursorVisible }">
                 {{ isCursorVisible ? cursorX.toFixed(2) : "N/A" }}
               </span>
             </div>
-            <div class="coord-row">
-              <span class="coord-label">Y:</span>
-              <span class="coord-value" :class="{ 'coord-value--na': !isCursorVisible }">
+            <div class="dxfk-coord-row">
+              <span class="dxfk-coord-label">Y:</span>
+              <span class="dxfk-coord-value" :class="{ 'dxfk-coord-value--na': !isCursorVisible }">
                 {{ isCursorVisible ? cursorY.toFixed(2) : "N/A" }}
               </span>
             </div>
           </template>
-          <div v-if="showZoomLevel" class="coord-row">
-            <span class="coord-value zoom-value">{{ zoomPercent }}%</span>
+          <div v-if="showZoomLevel" class="dxfk-coord-row">
+            <span class="dxfk-coord-value dxfk-zoom-value">{{ zoomPercent }}%</span>
           </div>
         </div>
 
-        <div v-if="debugPosition === pos && showDebugInfo" class="debug-overlay">
+        <div
+          v-if="debugPosition === pos && showDebugInfo"
+          class="dxfk-debug-overlay"
+          :class="classes?.debugOverlay"
+        >
           <span>{{ debugInfo.fps }} FPS</span>
           <span>{{ debugInfo.drawCalls }} draws</span>
           <span>{{ formatK(debugInfo.lines) }} lines</span>
@@ -93,7 +108,9 @@
 
         <LayerPanel
           v-if="showLayerPanel && layerPanelPosition === pos && layerList.length > 0"
+          :class="classes?.layerPanel"
           :layers="layerList"
+          :dark-theme="darkTheme"
           @toggle-layer="handleToggleLayer"
           @show-all="handleShowAllLayers"
           @hide-all="handleHideAllLayers"
@@ -107,11 +124,17 @@
       </div>
     </div>
 
-    <div v-if="isLoading" class="message-overlay loading-overlay" role="status" aria-live="polite">
+    <div
+      v-if="isLoading"
+      class="dxfk-message-overlay dxfk-loading-overlay"
+      :class="classes?.loadingOverlay"
+      role="status"
+      aria-live="polite"
+    >
       <slot name="loading" :phase="loadingPhase" :progress="displayProgress">
-        <div class="message-content">
-          <div class="spinner"></div>
-          <div class="message-text">
+        <div class="dxfk-message-content">
+          <div class="dxfk-spinner"></div>
+          <div class="dxfk-message-text">
             {{
               loadingPhase === "fetching"
                 ? "Loading DXF..."
@@ -120,20 +143,27 @@
                   : "Rendering..."
             }}
           </div>
-          <div v-if="loadingPhase === 'rendering'" class="progress-container">
-            <div class="progress-bar" :style="{ width: displayProgress * 100 + '%' }"></div>
+          <div v-if="loadingPhase === 'rendering'" class="dxfk-progress-container">
+            <div class="dxfk-progress-bar" :style="{ width: displayProgress * 100 + '%' }"></div>
           </div>
-          <div v-if="loadingPhase === 'rendering'" class="progress-text">
+          <div v-if="loadingPhase === 'rendering'" class="dxfk-progress-text">
             {{ Math.round(displayProgress * 100) }}%
           </div>
         </div>
       </slot>
     </div>
 
-    <div v-else-if="errorMessage" class="message-overlay error-overlay" role="alert" aria-live="assertive">
+    <div
+      v-else-if="errorMessage"
+      class="dxfk-message-overlay dxfk-error-overlay"
+      :class="classes?.errorOverlay"
+      role="alert"
+      aria-live="assertive"
+    >
       <slot name="error" :message="errorMessage" :retry="retry">
-        <div class="message-content error">
+        <div class="dxfk-message-content">
           <svg
+            class="dxfk-message-icon dxfk-message-icon--error"
             width="48"
             height="48"
             viewBox="0 0 24 24"
@@ -147,16 +177,21 @@
             <line x1="12" y1="9" x2="12" y2="14" />
             <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
           </svg>
-          <div class="message-title">Error</div>
-          <div class="message-text">{{ errorMessage }}</div>
+          <div class="dxfk-message-title">Error</div>
+          <div class="dxfk-message-text">{{ errorMessage }}</div>
         </div>
       </slot>
     </div>
 
-    <div v-else-if="!hasDXFData" class="message-overlay">
+    <div
+      v-else-if="!hasDXFData"
+      class="dxfk-message-overlay"
+      :class="classes?.emptyStateOverlay"
+    >
       <slot name="empty-state">
-        <div class="message-content placeholder">
+        <div class="dxfk-message-content">
           <svg
+            class="dxfk-message-icon dxfk-message-icon--placeholder"
             width="64"
             height="64"
             viewBox="0 0 24 24"
@@ -167,13 +202,17 @@
             <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
             <polyline points="13 2 13 9 20 9" />
           </svg>
-          <div class="message-text">Select a DXF file to view</div>
+          <div class="dxfk-message-text">Select a DXF file to view</div>
         </div>
       </slot>
     </div>
 
-    <div v-if="isDragOver" class="message-overlay drop-overlay">
-      <div class="message-content">
+    <div
+      v-if="isDragOver"
+      class="dxfk-message-overlay dxfk-drop-overlay"
+      :class="classes?.dropOverlay"
+    >
+      <div class="dxfk-message-content">
         <svg
           width="48"
           height="48"
@@ -186,7 +225,7 @@
           <polyline points="7 10 12 15 17 10" />
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
-        <div class="message-text">Drop DXF file here</div>
+        <div class="dxfk-message-text">Drop DXF file here</div>
       </div>
     </div>
   </div>
@@ -203,7 +242,7 @@ import { useHighlight } from "../composables/useHighlight";
 import { useKeyboardNavigation } from "../composables/useKeyboardNavigation";
 import type { DxfData, DxfLayer, PickingEntry, EntityAssociation } from "dxf-render";
 import { getZoomBox, getZoomBoxForLayer } from "dxf-render";
-import type { OverlayPosition } from "../types";
+import type { OverlayPosition, ViewerClasses } from "../types";
 import type { AntialiasingMode } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
 import ViewerToolbar from "./ViewerToolbar.vue";
@@ -243,6 +282,7 @@ interface Props {
   pickingDebug?: boolean;
   persistLayersKey?: string;
   keyboardNavigation?: boolean;
+  classes?: ViewerClasses;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -275,6 +315,7 @@ const props = withDefaults(defineProps<Props>(), {
   pickingDebug: false,
   persistLayersKey: "",
   keyboardNavigation: true,
+  classes: () => ({}),
 });
 
 interface Emits {
@@ -828,19 +869,19 @@ defineExpose({
 </script>
 
 <style scoped>
-.dxf-viewer {
+.dxfk-viewer {
   position: relative;
   width: 100%;
   flex: 1;
-  background-color: var(--dxf-vuer-bg-color, #fafafa);
-  border: 2px solid var(--dxf-vuer-border-color, #e0e0e0);
-  border-radius: var(--dxf-vuer-border-radius, 4px);
+  background-color: var(--dxfk-bg-color, #fafafa);
+  border: 2px solid var(--dxfk-border-color, #e0e0e0);
+  border-radius: var(--dxfk-border-radius, 4px);
   overflow: hidden;
   touch-action: none;
 }
 
-/* Overlay grid: 9-cell layout for positioning overlay elements */
-.overlay-grid {
+/* Overlay grid: 6-cell layout for positioning overlay elements */
+.dxfk-overlay-grid {
   position: absolute;
   inset: 0;
   z-index: 10;
@@ -850,12 +891,12 @@ defineExpose({
   grid-template-areas:
     "top-left     top-center     top-right"
     "bottom-left  bottom-center  bottom-right";
-  padding: var(--dxf-vuer-spacing-sm, 8px);
-  gap: var(--dxf-vuer-spacing-sm, 8px);
+  padding: var(--dxfk-spacing-sm, 8px);
+  gap: var(--dxfk-spacing-sm, 8px);
   pointer-events: none;
 }
 
-.overlay-cell {
+.dxfk-overlay-cell {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -863,81 +904,81 @@ defineExpose({
   min-height: 0;
 }
 
-.cell-top-left { grid-area: top-left; align-items: flex-start; }
-.cell-top-center { grid-area: top-center; align-items: center; }
-.cell-top-right { grid-area: top-right; align-items: flex-end; }
-.cell-bottom-left { grid-area: bottom-left; align-items: flex-start; justify-content: flex-end; }
-.cell-bottom-center { grid-area: bottom-center; align-items: center; justify-content: flex-end; }
-.cell-bottom-right { grid-area: bottom-right; align-items: flex-end; justify-content: flex-end; }
+.dxfk-overlay-cell--top-left { grid-area: top-left; align-items: flex-start; }
+.dxfk-overlay-cell--top-center { grid-area: top-center; align-items: center; }
+.dxfk-overlay-cell--top-right { grid-area: top-right; align-items: flex-end; }
+.dxfk-overlay-cell--bottom-left { grid-area: bottom-left; align-items: flex-start; justify-content: flex-end; }
+.dxfk-overlay-cell--bottom-center { grid-area: bottom-center; align-items: center; justify-content: flex-end; }
+.dxfk-overlay-cell--bottom-right { grid-area: bottom-right; align-items: flex-end; justify-content: flex-end; }
 
-.file-name-overlay {
-  padding: var(--dxf-vuer-spacing-sm, 8px) var(--dxf-vuer-spacing-md, 16px);
+.dxfk-file-name-overlay {
+  padding: var(--dxfk-spacing-sm, 8px) var(--dxfk-spacing-md, 16px);
   background-color: rgba(255, 255, 255, 0.95);
-  border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
-  border-radius: var(--dxf-vuer-border-radius, 4px);
+  border: 1px solid var(--dxfk-border-color, #e0e0e0);
+  border-radius: var(--dxfk-border-radius, 4px);
   font-size: 14px;
-  color: var(--dxf-vuer-text-color, #212121);
+  color: var(--dxfk-text-color, #212121);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dxf-viewer :deep(canvas) {
+.dxfk-viewer :deep(canvas) {
   display: block;
 }
 
-.coordinates-overlay {
+.dxfk-coordinates-overlay {
   display: flex;
   flex-direction: column;
-  padding: 4px var(--dxf-vuer-spacing-sm, 8px);
+  padding: 4px var(--dxfk-spacing-sm, 8px);
   background-color: rgba(255, 255, 255, 0.95);
-  color: var(--dxf-vuer-text-color, #212121);
-  border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
-  border-radius: var(--dxf-vuer-border-radius, 4px);
+  color: var(--dxfk-text-color, #212121);
+  border: 1px solid var(--dxfk-border-color, #e0e0e0);
+  border-radius: var(--dxfk-border-radius, 4px);
   font-size: 12px;
   font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
   white-space: nowrap;
 }
 
-.coord-row {
+.dxfk-coord-row {
   display: flex;
   gap: 2px;
 }
 
-.coord-value--na {
-  color: var(--dxf-vuer-text-secondary, #757575);
+.dxfk-coord-value--na {
+  color: var(--dxfk-text-secondary, #757575);
   opacity: 0.65;
 }
 
-.coord-label {
+.dxfk-coord-label {
   width: 1.2em;
   text-align: right;
   flex-shrink: 0;
 }
 
-.coord-value {
+.dxfk-coord-value {
   width: 7em;
   text-align: right;
   flex-shrink: 0;
 }
 
-.zoom-value {
+.dxfk-zoom-value {
   width: auto;
-  color: var(--dxf-vuer-text-secondary, #757575);
+  color: var(--dxfk-text-secondary, #757575);
 }
 
-.debug-overlay {
+.dxfk-debug-overlay {
   display: flex;
-  gap: var(--dxf-vuer-spacing-sm, 8px);
-  padding: 4px var(--dxf-vuer-spacing-sm, 8px);
+  gap: var(--dxfk-spacing-sm, 8px);
+  padding: 4px var(--dxfk-spacing-sm, 8px);
   background-color: rgba(0, 0, 0, 0.7);
   color: #ccc;
-  border-radius: var(--dxf-vuer-border-radius, 4px);
+  border-radius: var(--dxfk-border-radius, 4px);
   font-size: 11px;
   font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
 }
 
-.message-overlay {
+.dxfk-message-overlay {
   position: absolute;
   top: 0;
   left: 0;
@@ -946,75 +987,73 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--dxf-vuer-spacing-lg, 24px);
+  padding: var(--dxfk-spacing-lg, 24px);
 }
 
-.message-content {
+.dxfk-message-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--dxf-vuer-spacing-md, 16px);
+  gap: var(--dxfk-spacing-md, 16px);
   text-align: center;
 }
 
-.message-content.error svg {
-  color: var(--dxf-vuer-error-color, #f44336);
+.dxfk-message-icon--error {
+  color: var(--dxfk-error-color, #f44336);
 }
 
-.message-content.placeholder svg {
-  color: var(--dxf-vuer-border-color, #e0e0e0);
+.dxfk-message-icon--placeholder {
+  color: var(--dxfk-border-color, #e0e0e0);
 }
 
-.message-title {
+.dxfk-message-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--dxf-vuer-text-color, #212121);
+  color: var(--dxfk-text-color, #212121);
 }
 
-.message-text {
+.dxfk-message-text {
   font-size: 1rem;
-  color: var(--dxf-vuer-text-secondary, #757575);
+  color: var(--dxfk-text-secondary, #757575);
   max-width: 300px;
 }
 
-.loading-overlay {
+.dxfk-loading-overlay {
   z-index: 20;
   background-color: rgba(250, 250, 250, 0.85);
 }
 
-.error-overlay {
+.dxfk-error-overlay {
   z-index: 20;
   background-color: rgba(250, 250, 250, 0.95);
 }
 
-
-
-.spinner {
+.dxfk-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid var(--dxf-vuer-border-color, #e0e0e0);
-  border-top-color: var(--dxf-vuer-primary-color, #1040b0);
+  border: 3px solid var(--dxfk-border-color, #e0e0e0);
+  border-top-color: var(--dxfk-primary-color, #1040b0);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
-.progress-container {
+.dxfk-progress-container {
   width: 200px;
   height: 4px;
-  background-color: var(--dxf-vuer-border-color, #e0e0e0);
+  background-color: var(--dxfk-border-color, #e0e0e0);
   border-radius: 2px;
   overflow: hidden;
 }
 
-.progress-bar {
+.dxfk-progress-bar {
   height: 100%;
-  background-color: var(--dxf-vuer-primary-color, #1040b0);
+  background-color: var(--dxfk-primary-color, #1040b0);
   transition: width 0.1s ease-out;
 }
 
-.progress-text {
+.dxfk-progress-text {
   font-size: 0.85rem;
-  color: var(--dxf-vuer-text-secondary, #757575);
+  color: var(--dxfk-text-secondary, #757575);
 }
 
 @keyframes spin {
@@ -1023,151 +1062,92 @@ defineExpose({
   }
 }
 
-/* Dark theme overrides */
-.dxf-viewer.dark-theme {
+.dxfk-drop-overlay {
+  z-index: 30;
+  background-color: rgba(250, 250, 250, 0.9);
+  border: 3px dashed var(--dxfk-primary-color, #1040b0);
+}
+
+.dxfk-drop-overlay svg {
+  color: var(--dxfk-primary-color, #1040b0);
+}
+
+/*
+ * Dark theme — applied when the viewer root carries `.dxfk-dark`. Child
+ * components (ViewerToolbar, LayerPanel) own their own dark styles via the
+ * `darkTheme` prop, so this block stays local to elements the viewer renders
+ * directly.
+ */
+.dxfk-viewer.dxfk-dark {
   background-color: #1a1a1a;
   border-color: #333;
 }
 
-.dark-theme .loading-overlay {
+.dxfk-viewer.dxfk-dark .dxfk-loading-overlay {
   background-color: rgba(26, 26, 26, 0.85);
 }
 
-.dark-theme .error-overlay {
+.dxfk-viewer.dxfk-dark .dxfk-error-overlay {
   background-color: rgba(26, 26, 26, 0.95);
 }
 
-
-
-.dark-theme .file-name-overlay {
+.dxfk-viewer.dxfk-dark .dxfk-file-name-overlay {
   background-color: rgba(30, 30, 30, 0.95);
   border-color: #333;
   color: #e0e0e0;
 }
 
-.dark-theme :deep(.toolbar-button) {
+.dxfk-viewer.dxfk-dark .dxfk-coordinates-overlay {
   background-color: rgba(30, 30, 30, 0.95);
   border-color: #444;
   color: #e0e0e0;
 }
 
-.dark-theme .message-text {
+.dxfk-viewer.dxfk-dark .dxfk-message-text {
   color: #aaa;
 }
 
-.dark-theme .progress-text {
+.dxfk-viewer.dxfk-dark .dxfk-progress-text {
   color: #aaa;
 }
 
-.dark-theme .message-title {
+.dxfk-viewer.dxfk-dark .dxfk-message-title {
   color: #e0e0e0;
 }
 
-.dark-theme .spinner {
+.dxfk-viewer.dxfk-dark .dxfk-spinner {
   border-color: #444;
   border-top-color: #6b8fd4;
 }
 
-.dark-theme .progress-container {
+.dxfk-viewer.dxfk-dark .dxfk-progress-container {
   background-color: #444;
 }
 
-.dark-theme .message-content.placeholder svg {
+.dxfk-viewer.dxfk-dark .dxfk-message-icon--placeholder {
   color: #555;
 }
 
-.dark-theme :deep(.layer-panel) {
-  background-color: rgba(30, 30, 30, 0.95);
-  border-color: #444;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-.dark-theme :deep(.layer-panel-header) {
-  border-bottom-color: #444;
-}
-
-.dark-theme :deep(.layer-panel-title) {
-  color: #e0e0e0;
-}
-
-.dark-theme :deep(.collapse-btn) {
-  color: #aaa;
-}
-
-.dark-theme :deep(.layer-panel-actions) {
-  border-bottom-color: #444;
-}
-
-.dark-theme :deep(.action-btn) {
-  border-color: #555;
-  color: #aaa;
-}
-
-.dark-theme :deep(.action-btn:hover) {
-  border-color: #6b8fd4;
-  color: #6b8fd4;
-}
-
-.dark-theme :deep(.layer-item:hover) {
-  background-color: rgba(255, 255, 255, 0.06);
-}
-
-.dark-theme :deep(.eye-icon) {
-  color: #e0e0e0;
-}
-
-.dark-theme :deep(.eye-icon.off) {
-  color: #666;
-}
-
-.dark-theme :deep(.layer-name) {
-  color: #e0e0e0;
-}
-
-.dark-theme :deep(.layer-count) {
-  color: #888;
-}
-
-.dark-theme :deep(.color-swatch) {
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.drop-overlay {
-  z-index: 30;
-  background-color: rgba(250, 250, 250, 0.9);
-  border: 3px dashed var(--dxf-vuer-primary-color, #1040b0);
-}
-
-.drop-overlay svg {
-  color: var(--dxf-vuer-primary-color, #1040b0);
-}
-
-.dark-theme .drop-overlay {
+.dxfk-viewer.dxfk-dark .dxfk-drop-overlay {
   background-color: rgba(26, 26, 26, 0.9);
   border-color: #6b8fd4;
 }
 
-.dark-theme .drop-overlay svg {
+.dxfk-viewer.dxfk-dark .dxfk-drop-overlay svg {
   color: #6b8fd4;
 }
 
-.dark-theme .coordinates-overlay {
-  background-color: rgba(30, 30, 30, 0.95);
-  border-color: #444;
-  color: #e0e0e0;
-}
-
 @media (max-width: 768px) {
-  .file-name-overlay {
-    padding: 6px var(--dxf-vuer-spacing-sm, 8px);
+  .dxfk-file-name-overlay {
+    padding: 6px var(--dxfk-spacing-sm, 8px);
     font-size: 12px;
   }
 
-  .message-title {
+  .dxfk-message-title {
     font-size: 1.1rem;
   }
 
-  .message-text {
+  .dxfk-message-text {
     font-size: 0.9rem;
   }
 }

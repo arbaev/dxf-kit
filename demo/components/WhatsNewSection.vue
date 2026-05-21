@@ -24,6 +24,16 @@ interface WhatsNewItem {
 
 const whatsNew: WhatsNewItem[] = [
   {
+    pkg: "dxf-vuer",
+    version: "3.0.0",
+    text: "classes prop on <DXFViewer> — Headless UI-style class map for ~10 root elements (root, toolbar, layerPanel, fileNameOverlay, coordinatesOverlay, debugOverlay, loadingOverlay, errorOverlay, dropOverlay, emptyStateOverlay). Tailwind / utility-CSS finally first-class, no :deep() workarounds.",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "3.0.0",
+    text: "Stable .dxfk-* hook classes — every overlay and component root has a single-class, low-specificity selector (specificity 0,1,0) safe for plain CSS overrides and Tailwind @apply. Documented in README → Customizing styles. Breaking: classes and CSS variables renamed (.dxf-viewer → .dxfk-viewer, --dxf-vuer-* → --dxfk-*), child components own their dark-theme styles via a darkTheme prop instead of parent :deep() — see migration table.",
+  },
+  {
     pkg: "dxf-render",
     version: "1.6.0",
     text: "REGION entities now render their contour by borrowing the boundary edges of any HATCH that references them as a source object (DXF codes 97/330) — no ACIS decoding needed. The REGION becomes pickable too, so hatched details with a REGION outline (common in AutoCAD-built profile drawings) finally show their visible boundary and fire entity-hover / entity-click events.",

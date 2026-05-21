@@ -16,7 +16,7 @@ export { usePicking, type PickingEvent } from "./composables/usePicking";
 export { useHighlight } from "./composables/useHighlight";
 
 // Types
-export type { OverlayPosition } from "./types";
+export type { OverlayPosition, ViewerClasses } from "./types";
 
 // Re-export everything from dxf-render (backward compatibility)
 export * from "dxf-render";

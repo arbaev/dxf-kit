@@ -1,15 +1,15 @@
 <template>
-  <div class="file-uploader">
-    <label for="dxf-file-input" class="file-input-label">
+  <div class="dxfk-file-uploader">
+    <label for="dxf-file-input" class="dxfk-file-input-label">
       <input
         id="dxf-file-input"
         type="file"
         accept=".dxf"
-        class="file-input"
+        class="dxfk-file-input"
         aria-label="Select a DXF file to load"
         @change="handleFileChange"
       />
-      <div class="file-button">
+      <div class="dxfk-file-uploader-button">
         <svg
           width="24"
           height="24"
@@ -48,32 +48,32 @@ const handleFileChange = (event: Event) => {
 </script>
 
 <style scoped>
-.file-uploader {
+.dxfk-file-uploader {
   display: flex;
   flex-direction: column;
-  gap: var(--dxf-vuer-spacing-sm, 8px);
+  gap: var(--dxfk-spacing-sm, 8px);
   flex: 1;
   max-width: 420px;
 }
 
-.file-input {
+.dxfk-file-input {
   display: none;
 }
 
-.file-input-label {
+.dxfk-file-input-label {
   cursor: pointer;
 }
 
-.file-button {
+.dxfk-file-uploader-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--dxf-vuer-spacing-sm, 8px);
-  padding: var(--dxf-vuer-spacing-sm, 8px) var(--dxf-vuer-spacing-md, 16px);
+  gap: var(--dxfk-spacing-sm, 8px);
+  padding: var(--dxfk-spacing-sm, 8px) var(--dxfk-spacing-md, 16px);
   background-color: rgba(255, 255, 255, 0.2);
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: var(--dxf-vuer-border-radius, 4px);
+  border-radius: var(--dxfk-border-radius, 4px);
   font-weight: 500;
   font-size: 14px;
   transition: all 0.2s;
@@ -81,18 +81,18 @@ const handleFileChange = (event: Event) => {
   backdrop-filter: blur(10px);
 }
 
-.file-button:hover {
+.dxfk-file-uploader-button:hover {
   background-color: rgba(255, 255, 255, 0.3);
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-.file-button:active {
+.dxfk-file-uploader-button:active {
   transform: scale(0.98);
 }
 
 @media (max-width: 768px) {
-  .file-button {
-    padding: var(--dxf-vuer-spacing-sm, 8px);
+  .dxfk-file-uploader-button {
+    padding: var(--dxfk-spacing-sm, 8px);
     justify-content: center;
   }
 }

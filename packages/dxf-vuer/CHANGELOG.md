@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.0.0
+
+### Breaking changes
+
+- **All public CSS classes renamed to a unified `.dxfk-*` prefix.** The old names (`.dxf-viewer`, `.viewer-toolbar`, `.toolbar-button`, `.layer-panel`, `.layer-panel-header`, `.layer-item`, `.file-uploader`, `.file-button`, `.dxf-statistics`, `.unsupported-entities`, etc.) are gone. The new prefix is framework-neutral so the planned `dxf-react` and web-component wrappers share the same class surface. Rename one-to-one in your overrides — see [README → Migration from v2.x](./README.md#migration-from-v2x) for the full table.
+- **CSS custom properties renamed `--dxf-vuer-*` → `--dxfk-*`.** Same motivation: framework-neutral surface across wrappers. Internal `var(--dxfk-X, fallback)` ensures components still work without `import "dxf-vuer/style.css"`.
+- **Dark-theme overrides moved out of `DXFViewer`.** Previously the viewer reached into `ViewerToolbar` and `LayerPanel` via 15 `::v-deep` (`:deep()`) selectors. Those are removed; each child now accepts a `darkTheme` boolean prop and owns its own dark styles locally. If you used `<ViewerToolbar>` or `<LayerPanel>` standalone with `:deep(.toolbar-button)` from a parent, switch to passing `:dark-theme` directly.
+
+### Features
+
+- **Stable hook classes documented.** Every overlay and component root carries a single-class, low-specificity `.dxfk-*` selector — safe for plain CSS overrides and Tailwind `@apply`. See [README → Customizing styles](./README.md#customizing-styles).
+- **`classes` prop on `DXFViewer`** (Headless UI-style): `:classes="{ root, toolbar, layerPanel, fileNameOverlay, coordinatesOverlay, debugOverlay, loadingOverlay, errorOverlay, dropOverlay, emptyStateOverlay }"`. Each key concatenates onto the matching `.dxfk-*` root. New `ViewerClasses` type exported from the package entry.
+- **Flattened nested selectors.** Removed `.warning-header svg`, `.stat-section h4`, `.message-content.error svg` in favour of single-class selectors (`.dxfk-unsupported-icon`, `.dxfk-statistics-section-title`, `.dxfk-message-icon--error`). All selectors are now specificity `0,1,0`, so Tailwind utility classes can win without `!important`.
+
+### Migration
+
+Drop-in for most projects — only style overrides need rewriting. See the rename table in [README → Migration from v2.x](./README.md#migration-from-v2x).
+
 ## 2.6.0
 
 ### Features

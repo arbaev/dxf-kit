@@ -1,45 +1,45 @@
 <template>
-  <div class="dxf-statistics">
-    <h3 class="statistics-title">File Statistics</h3>
+  <div class="dxfk-statistics">
+    <h3 class="dxfk-statistics-title">File Statistics</h3>
 
-    <div class="statistics-grid">
-      <div class="stat-section">
-        <h4>General</h4>
-        <div class="stat-item">
-          <span class="stat-label">File Size:</span>
-          <span class="stat-value">{{ formatFileSize(statistics.fileSize) }}</span>
+    <div class="dxfk-statistics-grid">
+      <div class="dxfk-statistics-section">
+        <h4 class="dxfk-statistics-section-title">General</h4>
+        <div class="dxfk-statistics-item">
+          <span class="dxfk-statistics-label">File Size:</span>
+          <span class="dxfk-statistics-value">{{ formatFileSize(statistics.fileSize) }}</span>
         </div>
-        <div v-if="statistics.autocadVersion" class="stat-item">
-          <span class="stat-label">AutoCAD Version:</span>
-          <span class="stat-value">{{ statistics.autocadVersion }}</span>
+        <div v-if="statistics.autocadVersion" class="dxfk-statistics-item">
+          <span class="dxfk-statistics-label">AutoCAD Version:</span>
+          <span class="dxfk-statistics-value">{{ statistics.autocadVersion }}</span>
         </div>
       </div>
 
-      <div class="stat-section">
-        <h4>Entities</h4>
-        <div class="stat-item">
-          <span class="stat-label">Total Entities:</span>
-          <span class="stat-value stat-value-highlight">{{ statistics.totalEntities }}</span>
+      <div class="dxfk-statistics-section">
+        <h4 class="dxfk-statistics-section-title">Entities</h4>
+        <div class="dxfk-statistics-item">
+          <span class="dxfk-statistics-label">Total Entities:</span>
+          <span class="dxfk-statistics-value dxfk-statistics-value--highlight">{{ statistics.totalEntities }}</span>
         </div>
         <div
           v-for="(count, type) in sortedEntitiesByType"
           :key="type"
-          class="stat-item entity-type"
+          class="dxfk-statistics-item dxfk-statistics-item--entity-type"
         >
-          <span class="stat-label">{{ type }}:</span>
-          <span class="stat-value">{{ count }}</span>
+          <span class="dxfk-statistics-label">{{ type }}:</span>
+          <span class="dxfk-statistics-value">{{ count }}</span>
         </div>
       </div>
 
-      <div class="stat-section">
-        <h4>Structure</h4>
-        <div class="stat-item">
-          <span class="stat-label">Layers:</span>
-          <span class="stat-value">{{ statistics.layersCount }}</span>
+      <div class="dxfk-statistics-section">
+        <h4 class="dxfk-statistics-section-title">Structure</h4>
+        <div class="dxfk-statistics-item">
+          <span class="dxfk-statistics-label">Layers:</span>
+          <span class="dxfk-statistics-value">{{ statistics.layersCount }}</span>
         </div>
-        <div class="stat-item">
-          <span class="stat-label">Blocks:</span>
-          <span class="stat-value">{{ statistics.blocksCount }}</span>
+        <div class="dxfk-statistics-item">
+          <span class="dxfk-statistics-label">Blocks:</span>
+          <span class="dxfk-statistics-value">{{ statistics.blocksCount }}</span>
         </div>
       </div>
     </div>
@@ -70,69 +70,69 @@ const sortedEntitiesByType = computed(() => {
 </script>
 
 <style scoped>
-.dxf-statistics {
-  background-color: var(--dxf-vuer-bg-color, #fafafa);
-  border: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
-  border-radius: var(--dxf-vuer-border-radius, 4px);
-  padding: var(--dxf-vuer-spacing-md, 16px);
-  margin-top: var(--dxf-vuer-spacing-md, 16px);
+.dxfk-statistics {
+  background-color: var(--dxfk-bg-color, #fafafa);
+  border: 1px solid var(--dxfk-border-color, #e0e0e0);
+  border-radius: var(--dxfk-border-radius, 4px);
+  padding: var(--dxfk-spacing-md, 16px);
+  margin-top: var(--dxfk-spacing-md, 16px);
 }
 
-.statistics-title {
-  margin: 0 0 var(--dxf-vuer-spacing-md, 16px) 0;
+.dxfk-statistics-title {
+  margin: 0 0 var(--dxfk-spacing-md, 16px) 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--dxf-vuer-text-color, #212121);
+  color: var(--dxfk-text-color, #212121);
 }
 
-.statistics-grid {
+.dxfk-statistics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: var(--dxf-vuer-spacing-md, 16px);
+  gap: var(--dxfk-spacing-md, 16px);
 }
 
-.stat-section h4 {
-  margin: 0 0 var(--dxf-vuer-spacing-sm, 8px) 0;
+.dxfk-statistics-section-title {
+  margin: 0 0 var(--dxfk-spacing-sm, 8px) 0;
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--dxf-vuer-text-secondary, #757575);
+  color: var(--dxfk-text-secondary, #757575);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid var(--dxf-vuer-border-color, #e0e0e0);
-  padding-bottom: var(--dxf-vuer-spacing-xs, 4px);
+  border-bottom: 1px solid var(--dxfk-border-color, #e0e0e0);
+  padding-bottom: var(--dxfk-spacing-xs, 4px);
 }
 
-.stat-item {
+.dxfk-statistics-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--dxf-vuer-spacing-xs, 4px) 0;
+  padding: var(--dxfk-spacing-xs, 4px) 0;
   font-size: 0.875rem;
 }
 
-.stat-item.entity-type {
-  padding-left: var(--dxf-vuer-spacing-sm, 8px);
+.dxfk-statistics-item--entity-type {
+  padding-left: var(--dxfk-spacing-sm, 8px);
   font-size: 0.8125rem;
 }
 
-.stat-label {
-  color: var(--dxf-vuer-text-secondary, #757575);
+.dxfk-statistics-label {
+  color: var(--dxfk-text-secondary, #757575);
   font-weight: 500;
 }
 
-.stat-value {
-  color: var(--dxf-vuer-text-color, #212121);
+.dxfk-statistics-value {
+  color: var(--dxfk-text-color, #212121);
   font-weight: 600;
   font-family: "Courier New", monospace;
 }
 
-.stat-value-highlight {
-  color: var(--dxf-vuer-primary-color, #1040b0);
+.dxfk-statistics-value--highlight {
+  color: var(--dxfk-primary-color, #1040b0);
   font-size: 1rem;
 }
 
 @media (max-width: 768px) {
-  .statistics-grid {
+  .dxfk-statistics-grid {
     grid-template-columns: 1fr;
   }
 }
