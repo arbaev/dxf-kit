@@ -319,7 +319,9 @@ import {
 
 const dxf = parseDxf(dxfText);
 
-// 1. Per-entity bounding boxes (expands INSERTs, ATTRIBs, $INSUNITS, OCS)
+// 1. Per-entity bounding boxes (expands INSERTs, ATTRIBs, $INSUNITS, OCS).
+//    Each entry also exposes `worldMatrix` (composed parent-INSERT × OCS)
+//    and INSERT aggregates expose `childIds` listing all child pick ids.
 const pickingIndex = buildPickingIndex(dxf);
 
 // 2. Invisible THREE.Group of BoxGeometry meshes — one per entity
@@ -373,6 +375,34 @@ if (hits.length > 0) {
   console.log("hit", handle, entity?.type, extractEntityText(entity!));
 }
 ```
+
+### Highlight geometry
+
+`buildHighlightGeometry(entity, worldMatrix)` is a pure helper that returns polyline point arrays tracing the **visible geometry** of a DXF entity — the building block for hover/selection overlays that follow the actual lines, circles, arcs, polyline bulges, splines, and hatch contours instead of a bounding box.
+
+```ts
+import { buildHighlightGeometry, type HighlightGeometry } from "dxf-render";
+
+const entry = pickingIndex.byHandle.get(handle)?.[0];
+const entity = entityIndex.get(handle);
+if (!entry || !entity) return;
+
+const geom: HighlightGeometry = buildHighlightGeometry(entity, entry.worldMatrix ?? null);
+
+if (geom.fallbackToBBox) {
+  // No precise outline available (TEXT, MTEXT, ATTRIB, ATTDEF, DIMENSION,
+  // POINT, INSERT) — draw the entry's bbox edges instead.
+} else {
+  for (const polyline of geom.polylines) {
+    // Each polyline is a connected sequence of world-space points, ready
+    // to be wrapped in THREE.Line / THREE.BufferGeometry.
+  }
+}
+```
+
+Coverage: LINE, CIRCLE, ARC, ELLIPSE, POLYLINE / LWPOLYLINE (with bulge tessellation), SPLINE (NURBS or fit-point Catmull-Rom), SOLID, 3DFACE, HATCH (all boundary edge types), REGION (via the HATCH-borrowed `contourBoundary`), MLINE (centerline), LEADER, MULTILEADER (one polyline per leader line). XLINE/RAY return empty polylines with `fallbackToBBox: false` — they are intentionally skipped (infinite extent).
+
+INSERT aggregates return `fallbackToBBox: true` here — to highlight the contents of an INSERT instance, walk the aggregate's `PickingEntry.childIds` and call `buildHighlightGeometry` for each child entry. `dxf-vuer`'s `useHighlight` composable does exactly that.
 
 ### Associations
 

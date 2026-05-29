@@ -230,6 +230,9 @@ export function usePicking() {
   /** Underlying picking index (or null before any DXF is loaded). */
   const getPickingIndex = (): PickingIndex | null => pickingIndex;
 
+  /** Underlying entity-handle → DxfEntity map (or null before any DXF is loaded). */
+  const getEntityIndex = (): Map<string, DxfEntity> | null => entityIndex;
+
   /** All derived associations for the current DXF */
   const getAssociations = (): EntityAssociation[] => associations;
 
@@ -253,6 +256,7 @@ export function usePicking() {
     getPickingEntries,
     getPickingEntryById,
     getPickingIndex,
+    getEntityIndex,
     getAssociations,
     findAssociationsByHandle,
     getPickingGroup,

@@ -1,17 +1,28 @@
 import * as THREE from "three";
-import type { PickingEntry } from "dxf-render";
+import {
+  buildHighlightGeometry,
+  type DxfEntity,
+  type PickingEntry,
+  type PickingIndex,
+} from "dxf-render";
 
 /**
- * Manage a highlight overlay group: draw thin wireframe boxes over the
- * entities being hovered/clicked. Boxes mirror the picking bboxes; if a
- * tighter visualisation is needed, swap the bbox edges for the entity's
- * actual geometry in a follow-up.
+ * Manage a highlight overlay group: trace the precise geometry of hovered or
+ * clicked entities. Falls back to drawing the picking bbox edges for entity
+ * types that don't expose a meaningful outline (TEXT, MTEXT, DIMENSION,
+ * ATTRIB, ATTDEF, POINT, plain INSERT bbox when no children resolved).
+ *
+ * Call `installHighlightData(entityIndex, pickingIndex)` once per loaded DXF
+ * to give the composable access to entity payloads and the picking index
+ * (needed to expand INSERT aggregate entries into their child entries).
  */
 export function useHighlight() {
   let scene: THREE.Scene | null = null;
   let originOffset: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
   let highlightGroup: THREE.Group | null = null;
   let lineMaterial: THREE.LineBasicMaterial | null = null;
+  let entityIndex: Map<string, DxfEntity> | null = null;
+  let pickingIndex: PickingIndex | null = null;
 
   const init = (
     sceneRef: THREE.Scene,
@@ -39,6 +50,25 @@ export function useHighlight() {
     }
   };
 
+  /**
+   * Provide entity payloads and the picking index needed for precise-geometry
+   * highlight. Must be called after each successful DXF load (alongside
+   * `installPickingData` in `usePicking`). Without it, highlight silently
+   * falls back to bbox edges for every entry.
+   */
+  const installHighlightData = (
+    entityIdx: Map<string, DxfEntity>,
+    pickingIdx: PickingIndex,
+  ): void => {
+    entityIndex = entityIdx;
+    pickingIndex = pickingIdx;
+  };
+
+  const removeHighlightData = (): void => {
+    entityIndex = null;
+    pickingIndex = null;
+  };
+
   const setColor = (color: string): void => {
     lineMaterial?.color.set(color);
   };
@@ -47,36 +77,83 @@ export function useHighlight() {
     if (!highlightGroup || !lineMaterial) return;
     clear();
     for (const entry of entries) {
-      const size = new THREE.Vector3();
-      entry.bbox.getSize(size);
-      const center = new THREE.Vector3();
-      entry.bbox.getCenter(center);
-
-      // Use min size 0 — we don't need to inflate for highlight visibility,
-      // a degenerate flat box is still rendered as edges
-      const sx = Math.max(size.x, 0.01);
-      const sy = Math.max(size.y, 0.01);
-      const sz = Math.max(size.z, 0.01);
-
-      const boxGeo = new THREE.BoxGeometry(sx, sy, sz);
-      const edges = new THREE.EdgesGeometry(boxGeo);
-      boxGeo.dispose();
-      const lines = new THREE.LineSegments(edges, lineMaterial);
-      lines.position.set(
-        center.x - originOffset.x,
-        center.y - originOffset.y,
-        center.z - originOffset.z,
-      );
-      lines.frustumCulled = false;
-      lines.userData.isHighlight = true;
-      highlightGroup.add(lines);
+      renderEntry(entry);
     }
+  };
+
+  const renderEntry = (entry: PickingEntry): void => {
+    // INSERT aggregate → expand into child entries (children carry the
+    // actual geometry, the aggregate is only a bbox cover).
+    if (entry.type === "INSERT" && entry.childIds?.length && pickingIndex) {
+      for (const childId of entry.childIds) {
+        const child = pickingIndex.byId.get(childId);
+        if (child) renderEntry(child);
+      }
+      return;
+    }
+
+    const entity = entityIndex?.get(entry.handle);
+    if (!entity) {
+      addBBoxEdges(entry.bbox);
+      return;
+    }
+
+    const geom = buildHighlightGeometry(entity, entry.worldMatrix ?? null);
+    if (geom.fallbackToBBox) {
+      addBBoxEdges(entry.bbox);
+      return;
+    }
+    for (const polyline of geom.polylines) {
+      addPolyline(polyline);
+    }
+  };
+
+  const addPolyline = (points: THREE.Vector3[]): void => {
+    if (!highlightGroup || !lineMaterial || points.length < 2) return;
+    const positions = new Float32Array(points.length * 3);
+    for (let i = 0; i < points.length; i++) {
+      positions[i * 3] = points[i].x - originOffset.x;
+      positions[i * 3 + 1] = points[i].y - originOffset.y;
+      positions[i * 3 + 2] = points[i].z - originOffset.z;
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const line = new THREE.Line(geometry, lineMaterial);
+    line.frustumCulled = false;
+    line.userData.isHighlight = true;
+    highlightGroup.add(line);
+  };
+
+  const addBBoxEdges = (bbox: THREE.Box3): void => {
+    if (!highlightGroup || !lineMaterial) return;
+    const size = new THREE.Vector3();
+    bbox.getSize(size);
+    const center = new THREE.Vector3();
+    bbox.getCenter(center);
+
+    // Floor a degenerate box (POINT, flat 2D text) to a visible sliver.
+    const sx = Math.max(size.x, 0.01);
+    const sy = Math.max(size.y, 0.01);
+    const sz = Math.max(size.z, 0.01);
+
+    const boxGeo = new THREE.BoxGeometry(sx, sy, sz);
+    const edges = new THREE.EdgesGeometry(boxGeo);
+    boxGeo.dispose();
+    const lines = new THREE.LineSegments(edges, lineMaterial);
+    lines.position.set(
+      center.x - originOffset.x,
+      center.y - originOffset.y,
+      center.z - originOffset.z,
+    );
+    lines.frustumCulled = false;
+    lines.userData.isHighlight = true;
+    highlightGroup.add(lines);
   };
 
   const clear = (): void => {
     if (!highlightGroup) return;
     for (const child of [...highlightGroup.children]) {
-      if (child instanceof THREE.LineSegments) {
+      if (child instanceof THREE.Line || child instanceof THREE.LineSegments) {
         child.geometry.dispose();
       }
       highlightGroup.remove(child);
@@ -94,7 +171,17 @@ export function useHighlight() {
       lineMaterial = null;
     }
     scene = null;
+    entityIndex = null;
+    pickingIndex = null;
   };
 
-  return { init, setColor, highlight, clear, dispose };
+  return {
+    init,
+    installHighlightData,
+    removeHighlightData,
+    setColor,
+    highlight,
+    clear,
+    dispose,
+  };
 }

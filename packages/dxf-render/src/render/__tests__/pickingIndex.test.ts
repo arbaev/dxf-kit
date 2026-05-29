@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import * as THREE from "three";
 import { buildPickingIndex } from "../pickingIndex";
 import type {
   DxfData,
@@ -451,6 +452,27 @@ describe("buildPickingIndex", () => {
     expect(box.max.y - box.min.y).toBeCloseTo(100, 1);
   });
 
+  it("does NOT wrap a single-word MTEXT line even when it exceeds refWidth", () => {
+    // Real-world case: short label "X-29" authored with a narrow column
+    // reference (entity.width ≈ textHeight). Word-wrap is impossible (no
+    // whitespace inside the word) — the line overflows the column at full
+    // width, so bbox must stay short and wide, not tall and narrow.
+    const mtext: DxfTextEntity = {
+      type: "MTEXT",
+      handle: "T1",
+      position: { x: 0, y: 0 },
+      text: "X-29",
+      height: 10,
+      width: 12, // narrower than lineWidth = 4 * 10 * 0.7 = 28
+      attachmentPoint: 1,
+    };
+    const box = buildPickingIndex({ entities: [mtext] }).byHandle.get("T1")![0].bbox;
+    // Width = 28 (full unwrapped) + 2 * 7 padX = 42
+    expect(box.max.x - box.min.x).toBeCloseTo(42, 1);
+    // Height = single line: 10 * 5/3 ≈ 16.67
+    expect(box.max.y - box.min.y).toBeCloseTo(10 * (5 / 3), 1);
+  });
+
   it("centers MTEXT bbox horizontally for MiddleCenter attachmentPoint (5)", () => {
     const mtext: DxfTextEntity = {
       type: "MTEXT",
@@ -476,5 +498,66 @@ describe("buildPickingIndex", () => {
       vertices: [{ x: 0, y: 0 }, { x: 1, y: 0 }],
     };
     expect(buildPickingIndex({ entities: [line] }).entries).toHaveLength(0);
+  });
+
+  it("omits worldMatrix for top-level entities without OCS", () => {
+    const line: DxfLineEntity = {
+      type: "LINE",
+      handle: "L1",
+      vertices: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+    };
+    const entry = buildPickingIndex({ entities: [line] }).byHandle.get("L1")![0];
+    expect(entry.worldMatrix).toBeUndefined();
+  });
+
+  it("stores worldMatrix on INSERT child entries reflecting position/rotation/scale", () => {
+    const childLine: DxfLineEntity = {
+      type: "LINE",
+      handle: "C1",
+      vertices: [{ x: 0, y: 0 }, { x: 1, y: 0 }],
+    };
+    const block: DxfBlock = { name: "BLK", entities: [childLine] };
+    const insert: DxfInsertEntity = {
+      type: "INSERT",
+      handle: "I1",
+      name: "BLK",
+      position: { x: 10, y: 20, z: 0 },
+      xScale: 2,
+      yScale: 2,
+      rotation: 0,
+    };
+    const dxf: DxfData = { entities: [insert], blocks: { BLK: block } };
+    const index = buildPickingIndex(dxf);
+
+    const childEntry = index.entries.find((e) => e.handle === "C1");
+    expect(childEntry).toBeDefined();
+    expect(childEntry!.worldMatrix).toBeDefined();
+
+    // Verify the matrix maps local (0,0) to world (10,20) and (1,0) to (12,20)
+    const v = new THREE.Vector3(0, 0, 0).applyMatrix4(childEntry!.worldMatrix!);
+    expect(v.x).toBeCloseTo(10, 6);
+    expect(v.y).toBeCloseTo(20, 6);
+    const v2 = new THREE.Vector3(1, 0, 0).applyMatrix4(childEntry!.worldMatrix!);
+    expect(v2.x).toBeCloseTo(12, 6);
+    expect(v2.y).toBeCloseTo(20, 6);
+  });
+
+  it("stores worldMatrix on the aggregate INSERT entry", () => {
+    const childLine: DxfLineEntity = {
+      type: "LINE",
+      handle: "C1",
+      vertices: [{ x: 0, y: 0 }, { x: 1, y: 0 }],
+    };
+    const block: DxfBlock = { name: "BLK", entities: [childLine] };
+    const insert: DxfInsertEntity = {
+      type: "INSERT",
+      handle: "I1",
+      name: "BLK",
+      position: { x: 5, y: 6, z: 0 },
+    };
+    const dxf: DxfData = { entities: [insert], blocks: { BLK: block } };
+    const aggregate = buildPickingIndex(dxf).byHandle.get("I1")![0];
+    expect(aggregate.type).toBe("INSERT");
+    expect(aggregate.worldMatrix).toBeDefined();
   });
 });

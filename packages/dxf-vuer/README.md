@@ -223,13 +223,17 @@ interface PickingEvent {
 
 ### How highlighting works
 
-The viewer ships a built-in yellow bbox overlay. Three props control it:
+The viewer ships a built-in highlight overlay that traces the **precise geometry** of the hovered entity — lines, circles, arcs, polylines (with bulge), splines, hatch contours, and INSERT children all follow their real outline, not a bounding rectangle. Entities without a meaningful outline (TEXT, MTEXT, DIMENSION, ATTRIB, ATTDEF, POINT) fall back to bbox edges so they remain visually identifiable.
+
+Three props control it:
 
 | Prop                  | Effect                                                                                                                                                                                                                                  |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pickingEnabled`      | Master switch. When `false`, no events are emitted and no highlight is drawn                                                                                                                                                            |
 | `highlightOnHover`    | When `true`, the viewer draws the highlight overlay on hover. Turn it **off** if you render selection from your own UI (e.g. AG Grid) and only need the events                                                                          |
 | `highlightAssociated` | When `true` (default), hovering an entity that participates in an association highlights **all members** (e.g. LEADER + linked MTEXT). When `false`, only the hovered entity is highlighted. Has no effect if `highlightOnHover` is off |
+
+For consumers building a fully custom selection visual, the same machinery is available framework-agnostic as `buildHighlightGeometry(entity, worldMatrix)` from `dxf-render` — it returns the polyline point arrays without allocating Three.js objects.
 
 ### Associations
 
@@ -375,9 +379,10 @@ if (firstMleader) viewer.value!.highlight(firstMleader.members);
 ```
 
 > Picking is implemented as an invisible bbox group on the scene — entities are
-> picked by their bounding box, not by exact geometry. Tradeoff: very fast and
-> framework-agnostic, but the highlight is a rectangle, not a precise outline.
-> Precise per-geometry highlighting is on the roadmap.
+> picked by their bounding box, which is very fast and framework-agnostic. The
+> highlight overlay, in contrast, traces the precise geometry of the selected
+> entity (lines, arcs, polylines, hatch contours, INSERT children); only types
+> without a meaningful outline (TEXT, DIMENSION, etc.) fall back to bbox edges.
 
 ## Accessibility
 

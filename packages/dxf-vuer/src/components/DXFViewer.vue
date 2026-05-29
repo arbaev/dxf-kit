@@ -440,11 +440,17 @@ const setupPickingForDxf = (dxf: DxfData): void => {
   const offset = { x: oo.x, y: oo.y, z: oo.z };
   picking.installPickingData(dxf, scene, offset);
   highlightCtl.init(scene, offset, props.highlightColor);
+  const entityIdx = picking.getEntityIndex();
+  const pickingIdx = picking.getPickingIndex();
+  if (entityIdx && pickingIdx) {
+    highlightCtl.installHighlightData(entityIdx, pickingIdx);
+  }
   if (props.pickingDebug) picking.setDebug(true);
   lastDxfForPicking = dxf;
 };
 
 const teardownPicking = (): void => {
+  highlightCtl.removeHighlightData();
   highlightCtl.dispose();
   picking.removePickingData(getScene());
   lastDxfForPicking = null;

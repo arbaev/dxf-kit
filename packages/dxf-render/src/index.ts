@@ -17,6 +17,10 @@ export {
   setPickingGroupDebug,
 } from "./render/createPickingGroup";
 export { buildEntityIndex, extractEntityText } from "./utils/entityIndex";
+export {
+  buildHighlightGeometry,
+  type HighlightGeometry,
+} from "./render/highlightGeometry";
 export { getZoomBox, type GetZoomBoxOptions } from "./utils/getZoomBox";
 export {
   getZoomBoxForLayer,

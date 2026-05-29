@@ -43,6 +43,22 @@ export interface PickingEntry {
   layer: string;
   /** Axis-aligned bounding box in world coordinates (after OCS + INSERT transforms) */
   bbox: THREE.Box3;
+  /**
+   * Composed local→world transform (parent INSERT chain × OCS). `undefined`
+   * for top-level entities with no OCS. Consumers that need to project local
+   * entity geometry into world coords (precise highlight, snap helpers,
+   * custom overlays) apply this matrix to vertices generated from the raw
+   * entity. The world-space `bbox` above is already this matrix applied to
+   * the entity's local bbox.
+   */
+  worldMatrix?: THREE.Matrix4;
+  /**
+   * For INSERT aggregate entries only: the unique ids of all child entries
+   * (and any ATTRIBs) emitted for this instance, in emit order. Lets
+   * consumers walk the contents of an INSERT instance without scanning the
+   * full entries list. Undefined for non-INSERT entries.
+   */
+  childIds?: string[];
 }
 
 export interface PickingIndex {
@@ -134,7 +150,9 @@ function collectEntry(
     : localBox.clone();
 
   const id = ctx.instancePath ? `${handle}@${ctx.instancePath}` : handle;
-  out.push({ id, handle, type: entity.type, layer, bbox: worldBox });
+  const entry: PickingEntry = { id, handle, type: entity.type, layer, bbox: worldBox };
+  if (worldMatrix) entry.worldMatrix = worldMatrix;
+  out.push(entry);
 }
 
 function expandInsert(
@@ -242,12 +260,16 @@ function expandInsert(
             const aggregateId = ctx.instancePath
               ? `${insertHandle}@${ctx.instancePath}${arraySuffix}`
               : insertHandle + arraySuffix;
+            const childIds: string[] = [];
+            for (let i = insertStart; i < out.length; i++) childIds.push(out[i].id);
             out.push({
               id: aggregateId,
               handle: insertHandle,
               type: "INSERT",
               layer: insertLayer,
               bbox: aggregate,
+              worldMatrix,
+              childIds,
             });
           }
         }
@@ -532,12 +554,17 @@ function textBBox(
 
     // Wrap accounting:
     // - Lines that fit within refWidth stay on a single row.
-    // - Long lines wrap at WORD boundaries (not characters), which tends to leave
-    //   each row only ~70-80% full because the next word jumps to a new row when
-    //   it doesn't fit. A 30% overhead factor keeps the bbox conservative enough
-    //   to cover the visible row count for narrow columns of long prose.
+    // - Lines with no whitespace cannot word-wrap — they overflow the column
+    //   and render at their full width (e.g. short labels like "X-29" with a
+    //   narrow `width` reference). Without this check the bbox over-rotated
+    //   to tall-and-narrow for any single-word label that exceeded refWidth.
+    // - Long lines with whitespace wrap at WORD boundaries, which leaves each
+    //   row only ~70-80% full because the next word jumps to a new row when
+    //   it doesn't fit. A 30% overhead factor keeps the bbox conservative
+    //   enough to cover the visible row count for narrow columns of prose.
+    const canWrap = /\s/.test(visibleLines[i]);
     let wrapRows: number;
-    if (refWidth === Infinity || lineWidth <= refWidth) {
+    if (refWidth === Infinity || lineWidth <= refWidth || !canWrap) {
       wrapRows = 1;
     } else {
       const WORD_WRAP_OVERHEAD = 1.3;
@@ -545,8 +572,11 @@ function textBBox(
     }
     totalH += lineHeight * wrapRows;
 
-    // Visual width of THIS line (capped by wrap boundary)
-    const visibleLineW = Math.min(lineWidth, refWidth === Infinity ? lineWidth : refWidth);
+    // Visual width of THIS line: unwrappable lines overflow the column and
+    // render at their full width; wrappable lines are capped to refWidth.
+    const visibleLineW = !canWrap || refWidth === Infinity
+      ? lineWidth
+      : Math.min(lineWidth, refWidth);
     if (visibleLineW > widestLineW) widestLineW = visibleLineW;
   }
   if (totalH <= 0) totalH = h * (5 / 3);
