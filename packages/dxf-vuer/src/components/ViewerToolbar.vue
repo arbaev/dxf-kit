@@ -28,6 +28,32 @@
       </svg>
     </button>
     <button
+      v-if="showMeasureButton"
+      class="dxfk-toolbar-button"
+      :class="{ 'dxfk-toolbar-button--active': measureActive }"
+      @click="$emit('toggle-measure')"
+      :title="measureActive ? 'Disable measure tool' : 'Measure distance'"
+      :aria-label="measureActive ? 'Disable measure tool' : 'Enable measure-distance tool'"
+      :aria-pressed="measureActive"
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M3 17 17 3l4 4L7 21z" />
+        <path d="M14 6l2 2" />
+        <path d="M11 9l2 2" />
+        <path d="M8 12l2 2" />
+        <path d="M5 15l2 2" />
+      </svg>
+    </button>
+    <button
       v-if="showResetButton"
       class="dxfk-toolbar-button"
       @click="$emit('reset-view')"
@@ -101,6 +127,8 @@ interface Props {
   showExportButton?: boolean;
   showResetButton?: boolean;
   showFullscreenButton?: boolean;
+  showMeasureButton?: boolean;
+  measureActive?: boolean;
   isFullscreen?: boolean;
   darkTheme?: boolean;
 }
@@ -109,6 +137,8 @@ withDefaults(defineProps<Props>(), {
   showExportButton: false,
   showResetButton: false,
   showFullscreenButton: true,
+  showMeasureButton: false,
+  measureActive: false,
   isFullscreen: false,
   darkTheme: false,
 });
@@ -117,6 +147,7 @@ defineEmits<{
   (e: "export"): void;
   (e: "reset-view"): void;
   (e: "toggle-fullscreen"): void;
+  (e: "toggle-measure"): void;
 }>();
 </script>
 
@@ -150,10 +181,26 @@ defineEmits<{
   transform: scale(0.94);
 }
 
+.dxfk-toolbar-button--active {
+  background-color: var(--dxfk-primary-color, #1040b0);
+  border-color: var(--dxfk-primary-color, #1040b0);
+  color: #fff;
+}
+
+.dxfk-toolbar-button--active:hover {
+  border-color: var(--dxfk-primary-color, #1040b0);
+}
+
 .dxfk-toolbar.dxfk-dark .dxfk-toolbar-button {
   background-color: rgba(30, 30, 30, 0.95);
   border-color: #444;
   color: #e0e0e0;
+}
+
+.dxfk-toolbar.dxfk-dark .dxfk-toolbar-button--active {
+  background-color: var(--dxfk-primary-color, #2563eb);
+  border-color: var(--dxfk-primary-color, #2563eb);
+  color: #fff;
 }
 
 @media (max-width: 768px) {

@@ -206,6 +206,8 @@
           :overlay-position="pickingPosition"
           :show-rulers="showRulers"
           :ruler-units="rulerUnits"
+          :show-measure-button="true"
+          v-model:measure-distance="measureDistance"
           v-model:hidden-layers="hiddenLayers"
           @dxf-data="handleDXFData"
           @unsupported-entities="handleUnsupportedEntities"
@@ -216,6 +218,8 @@
           @entity-hover="handleEntityHover"
           @entity-click="handleEntityClick"
           @entities-select="handleEntitiesSelect"
+          @measure="handleMeasureResult"
+          @measure-cancel="handleMeasureCancel"
         >
           <template #overlay>
             <div v-if="pickingEnabled && hoveredEntity" class="hover-pill">
@@ -418,6 +422,42 @@
           <div class="settings-cell">
             <header class="settings-cell-header">
               <span class="settings-cell-title">
+                Measurement
+                <span v-if="measureDistance" class="settings-badge">on</span>
+              </span>
+              <button
+                v-if="lastMeasureResult"
+                class="settings-cell-action"
+                type="button"
+                @click="clearMeasureResult"
+              >
+                Clear
+              </button>
+            </header>
+            <label class="picking-label">
+              <input type="checkbox" v-model="measureDistance" />
+              <span>Distance tool (linear ruler)</span>
+            </label>
+            <p class="settings-cell-hint">
+              Toggle the ruler icon in the toolbar (top-right) or the checkbox above.
+              Click two points on the drawing to measure. <kbd>Esc</kbd> cancels an
+              in-flight measurement. Units follow the rulers (<code>{{ rulerUnits }}</code>).
+            </p>
+            <div v-if="lastMeasureResult" class="measure-result">
+              <span class="measure-result-label">Last reading:</span>
+              <code class="measure-result-value">{{ formattedMeasureValue }}</code>
+              <span class="measure-result-meta">
+                A&nbsp;({{ lastMeasureResult.p1.x.toFixed(2) }},
+                {{ lastMeasureResult.p1.y.toFixed(2) }}) &rarr;
+                B&nbsp;({{ lastMeasureResult.p2.x.toFixed(2) }},
+                {{ lastMeasureResult.p2.y.toFixed(2) }})
+              </span>
+            </div>
+          </div>
+
+          <div class="settings-cell">
+            <header class="settings-cell-header">
+              <span class="settings-cell-title">
                 Layer visibility (<code>v-model</code>)
                 <span v-if="hiddenLayers.length > 0" class="settings-badge">{{
                   hiddenLayers.length
@@ -567,7 +607,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { FileUploader, UnsupportedEntities, DXFViewer } from "dxf-vuer";
-import type { AntialiasingMode, OverlayPosition, PickingEvent } from "dxf-vuer";
+import type {
+  AntialiasingMode,
+  OverlayPosition,
+  PickingEvent,
+  MeasureResult,
+} from "dxf-vuer";
 import "dxf-vuer/style.css";
 import type { DxfData, EntityAssociation } from "dxf-render";
 import { findEntitiesByText } from "dxf-render";
@@ -621,6 +666,8 @@ const highlightOnHover = ref(true);
 const highlightAssociated = ref(true);
 const rectangleSelection = ref(true);
 const selectedEntities = ref<PickingEvent[]>([]);
+const measureDistance = ref(false);
+const lastMeasureResult = ref<MeasureResult | null>(null);
 const hiddenLayers = ref<string[]>([]);
 const hoveredEntity = ref<PickingEvent | null>(null);
 const clickedEntity = ref<PickingEvent | null>(null);
@@ -700,6 +747,29 @@ const clearRectangleSelection = () => {
   dxfViewerRef.value?.clearHighlight();
 };
 
+const handleMeasureResult = (result: MeasureResult) => {
+  lastMeasureResult.value = result;
+};
+
+const handleMeasureCancel = () => {
+  // Don't clear lastMeasureResult — keep the previous reading visible.
+};
+
+const clearMeasureResult = () => {
+  lastMeasureResult.value = null;
+  dxfViewerRef.value?.clearMeasure();
+};
+
+const formattedMeasureValue = computed<string>(() => {
+  const r = lastMeasureResult.value;
+  if (!r) return "";
+  const value = Math.abs(r.value);
+  const fixed = value >= 100 ? r.value.toFixed(1) : r.value.toFixed(2);
+  if (r.units === "mm") return `${fixed} mm`;
+  if (r.units === "inch") return `${fixed} in`;
+  return fixed;
+});
+
 const zoomToSelectedEntity = (event: PickingEvent) => {
   dxfViewerRef.value?.zoomToEntity([event.handle]);
 };
@@ -738,6 +808,8 @@ const resetSettings = () => {
   highlightOnHover.value = true;
   highlightAssociated.value = true;
   rectangleSelection.value = true;
+  measureDistance.value = false;
+  lastMeasureResult.value = null;
   showFileName.value = true;
   showCoordinates.value = true;
   showZoomLevel.value = true;
@@ -1682,6 +1754,49 @@ const resetView = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.measure-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  background: rgba(255, 107, 26, 0.08);
+  border: 1px solid rgba(255, 107, 26, 0.3);
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.measure-result-label {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.measure-result-value {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #c8501a;
+}
+
+.measure-result-meta {
+  color: var(--text-secondary);
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 0.7rem;
+}
+
+.app.dark .measure-result {
+  background: rgba(255, 107, 26, 0.12);
+  border-color: rgba(255, 107, 26, 0.45);
+}
+
+.app.dark .measure-result-value {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ff9555;
 }
 
 .app.dark .vmodel-state {

@@ -84,18 +84,28 @@
         <slot
           v-if="toolbarPosition === pos"
           name="toolbar"
-          v-bind="{ resetView: handleResetView, exportToPNG, toggleFullscreen, isFullscreen }"
+          v-bind="{
+            resetView: handleResetView,
+            exportToPNG,
+            toggleFullscreen,
+            isFullscreen,
+            toggleMeasureDistance,
+            measureActive: measureDistance,
+          }"
         >
           <ViewerToolbar
             :class="classes?.toolbar"
             :show-export-button="showExportButton"
             :show-reset-button="showResetButton"
             :show-fullscreen-button="showFullscreenButton"
+            :show-measure-button="showMeasureButton"
+            :measure-active="measureDistance"
             :is-fullscreen="isFullscreen"
             :dark-theme="darkTheme"
             @export="exportToPNG"
             @reset-view="handleResetView"
             @toggle-fullscreen="toggleFullscreen"
+            @toggle-measure="toggleMeasureDistance"
           >
             <template v-if="$slots['toolbar-extra']" #extra>
               <slot name="toolbar-extra" />
@@ -247,6 +257,20 @@
     </div>
 
     <div
+      v-if="measureLabel"
+      class="dxfk-measure-label"
+      :class="[{ 'dxfk-dark': darkTheme }, classes?.measureLabel]"
+      :style="{
+        left: measureLabel.left + 'px',
+        top: measureLabel.top + 'px',
+        '--dxfk-measure-color': measureColor,
+      }"
+      aria-live="polite"
+    >
+      {{ measureLabel.text }}
+    </div>
+
+    <div
       v-if="rectSelScreenRect"
       class="dxfk-selection-rect"
       :class="[
@@ -301,6 +325,12 @@ import {
   type RectSelectionResolvedMode,
 } from "../composables/useRectangleSelection";
 import { useKeyboardNavigation } from "../composables/useKeyboardNavigation";
+import {
+  useMeasurement,
+  formatMeasureValue,
+  type MeasureResult,
+  type MeasureUnits,
+} from "../composables/useMeasurement";
 import type {
   DxfData,
   DxfLayer,
@@ -359,6 +389,10 @@ interface Props {
   rectangleSelection?: boolean;
   rectangleSelectionModifier?: RectSelectionModifier;
   rectangleSelectionMode?: RectSelectionMode;
+  measureDistance?: boolean;
+  showMeasureButton?: boolean;
+  measureUnits?: RulerUnits;
+  measureColor?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -399,6 +433,9 @@ const props = withDefaults(defineProps<Props>(), {
   rectangleSelection: false,
   rectangleSelectionModifier: "shift",
   rectangleSelectionMode: "auto",
+  measureDistance: false,
+  showMeasureButton: false,
+  measureColor: "#ff6b1a",
 });
 
 interface Emits {
@@ -414,6 +451,9 @@ interface Emits {
   (e: "selection-start", mode: RectSelectionResolvedMode): void;
   (e: "selection-end"): void;
   (e: "update:hiddenLayers", hidden: string[]): void;
+  (e: "update:measureDistance", on: boolean): void;
+  (e: "measure", result: MeasureResult): void;
+  (e: "measure-cancel"): void;
 }
 
 const emit = defineEmits<Emits>();
@@ -466,6 +506,8 @@ const picking = usePicking();
 const highlightCtl = useHighlight();
 const rectSelection = useRectangleSelection();
 const rectSelScreenRect = rectSelection.screenRect;
+const measurement = useMeasurement();
+const measureState = measurement.state;
 let lastDxfForPicking: DxfData | null = null;
 
 // Currently selected entity surfaced to the built-in PropertiesPanel.
@@ -547,6 +589,41 @@ const handleRectSelectionSelect = (
 
 const handleRectSelectionEnd = (): void => {
   emit("selection-end");
+};
+
+const handleMeasureResult = (result: MeasureResult): void => {
+  emit("measure", result);
+};
+
+const handleMeasureCancel = (): void => {
+  emit("measure-cancel");
+};
+
+const attachMeasurementIfReady = (): void => {
+  const renderer = getRenderer();
+  const camera = getCamera();
+  const scene = getScene();
+  if (!renderer || !camera || !scene) return;
+  measurement.attach(
+    renderer.domElement,
+    scene,
+    camera,
+    getControls() as unknown as Parameters<typeof measurement.attach>[3],
+    getOriginOffset,
+    () => renderScene(),
+    {
+      onResult: handleMeasureResult,
+      onCancel: handleMeasureCancel,
+    },
+  );
+  measurement.setColor(props.measureColor);
+  measurement.setUnitsScale(measureUnitsScale.value, currentMeasureUnits.value);
+  if (props.measureDistance) {
+    measurement.setEnabled(true);
+    // Suspend competing pointer tools so they don't double-fire on the same click.
+    picking.setEnabled(false);
+    rectSelection.setEnabled(false);
+  }
 };
 
 const attachRectSelectionIfReady = (): void => {
@@ -752,10 +829,69 @@ const rulerUnitsLabel = computed<string>(() => {
   return "—";
 });
 
+// Units the measurement label renders in. Defaults to `rulerUnits` (so a single
+// "switch units" control governs both surfaces), can be overridden per-prop.
+const currentMeasureUnits = computed<MeasureUnits>(
+  () => props.measureUnits ?? props.rulerUnits,
+);
+
+// Same conversion chain as `rulerUnitsScale`, but driven by `currentMeasureUnits`
+// so the label respects the prop override.
+const measureUnitsScale = computed<number>(() => {
+  const units = currentMeasureUnits.value;
+  if (units === "dxf-units") return 1;
+  const insUnits = activeDxf.value?.header?.$INSUNITS ?? 0;
+  const toMm = insUnits === 0 ? 1 : getUnitsToMmFactor(insUnits) || 1;
+  return units === "inch" ? toMm / 25.4 : toMm;
+});
+
+// HTML-overlay label placed at the midpoint of the in-flight or completed
+// segment. Re-computed reactively against camera position / state changes —
+// pan / zoom triggers re-render which causes the label to reposition.
+const measureLabel = computed<{ left: number; top: number; text: string } | null>(() => {
+  // Reactive dep on camera pan/zoom — value unused, only the read matters.
+  void cameraTick.value;
+  const st = measureState.value;
+  if (st.points.length === 0) return null;
+  const p1 = st.points[0];
+  const p2 = st.points[1] ?? st.hoverWorld;
+  if (!p2) return null;
+  const cam = getCamera();
+  const container = dxfContainer.value;
+  if (!cam || !container) return null;
+  // Read offset eagerly (not as a Vue ref) — same lifecycle as cursorWorld
+  // computed in handleMouseMove.
+  const offset = getOriginOffset();
+  const mid = new THREE.Vector3(
+    (p1.x + p2.x) / 2 - offset.x,
+    (p1.y + p2.y) / 2 - offset.y,
+    0,
+  );
+  mid.project(cam);
+  const rect = container.getBoundingClientRect();
+  const left = (mid.x + 1) * 0.5 * rect.width;
+  const top = (-mid.y + 1) * 0.5 * rect.height;
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const scaled = distance * measureUnitsScale.value;
+  return {
+    left,
+    top,
+    text: formatMeasureValue(scaled, currentMeasureUnits.value),
+  };
+});
+
 // Reactive snapshot of the scene's originOffset. `getOriginOffset()` returns a
 // non-reactive object that changes only when a new DXF is rendered, so we mirror
 // it into a ref and refresh after every successful displayDXF() call.
 const rulerOriginOffset = ref({ x: 0, y: 0 });
+
+// Bumped on every `controls.change` so screen-space-projecting computeds
+// (e.g. `measureLabel`) re-evaluate when the camera pans / zooms but no
+// Vue ref otherwise changed. Three.js scene overlays already follow the
+// camera natively — this ref exists purely to drag Vue's reactivity along.
+const cameraTick = ref(0);
 
 const refreshRulerOriginOffset = () => {
   const oo = getOriginOffset();
@@ -1000,6 +1136,34 @@ watch(
   (color) => { highlightCtl.setColor(color); },
 );
 
+watch(
+  () => props.measureColor,
+  (color) => measurement.setColor(color),
+);
+
+watch(
+  [measureUnitsScale, currentMeasureUnits],
+  ([scale, units]) => measurement.setUnitsScale(scale, units),
+);
+
+watch(
+  () => props.measureDistance,
+  (on) => {
+    measurement.setEnabled(on);
+    if (on) {
+      // Measurement intercepts clicks before picking and rectangle-selection.
+      // Suspend those tools so they don't fight for the same click stream.
+      picking.setEnabled(false);
+      rectSelection.setEnabled(false);
+    } else {
+      // Restore prop-driven state. Picking re-enables if its prop is true;
+      // rectangle selection re-attaches if its prop is true.
+      picking.setEnabled(props.pickingEnabled);
+      rectSelection.setEnabled(props.rectangleSelection && props.pickingEnabled);
+    }
+  },
+);
+
 // Push external `hiddenLayers` updates into useLayers (controlled mode).
 // User-driven toggles emit `update:hiddenLayers` via the onChange option, so
 // this watch only fires for genuine external changes — the same-set check
@@ -1054,8 +1218,19 @@ onMounted(() => {
   nextTick(() => {
     if (dxfContainer.value) {
       initThreeJS(dxfContainer.value, { enableControls: true, aaMode: props.antialiasing });
+
+      // Bump cameraTick on every controls change so screen-projecting
+      // computeds (measureLabel) re-evaluate as the camera moves.
+      const ctrlsForTick = getControls();
+      if (ctrlsForTick) {
+        ctrlsForTick.addEventListener("change", () => {
+          cameraTick.value++;
+        });
+      }
+
       attachPickingIfReady();
       attachRectSelectionIfReady();
+      attachMeasurementIfReady();
 
       const cam = getCamera();
       rulerCamera.value = cam ? markRaw(cam) : null;
@@ -1092,10 +1267,16 @@ onBeforeUnmount(() => {
 
   picking.detach();
   rectSelection.detach();
+  measurement.dispose();
   keyboardNav.detach();
   teardownPicking();
   cleanup();
 });
+
+const toggleMeasureDistance = (): void => {
+  const next = !props.measureDistance;
+  emit("update:measureDistance", next);
+};
 
 defineExpose({
   loadDXFFromText,
@@ -1115,6 +1296,8 @@ defineExpose({
   zoomToEntity,
   zoomToLayer,
   getPickingIndex: picking.getPickingIndex,
+  clearMeasure: () => measurement.clear(),
+  toggleMeasureDistance,
 });
 </script>
 
@@ -1299,6 +1482,22 @@ defineExpose({
   font-size: 1rem;
   color: var(--dxfk-text-secondary, #757575);
   max-width: 300px;
+}
+
+.dxfk-measure-label {
+  position: absolute;
+  z-index: 14;
+  pointer-events: none;
+  transform: translate(-50%, -150%);
+  padding: 2px 8px;
+  background-color: var(--dxfk-measure-color, #ff6b1a);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  user-select: none;
 }
 
 .dxfk-selection-rect {

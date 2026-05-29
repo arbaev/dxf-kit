@@ -92,6 +92,10 @@ async function loadFile(file) {
 | `rectangleSelection`         | `boolean`                          | `false`           | Enable modifier-drag rectangle selection. Requires `pickingEnabled` to function (the picking index is the source of bboxes)                                              |
 | `rectangleSelectionModifier` | `"shift" \| "ctrl" \| "alt"`       | `"shift"`         | Modifier key that arms the rectangle drag. While held, OrbitControls panning is suspended and the cursor turns into a crosshair                                          |
 | `rectangleSelectionMode`     | `"auto" \| "window" \| "crossing"` | `"auto"`          | `auto` — drag direction decides (AutoCAD): L→R = window (fully inside), R→L = crossing (any overlap). The other values lock the semantic regardless of drag direction    |
+| `measureDistance`            | `boolean`                          | `false`           | Named v-model (`v-model:measure-distance`). Enables the linear distance tool — click two points on the canvas to measure their Euclidean distance. See [Measurement tool](#measurement-tool) |
+| `showMeasureButton`          | `boolean`                          | `false`           | Render a ruler-icon toggle in `<ViewerToolbar>` that drives `measureDistance`. Active state is shown via `.dxfk-toolbar-button--active` + `aria-pressed`                |
+| `measureUnits`               | `RulerUnits`                       | —                 | Override label units independently from `rulerUnits`. When omitted (default), measurement labels follow `rulerUnits` so a single switch governs both rulers and labels  |
+| `measureColor`               | `string`                           | `"#ff6b1a"`       | Color of the measurement segment, marker points, and the value label. Cascades into the `--dxfk-measure-color` CSS custom property                                       |
 
 `OverlayPosition` = `"top-left"` | `"top-center"` | `"top-right"` | `"bottom-left"` | `"bottom-center"` | `"bottom-right"`
 
@@ -118,7 +122,7 @@ async function loadFile(file) {
 
 | Slot             | Scoped data                                                  | Description                                            |
 | ---------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
-| `#toolbar`       | `{ resetView, exportToPNG, toggleFullscreen, isFullscreen }` | Replace entire toolbar                                 |
+| `#toolbar`       | `{ resetView, exportToPNG, toggleFullscreen, isFullscreen, toggleMeasureDistance, measureActive }` | Replace entire toolbar                 |
 | `#toolbar-extra` | —                                                            | Add buttons to the existing toolbar                    |
 | `#loading`       | `{ phase, progress }`                                        | Replace loading screen                                 |
 | `#error`         | `{ message, retry }`                                         | Replace error screen                                   |
@@ -158,6 +162,9 @@ async function loadFile(file) {
 | `selection-start`      | `"window" \| "crossing"` | Fired when a rectangle drag passes the 4px threshold. Payload is the resolved mode |
 | `selection-end`        | —                      | Fired after `entities-select` or when the drag is cancelled (Esc) |
 | `update:hiddenLayers`  | `string[]`             | Sent on every internal layer toggle / show-all / hide-all (only when `hiddenLayers` is provided). Powers `v-model:hidden-layers` |
+| `update:measureDistance` | `boolean`            | Sent when the toolbar's ruler button toggles or `toggleMeasureDistance()` is called. Powers `v-model:measure-distance`           |
+| `measure`              | `MeasureResult`        | Fires after the second click of a distance measurement. Payload: `{ kind: "distance", p1, p2, valueRaw, value, units }` (`value` is scaled to displayed units, `valueRaw` is in raw DXF units) |
+| `measure-cancel`       | —                      | Fires on <kbd>Esc</kbd> / toggling off the tool while a measurement draft was in flight                                          |
 
 ## DXFViewer Methods (via `ref`)
 
@@ -179,6 +186,8 @@ async function loadFile(file) {
 | `zoomToEntity(handles: string[])`          | Fit the camera to the union of the entities' bboxes, with 20% padding. Requires `pickingEnabled` |
 | `zoomToLayer(layerName: string)`           | Fit the camera to all entities on the given layer. Requires `pickingEnabled`. Layer names are case-sensitive (DXF spec) |
 | `getPickingIndex()`                        | Returns the underlying `PickingIndex \| null`. Useful for filtering external search results (e.g. from `findEntitiesByText`) to entities that are actually rendered in the scene |
+| `clearMeasure()`                           | Clear any in-flight or completed measurement overlay from the canvas without firing `measure-cancel` |
+| `toggleMeasureDistance()`                  | Emit `update:measureDistance` with the inverted current state — same code path the toolbar button uses, useful for binding keyboard shortcuts |
 
 ```vue
 <script setup>
@@ -552,6 +561,108 @@ For per-instance class injection, use the `rulerHorizontal` / `rulerVertical` / 
 
 When `showRulers` is on, the overlay grid receives `padding-top: 24px; padding-left: 24px` so existing overlays (file name, coordinates, debug, toolbar) don't sit underneath the rulers. The canvas itself stays full-size — picking, coordinates, and all NDC math are unchanged. The rulers are just overlays painted on top.
 
+## Measurement tool
+
+A two-click linear measurement tool — click point A, click point B, see the Euclidean distance. The segment + endpoint markers live in the Three.js scene (so they follow pan / zoom natively); the value (`12.34 mm`) is rendered as a positioned HTML label above the midpoint. Completed measurements stay visible until the next interaction.
+
+```vue
+<script setup>
+import { ref } from "vue";
+import { DXFViewer } from "dxf-vuer";
+import type { MeasureResult } from "dxf-vuer";
+
+const measureDistance = ref(false);
+const lastMeasurement = ref<MeasureResult | null>(null);
+</script>
+
+<template>
+  <DXFViewer
+    :dxf-data="dxfData"
+    v-model:measure-distance="measureDistance"
+    :show-measure-button="true"
+    :show-rulers="true"
+    ruler-units="mm"
+    @measure="lastMeasurement = $event"
+  />
+  <p v-if="lastMeasurement">
+    Distance: {{ lastMeasurement.value.toFixed(2) }} {{ lastMeasurement.units }}
+  </p>
+</template>
+```
+
+### State machine
+
+The tool has three resting states:
+
+| State | Visual                              | What the user can do                                                                |
+| ----- | ----------------------------------- | ----------------------------------------------------------------------------------- |
+| empty | (nothing on canvas)                 | Click anywhere → places point A → transition to **one**                             |
+| one   | Marker A + live segment A → cursor | Move cursor → segment + label follow. Click → places point B → fires `measure`, transition to **two**. <kbd>Esc</kbd> cancels → `measure-cancel`, transition to **empty** |
+| two   | Marker A + marker B + final segment | Click → starts a new measurement (previous A/B cleared, click becomes new A → transition to **one**). <kbd>Esc</kbd> clears → transition to **empty** |
+
+`measureColor` controls the segment, marker, and label color. `measureUnits` overrides the label unit (otherwise it follows `rulerUnits` so rulers and measurements always agree).
+
+### Interaction with pan / zoom
+
+While the tool is active, the viewer rebinds the mouse so left-click places points instead of panning:
+
+- **Left-click** → place point (composable temporarily nulls `controls.mouseButtons.LEFT`, restores on exit)
+- **Middle-button drag** → pan (unchanged)
+- **Right-button drag** → pan (unchanged)
+- **Wheel** → zoom (unchanged)
+- **<kbd>Esc</kbd>** → cancel / clear
+
+Picking (`pickingEnabled`) and rectangle selection (`rectangleSelection`) are automatically suspended while the measurement tool is active and restored on toggle-off — they share the same left-click stream, so only one can be active at a time.
+
+### Imperative control
+
+When you don't want to surface the toolbar button, drive the tool from your own UI via the v-model + ref methods:
+
+```vue
+<script setup>
+import { ref } from "vue";
+const measureDistance = ref(false);
+const viewer = ref();
+</script>
+
+<template>
+  <button @click="measureDistance = !measureDistance">
+    {{ measureDistance ? 'Stop measuring' : 'Measure' }}
+  </button>
+  <button @click="viewer.clearMeasure()">Clear</button>
+
+  <DXFViewer
+    ref="viewer"
+    :dxf-data="dxfData"
+    v-model:measure-distance="measureDistance"
+  />
+</template>
+```
+
+### `MeasureResult` shape
+
+```ts
+interface MeasureResult {
+  kind: "distance";
+  p1: { x: number; y: number; z: number };  // world coords
+  p2: { x: number; y: number; z: number };
+  valueRaw: number;       // distance in raw DXF units
+  value: number;          // distance scaled to `units`
+  units: "dxf-units" | "mm" | "inch";
+}
+```
+
+`valueRaw` is what you store; `value` + `units` is what you display.
+
+### Styling
+
+| Hook                       | Element / variable                                                |
+| -------------------------- | ----------------------------------------------------------------- |
+| `.dxfk-measure-label`      | HTML label positioned over the segment midpoint                   |
+| `--dxfk-measure-color`     | Color of the label background, segment line, and marker dots (cascades from the `measureColor` prop) |
+
+For per-instance class injection, use the `measureLabel` key in [`classes`](#3-classes-prop-headless-ui-style).
+
 ## Customizing styles
 
 `dxf-vuer` exposes three layers of style customization, ordered from least to most invasive. Pick the one that matches your toolchain.
@@ -584,6 +695,7 @@ Available variables:
 | `--dxfk-selection-rect-border-window` | `#4080ff`              | Window-mode rectangle border       |
 | `--dxfk-selection-rect-bg-crossing`   | `rgba(64,192,64,.12)`  | Crossing-mode (R→L) rectangle fill |
 | `--dxfk-selection-rect-border-crossing` | `#40c040`            | Crossing-mode rectangle border     |
+| `--dxfk-measure-color`                | `#ff6b1a`              | Measurement segment, marker dots, label background (cascades from `measureColor` prop) |
 
 ### 2. Hook classes
 
@@ -617,6 +729,7 @@ Stable hook classes:
 | `.dxfk-selection-rect`         | Rectangle-drag overlay (gated by `rectangleSelection`)       |
 | `.dxfk-selection-rect--window` | Modifier — added when the drag resolves to window mode       |
 | `.dxfk-selection-rect--crossing` | Modifier — added when the drag resolves to crossing mode   |
+| `.dxfk-measure-label`          | HTML value label of the measurement tool (gated by `measureDistance`) |
 | `.dxfk-dark`                   | Modifier — added to `.dxfk-viewer` / `.dxfk-toolbar` / `.dxfk-layer-panel` / `.dxfk-ruler-*` when `darkTheme` is on |
 
 These class names are part of the public API — they won't change between patch / minor versions.
@@ -676,6 +789,7 @@ Available keys (`ViewerClasses` interface, all optional):
 | `rulerVertical`      | `.dxfk-ruler-v`                              |
 | `rulerCorner`        | `.dxfk-ruler-corner`                         |
 | `selectionRect`      | `.dxfk-selection-rect` (rectangle drag overlay) |
+| `measureLabel`       | `.dxfk-measure-label` (measurement HTML value label) |
 
 Standalone components (`FileUploader`, `UnsupportedEntities`, `DXFStatistics`, `LayerPanel`, `ViewerToolbar`) accept a regular `class` attribute thanks to Vue's class fallthrough — no separate `classes` prop is needed when you compose them yourself:
 
@@ -719,6 +833,7 @@ Dark-theme styling no longer relies on `::v-deep` / `:deep()` reaching into `Vie
 | `usePicking`            | Builds the picking index + associations, wires pointer listeners to a canvas, emits enriched `PickingEvent`s. Exposes `installPickingData`, `attach`, `getAssociations`, `findAssociationsByHandle` |
 | `useHighlight`          | Manages an overlay group of LineSegments per highlighted bbox. `init`, `setColor`, `highlight(entries)`, `clear`, `dispose`                                                                         |
 | `useRectangleSelection` | Modifier+drag rectangle selection. Reactive `screenRect` + `isDragging` for the visual overlay; `attach(canvas, camera, controls, callbacks)` + `installRectData(pickingIndex, originOffset)`. Wraps `findEntriesInRect` from `dxf-render` |
+| `useMeasurement`        | Linear distance state machine (foundation for upcoming area / angle modes). Reactive `state` (`{ points, hoverWorld }`) + `isActive`. Owns a Three.js overlay group (line + marker dots). `attach(canvas, scene, camera, controls, getOriginOffset, requestRender, callbacks)`, `setEnabled` / `setUnitsScale` / `setColor` / `clear` / `dispose`. Math comes from `measureDistance` (re-exported from `dxf-render`). Pure helper `formatMeasureValue(value, units)` exported alongside |
 
 ## Re-exports
 

@@ -27,6 +27,15 @@ export {
   type RectScreenRect,
   type OrbitLikeControls,
 } from "./composables/useRectangleSelection";
+export {
+  useMeasurement,
+  formatMeasureValue,
+  type MeasureKind,
+  type MeasureUnits,
+  type MeasureState,
+  type MeasureResult,
+  type MeasureCallbacks,
+} from "./composables/useMeasurement";
 
 // Types
 export type { OverlayPosition, ViewerClasses, RulerUnits } from "./types";

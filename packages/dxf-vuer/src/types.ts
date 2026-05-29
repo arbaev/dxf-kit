@@ -58,4 +58,6 @@ export interface ViewerClasses {
   rulerCorner?: string;
   /** Rectangle-selection drag overlay — applied to `.dxfk-selection-rect`. */
   selectionRect?: string;
+  /** Measurement HTML label (linear distance) — applied to `.dxfk-measure-label`. */
+  measureLabel?: string;
 }
