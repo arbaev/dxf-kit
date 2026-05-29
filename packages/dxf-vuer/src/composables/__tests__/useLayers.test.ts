@@ -546,6 +546,264 @@ describe("persistence via getStorageKey", () => {
   });
 });
 
+// ── controlled mode (v-model:hiddenLayers) ─────────────────────────────
+
+describe("controlled mode via getControlledHidden / onChange", () => {
+  beforeEach(() => {
+    installLocalStorageStub();
+  });
+
+  it("applies the externally-owned hidden list during initLayers", () => {
+    const hidden = ["B"];
+    const { initLayers, layers } = useLayers({
+      getControlledHidden: () => hidden,
+    });
+
+    initLayers(
+      {
+        A: makeLayer({ name: "A", visible: true, frozen: false }),
+        B: makeLayer({ name: "B", visible: true, frozen: false }),
+      },
+      {},
+    );
+
+    expect(layers.value.get("A")!.visible).toBe(true);
+    expect(layers.value.get("B")!.visible).toBe(false);
+  });
+
+  it("ignores localStorage when in controlled mode", () => {
+    window.localStorage.setItem("test-key", JSON.stringify(["A"]));
+    const hidden: readonly string[] = [];
+    const { initLayers, toggleLayerVisibility, layers } = useLayers({
+      getStorageKey: () => "test-key",
+      getControlledHidden: () => hidden,
+      onChange: () => {},
+    });
+
+    initLayers(
+      {
+        A: makeLayer({ name: "A", visible: true, frozen: false }),
+        B: makeLayer({ name: "B", visible: true, frozen: false }),
+      },
+      {},
+    );
+
+    // Controlled list is empty → both layers visible, localStorage ignored
+    expect(layers.value.get("A")!.visible).toBe(true);
+    expect(layers.value.get("B")!.visible).toBe(true);
+
+    toggleLayerVisibility("A");
+
+    // Storage is NOT written in controlled mode (still has the original ["A"])
+    expect(window.localStorage.getItem("test-key")).toBe(JSON.stringify(["A"]));
+  });
+
+  it("invokes onChange with the new hidden list on toggleLayerVisibility", () => {
+    const calls: string[][] = [];
+    const hidden: string[] = [];
+    const { initLayers, toggleLayerVisibility } = useLayers({
+      getControlledHidden: () => hidden,
+      onChange: (h) => calls.push([...h]),
+    });
+
+    initLayers(
+      {
+        A: makeLayer({ name: "A", visible: true, frozen: false }),
+        B: makeLayer({ name: "B", visible: true, frozen: false }),
+      },
+      {},
+    );
+
+    toggleLayerVisibility("A");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual(["A"]);
+
+    toggleLayerVisibility("B");
+    expect(calls).toHaveLength(2);
+    expect(calls[1].sort()).toEqual(["A", "B"]);
+
+    toggleLayerVisibility("A");
+    expect(calls).toHaveLength(3);
+    expect(calls[2]).toEqual(["B"]);
+  });
+
+  it("invokes onChange on showAllLayers and hideAllLayers", () => {
+    const calls: string[][] = [];
+    const hidden: string[] = [];
+    const { initLayers, showAllLayers, hideAllLayers } = useLayers({
+      getControlledHidden: () => hidden,
+      onChange: (h) => calls.push([...h]),
+    });
+
+    initLayers(
+      {
+        A: makeLayer({ name: "A", visible: true, frozen: false }),
+        B: makeLayer({ name: "B", visible: true, frozen: false }),
+      },
+      {},
+    );
+
+    hideAllLayers();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].sort()).toEqual(["A", "B"]);
+
+    showAllLayers();
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toEqual([]);
+  });
+
+  it("excludes frozen layers from the onChange-emitted list", () => {
+    const calls: string[][] = [];
+    const hidden: string[] = [];
+    const { initLayers, hideAllLayers } = useLayers({
+      getControlledHidden: () => hidden,
+      onChange: (h) => calls.push([...h]),
+    });
+
+    initLayers(
+      {
+        Normal: makeLayer({ name: "Normal", visible: true, frozen: false }),
+        Frozen: makeLayer({ name: "Frozen", visible: true, frozen: true }),
+      },
+      {},
+    );
+
+    hideAllLayers();
+
+    expect(calls).toHaveLength(1);
+    // Frozen never appears in the emitted hidden list — it's frozen-by-DXF,
+    // not user-hidden. Only Normal is present.
+    expect(calls[0]).toEqual(["Normal"]);
+  });
+
+  it("silently ignores hidden-list entries that don't exist in the LAYER table", () => {
+    const hidden = ["GHOST", "B"];
+    const { initLayers, layers } = useLayers({
+      getControlledHidden: () => hidden,
+    });
+
+    initLayers(
+      {
+        A: makeLayer({ name: "A", visible: true, frozen: false }),
+        B: makeLayer({ name: "B", visible: true, frozen: false }),
+      },
+      {},
+    );
+
+    // GHOST doesn't exist → no layer added or thrown error
+    expect(layers.value.size).toBe(2);
+    expect(layers.value.get("A")!.visible).toBe(true);
+    expect(layers.value.get("B")!.visible).toBe(false);
+  });
+
+  it("falls back to uncontrolled mode when getControlledHidden returns undefined", () => {
+    window.localStorage.setItem("test-key", JSON.stringify(["A"]));
+    const calls: string[][] = [];
+    const { initLayers, toggleLayerVisibility, layers } = useLayers({
+      getStorageKey: () => "test-key",
+      // Returning undefined → uncontrolled
+      getControlledHidden: () => undefined,
+      onChange: (h) => calls.push([...h]),
+    });
+
+    initLayers(
+      {
+        A: makeLayer({ name: "A", visible: true, frozen: false }),
+        B: makeLayer({ name: "B", visible: true, frozen: false }),
+      },
+      {},
+    );
+
+    // Uncontrolled → localStorage WAS read, A is hidden
+    expect(layers.value.get("A")!.visible).toBe(false);
+
+    toggleLayerVisibility("B");
+
+    // Uncontrolled → persistHiddenToStorage called, onChange NOT called
+    expect(calls).toHaveLength(0);
+    expect(JSON.parse(window.localStorage.getItem("test-key")!).sort()).toEqual(
+      ["A", "B"],
+    );
+  });
+
+  it("setHiddenLayers applies the list without triggering onChange", () => {
+    const calls: string[][] = [];
+    const hidden: string[] = [];
+    const { initLayers, setHiddenLayers, layers } = useLayers({
+      getControlledHidden: () => hidden,
+      onChange: (h) => calls.push([...h]),
+    });
+
+    initLayers(
+      {
+        A: makeLayer({ name: "A", visible: true, frozen: false }),
+        B: makeLayer({ name: "B", visible: true, frozen: false }),
+      },
+      {},
+    );
+
+    setHiddenLayers(["A"]);
+
+    expect(layers.value.get("A")!.visible).toBe(false);
+    expect(layers.value.get("B")!.visible).toBe(true);
+    // setHiddenLayers is meant for the consumer to mirror external state →
+    // emitting back would create a cycle
+    expect(calls).toHaveLength(0);
+  });
+
+  it("setHiddenLayers does not affect frozen layers", () => {
+    const hidden: string[] = [];
+    const { initLayers, setHiddenLayers, layers } = useLayers({
+      getControlledHidden: () => hidden,
+    });
+
+    initLayers(
+      {
+        Frozen: makeLayer({ name: "Frozen", visible: true, frozen: true }),
+        Normal: makeLayer({ name: "Normal", visible: true, frozen: false }),
+      },
+      {},
+    );
+
+    // initLayers sets Frozen.visible = false (visible && !frozen). The
+    // controlled list never controls frozen layers — passing its name in
+    // the list does nothing to the actual flag.
+    expect(layers.value.get("Frozen")!.visible).toBe(false);
+
+    setHiddenLayers(["Frozen", "Normal"]);
+
+    // Normal becomes hidden via the controlled list; Frozen stays as it was
+    expect(layers.value.get("Normal")!.visible).toBe(false);
+    expect(layers.value.get("Frozen")!.visible).toBe(false);
+    expect(layers.value.get("Frozen")!.frozen).toBe(true);
+  });
+});
+
+// ── hiddenLayerNames computed ──────────────────────────────────────────
+
+describe("hiddenLayerNames", () => {
+  it("returns the names of non-frozen hidden layers as an array", () => {
+    const { initLayers, hiddenLayerNames, toggleLayerVisibility } = useLayers();
+
+    initLayers(
+      {
+        A: makeLayer({ name: "A", visible: true, frozen: false }),
+        B: makeLayer({ name: "B", visible: true, frozen: false }),
+        Frozen: makeLayer({ name: "Frozen", visible: true, frozen: true }),
+      },
+      {},
+    );
+
+    expect(hiddenLayerNames.value).toEqual([]);
+
+    toggleLayerVisibility("A");
+
+    expect(hiddenLayerNames.value).toEqual(["A"]);
+    // Frozen is never part of the hidden list, even though its visible is false
+    expect(hiddenLayerNames.value).not.toContain("Frozen");
+  });
+});
+
 // ── clearLayers ─────────────────────────────────────────────────────────
 
 describe("clearLayers", () => {

@@ -351,6 +351,7 @@ interface Props {
   highlightColor?: string;
   pickingDebug?: boolean;
   persistLayersKey?: string;
+  hiddenLayers?: string[];
   keyboardNavigation?: boolean;
   classes?: ViewerClasses;
   showRulers?: boolean;
@@ -412,6 +413,7 @@ interface Emits {
   (e: "entities-select", events: PickingEvent[]): void;
   (e: "selection-start", mode: RectSelectionResolvedMode): void;
   (e: "selection-end"): void;
+  (e: "update:hiddenLayers", hidden: string[]): void;
 }
 
 const emit = defineEmits<Emits>();
@@ -696,10 +698,12 @@ const onFullscreenChange = () => {
 const {
   layerList,
   visibleLayerNames,
+  hiddenLayerNames,
   initLayers,
   toggleLayerVisibility,
   showAllLayers,
   hideAllLayers,
+  setHiddenLayers,
   updateLayerThemeColors,
   clearLayers,
 } = useLayers({
@@ -707,7 +711,17 @@ const {
     if (!props.persistLayersKey) return null;
     return `${props.persistLayersKey}:${props.fileName || "default"}`;
   },
+  getControlledHidden: () => props.hiddenLayers,
+  onChange: (hidden) => emit("update:hiddenLayers", hidden),
 });
+
+const hasSameHiddenSet = (a: readonly string[]): boolean => {
+  const current = hiddenLayerNames.value;
+  if (a.length !== current.length) return false;
+  const set = new Set(a);
+  for (const x of current) if (!set.has(x)) return false;
+  return true;
+};
 
 const hasDXFData = computed(() => {
   return props.dxfData && props.dxfData.entities && props.dxfData.entities.length > 0;
@@ -984,6 +998,21 @@ watch(
 watch(
   () => props.highlightColor,
   (color) => { highlightCtl.setColor(color); },
+);
+
+// Push external `hiddenLayers` updates into useLayers (controlled mode).
+// User-driven toggles emit `update:hiddenLayers` via the onChange option, so
+// this watch only fires for genuine external changes — the same-set check
+// short-circuits the echo from our own emit.
+watch(
+  () => props.hiddenLayers,
+  (newHidden) => {
+    if (newHidden === undefined) return;
+    if (hasSameHiddenSet(newHidden)) return;
+    setHiddenLayers(newHidden);
+    applyLayerVisibility(visibleLayerNames.value);
+  },
+  { deep: true },
 );
 
 watch(

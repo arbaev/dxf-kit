@@ -20,8 +20,26 @@ export interface UseLayersOptions {
    * Returns the localStorage key under which hidden layer names are persisted,
    * or null/undefined to disable persistence. Called fresh on every read/write,
    * so the consumer can derive the key from reactive state (e.g. file name).
+   *
+   * Ignored when the consumer is in controlled mode (see `getControlledHidden`).
    */
   getStorageKey?: () => string | null | undefined;
+  /**
+   * Controlled-mode hook: returns the externally-owned list of hidden layer
+   * names, or `undefined` for uncontrolled mode.
+   *
+   * When this returns a non-undefined array, `useLayers` treats the consumer
+   * as the source of truth — it applies the list during `initLayers` and on
+   * `setHiddenLayers(...)`, and never reads/writes `localStorage`.
+   */
+  getControlledHidden?: () => readonly string[] | undefined;
+  /**
+   * Controlled-mode notification: called after `toggleLayerVisibility`,
+   * `showAllLayers`, or `hideAllLayers` mutates state. Receives the new list
+   * of hidden non-frozen layer names. Only invoked when `getControlledHidden`
+   * returns a non-undefined array (i.e. the consumer is controlled).
+   */
+  onChange?: (hidden: string[]) => void;
 }
 
 const isStorageAvailable = (): boolean =>
@@ -29,6 +47,9 @@ const isStorageAvailable = (): boolean =>
 
 export function useLayers(options?: UseLayersOptions) {
   const layers = ref<Map<string, LayerState>>(new Map());
+
+  const isControlled = (): boolean =>
+    options?.getControlledHidden?.() !== undefined;
 
   const loadHiddenFromStorage = (): Set<string> => {
     if (!isStorageAvailable()) return new Set();
@@ -48,14 +69,44 @@ export function useLayers(options?: UseLayersOptions) {
     if (!isStorageAvailable()) return;
     const key = options?.getStorageKey?.();
     if (!key) return;
-    const hidden: string[] = [];
-    layers.value.forEach((l) => {
-      if (!l.visible && !l.frozen) hidden.push(l.name);
-    });
+    const hidden = computeCurrentHidden();
     try {
       window.localStorage.setItem(key, JSON.stringify(hidden));
     } catch {
       // Quota exceeded or storage disabled — silently skip
+    }
+  };
+
+  const computeCurrentHidden = (): string[] => {
+    const hidden: string[] = [];
+    layers.value.forEach((l) => {
+      if (!l.visible && !l.frozen) hidden.push(l.name);
+    });
+    return hidden;
+  };
+
+  const applyHiddenSetToLayers = (hiddenSet: Set<string>): void => {
+    layers.value.forEach((layer) => {
+      if (layer.frozen) return;
+      layer.visible = !hiddenSet.has(layer.name);
+    });
+  };
+
+  /**
+   * Replace the visibility of all non-frozen layers with the given hidden-set.
+   * Used by controlled-mode watchers in the consumer to push external updates
+   * into `useLayers` without going through `toggleLayerVisibility`. Does NOT
+   * call `onChange` — only state-mutating user actions do.
+   */
+  const setHiddenLayers = (hidden: readonly string[]): void => {
+    applyHiddenSetToLayers(new Set(hidden));
+  };
+
+  const persistOrNotify = (): void => {
+    if (isControlled()) {
+      options!.onChange?.(computeCurrentHidden());
+    } else {
+      persistHiddenToStorage();
     }
   };
 
@@ -105,24 +156,30 @@ export function useLayers(options?: UseLayersOptions) {
       }
     }
 
-    // Apply persisted visibility (silently ignores names that no longer exist)
-    const hidden = loadHiddenFromStorage();
-    if (hidden.size > 0) {
-      newLayers.forEach((layer) => {
-        if (!layer.frozen && hidden.has(layer.name)) {
-          layer.visible = false;
-        }
-      });
-    }
-
     layers.value = newLayers;
+
+    // Apply visibility from the source of truth: controlled-mode external list
+    // overrides DXF defaults; uncontrolled mode falls back to localStorage.
+    const controlled = options?.getControlledHidden?.();
+    if (controlled !== undefined) {
+      applyHiddenSetToLayers(new Set(controlled));
+    } else {
+      const hidden = loadHiddenFromStorage();
+      if (hidden.size > 0) {
+        newLayers.forEach((layer) => {
+          if (!layer.frozen && hidden.has(layer.name)) {
+            layer.visible = false;
+          }
+        });
+      }
+    }
   };
 
   const toggleLayerVisibility = (layerName: string) => {
     const layer = layers.value.get(layerName);
     if (layer && !layer.frozen) {
       layer.visible = !layer.visible;
-      persistHiddenToStorage();
+      persistOrNotify();
     }
   };
 
@@ -130,14 +187,14 @@ export function useLayers(options?: UseLayersOptions) {
     layers.value.forEach((layer) => {
       if (!layer.frozen) layer.visible = true;
     });
-    persistHiddenToStorage();
+    persistOrNotify();
   };
 
   const hideAllLayers = () => {
     layers.value.forEach((layer) => {
       layer.visible = false;
     });
-    persistHiddenToStorage();
+    persistOrNotify();
   };
 
   const visibleLayerNames = computed(() => {
@@ -147,6 +204,8 @@ export function useLayers(options?: UseLayersOptions) {
     });
     return names;
   });
+
+  const hiddenLayerNames = computed<string[]>(() => computeCurrentHidden());
 
   const layerList = computed(() => Array.from(layers.value.values()));
 
@@ -168,10 +227,12 @@ export function useLayers(options?: UseLayersOptions) {
     layers,
     layerList,
     visibleLayerNames,
+    hiddenLayerNames,
     initLayers,
     toggleLayerVisibility,
     showAllLayers,
     hideAllLayers,
+    setHiddenLayers,
     updateLayerThemeColors,
     clearLayers,
   };

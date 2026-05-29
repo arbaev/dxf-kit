@@ -206,6 +206,7 @@
           :overlay-position="pickingPosition"
           :show-rulers="showRulers"
           :ruler-units="rulerUnits"
+          v-model:hidden-layers="hiddenLayers"
           @dxf-data="handleDXFData"
           @unsupported-entities="handleUnsupportedEntities"
           @error="handleError"
@@ -417,6 +418,60 @@
           <div class="settings-cell">
             <header class="settings-cell-header">
               <span class="settings-cell-title">
+                Layer visibility (<code>v-model</code>)
+                <span v-if="hiddenLayers.length > 0" class="settings-badge">{{
+                  hiddenLayers.length
+                }}</span>
+              </span>
+              <button
+                v-if="hiddenLayers.length > 0"
+                class="settings-cell-action"
+                type="button"
+                @click="showAllLayersExternally"
+              >
+                Show all
+              </button>
+            </header>
+            <p class="settings-cell-hint">
+              <code>:hidden-layers</code> drives the layer panel from the parent. Toggle layers in
+              the panel and watch the array below update; click below and watch the panel update.
+            </p>
+            <div class="vmodel-actions">
+              <button
+                class="vmodel-btn"
+                type="button"
+                :disabled="allLayerNames.length === 0"
+                @click="hideFirstLayer"
+              >
+                Hide one more
+              </button>
+              <button
+                class="vmodel-btn"
+                type="button"
+                :disabled="allLayerNames.length === 0"
+                @click="hideHalfLayers"
+              >
+                Hide half
+              </button>
+            </div>
+            <div class="vmodel-state">
+              <span class="vmodel-label">hiddenLayers =</span>
+              <code v-if="hiddenLayers.length === 0" class="vmodel-empty">[]</code>
+              <template v-else>
+                <span
+                  v-for="name in hiddenLayers"
+                  :key="name"
+                  class="vmodel-chip"
+                >
+                  {{ name }}
+                </span>
+              </template>
+            </div>
+          </div>
+
+          <div class="settings-cell">
+            <header class="settings-cell-header">
+              <span class="settings-cell-title">
                 Associations
                 <span v-if="associations.length > 0" class="settings-badge">{{
                   associations.length
@@ -566,6 +621,7 @@ const highlightOnHover = ref(true);
 const highlightAssociated = ref(true);
 const rectangleSelection = ref(true);
 const selectedEntities = ref<PickingEvent[]>([]);
+const hiddenLayers = ref<string[]>([]);
 const hoveredEntity = ref<PickingEvent | null>(null);
 const clickedEntity = ref<PickingEvent | null>(null);
 const associations = ref<EntityAssociation[]>([]);
@@ -917,6 +973,33 @@ const handleDXFLoaded = (success: boolean) => {
 const handleDXFData = (data: DxfData | null) => {
   dxfData.value = data;
   selectedEntities.value = [];
+  // Reset the controlled v-model when a new file is loaded so we don't carry
+  // hidden-layer names from the previous DXF over to the new one.
+  hiddenLayers.value = [];
+};
+
+const allLayerNames = computed<string[]>(() => {
+  const layers = dxfData.value?.tables?.layer?.layers;
+  if (!layers) return [];
+  // Exclude frozen layers — the v-model never includes them, so the demo
+  // buttons should also skip them to stay consistent with the contract.
+  return Object.values(layers)
+    .filter((l) => !l.frozen)
+    .map((l) => l.name);
+});
+
+const hideFirstLayer = () => {
+  const candidate = allLayerNames.value.find((n) => !hiddenLayers.value.includes(n));
+  if (candidate) hiddenLayers.value = [...hiddenLayers.value, candidate];
+};
+
+const showAllLayersExternally = () => {
+  hiddenLayers.value = [];
+};
+
+const hideHalfLayers = () => {
+  const half = Math.ceil(allLayerNames.value.length / 2);
+  hiddenLayers.value = allLayerNames.value.slice(0, half);
 };
 
 const resetView = () => {
@@ -1533,6 +1616,81 @@ const resetView = () => {
   color: var(--text-secondary, #888);
   text-align: center;
   font-style: italic;
+}
+
+.vmodel-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.vmodel-btn {
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vmodel-btn:hover:not(:disabled) {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.vmodel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vmodel-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 3px;
+  font-size: 0.72rem;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+}
+
+.vmodel-label {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.vmodel-empty {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 0;
+}
+
+.vmodel-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  background: rgba(64, 128, 255, 0.14);
+  border: 1px solid rgba(64, 128, 255, 0.35);
+  border-radius: 999px;
+  color: var(--text-color);
+  font-size: 0.7rem;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app.dark .vmodel-state {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.app.dark .vmodel-chip {
+  background: rgba(96, 156, 255, 0.18);
+  border-color: rgba(96, 156, 255, 0.4);
 }
 
 .associations-list {

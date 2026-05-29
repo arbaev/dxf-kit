@@ -84,7 +84,8 @@ async function loadFile(file) {
 | `highlightAssociated`  | `boolean`          | `true`            | When the hovered entity participates in an association (MLEADER / LEADER+TEXT / INSERT+ATTRIB / DIMENSION), highlight all its members instead of just the entity itself |
 | `highlightColor`       | `string`           | `"#ffaa00"`       | Color used by the built-in hover highlight                                                                                                                              |
 | `keyboardNavigation`   | `boolean`          | `true`            | Enable keyboard pan/zoom (arrow keys, `+`/`-`, `0`). Listener fires only when the canvas is focused                                                                     |
-| `persistLayersKey`     | `string`           | `""`              | When set, layer visibility is persisted to `localStorage` under `${persistLayersKey}:${fileName \|\| "default"}`. Empty string disables persistence                     |
+| `persistLayersKey`     | `string`           | `""`              | When set, layer visibility is persisted to `localStorage` under `${persistLayersKey}:${fileName \|\| "default"}`. Empty string disables persistence. Ignored when `hiddenLayers` is provided (parent owns the state) |
+| `hiddenLayers`         | `string[]`         | —                 | Named v-model (`v-model:hidden-layers`). Array of layer names that should be hidden. When provided, the viewer is **controlled** — the parent owns visibility state and the viewer emits `update:hiddenLayers` on every internal toggle. When omitted (default), the viewer is **uncontrolled** and manages state internally |
 | `classes`              | `ViewerClasses`    | `{}`              | Headless UI-style class map. Each key adds a class onto the matching `.dxfk-*` root element (e.g. `{ toolbar: 'my-toolbar' }`). See [Customizing styles](#customizing-styles) |
 | `showRulers`           | `boolean`          | `false`           | Show horizontal + vertical rulers along the top/left edges of the canvas with adaptive tick density, cursor marker, and a corner unit badge                              |
 | `rulerUnits`           | `RulerUnits`       | `"mm"`            | Units displayed on ruler tick labels. `"mm"`/`"inch"` convert via `$INSUNITS`; on a Unitless file (`$INSUNITS=0`) raw values are treated as the chosen unit 1:1          |
@@ -156,6 +157,7 @@ async function loadFile(file) {
 | `entities-select`      | `PickingEvent[]`       | Final result of a rectangle drag (only when `rectangleSelection`). Empty array if the rect didn't cover anything |
 | `selection-start`      | `"window" \| "crossing"` | Fired when a rectangle drag passes the 4px threshold. Payload is the resolved mode |
 | `selection-end`        | —                      | Fired after `entities-select` or when the drag is cancelled (Esc) |
+| `update:hiddenLayers`  | `string[]`             | Sent on every internal layer toggle / show-all / hide-all (only when `hiddenLayers` is provided). Powers `v-model:hidden-layers` |
 
 ## DXFViewer Methods (via `ref`)
 
@@ -466,6 +468,36 @@ Set `persistLayersKey` to enable per-file persistence in `localStorage`:
 
 Hidden layer names are stored under `${persistLayersKey}:${fileName || "default"}`. Different files keep separate visibility configurations. Stored names that no longer exist in the current DXF are silently ignored, so changing files between sessions is safe. Frozen layers are never persisted (they're already hidden by DXF flags).
 
+## Controlled layer visibility (`v-model:hidden-layers`)
+
+`persistLayersKey` is fire-and-forget — the viewer owns the state and tucks it away in `localStorage` between sessions. When you need the parent component to **see** and **control** which layers are hidden (sync to a backend, drive other UI from the same state, restore a saved view), use the named v-model instead:
+
+```vue
+<script setup>
+import { ref } from "vue";
+
+const hiddenLayers = ref(["A-DIMS"]);
+</script>
+
+<template>
+  <DXFViewer :dxf-data="dxfData" v-model:hidden-layers="hiddenLayers" />
+
+  <p>{{ hiddenLayers.length }} layers hidden</p>
+  <button @click="hiddenLayers = []">Show all</button>
+</template>
+```
+
+The viewer treats the parent's array as the source of truth — it applies the list on every DXF load (overriding DXF's own `frozen` / `visible` defaults) and emits `update:hiddenLayers` whenever the user toggles a layer through `<LayerPanel>` or you call `viewer.showAllLayers()` / `viewer.hideAllLayers()` (via the layer panel buttons). In return, mutating `hiddenLayers` from the parent immediately reflects in the panel and on screen.
+
+A few rules to keep in mind:
+
+- **`persistLayersKey` is ignored when `hiddenLayers` is provided.** Mixing the two is ambiguous (which side wins on init?), so the controlled prop takes over. Persist on the parent side instead — usually whatever store/router/server you already drive the prop from.
+- **Frozen layers never appear in the list.** They're hidden by the DXF `frozen` flag, not by user choice. Passing a frozen layer's name in the array is a silent no-op.
+- **Unknown names are ignored.** Names that don't match any layer in the current DXF won't trigger an error — handy when switching files.
+- **No initial `update:hiddenLayers` is emitted on DXF load.** The viewer only emits in response to genuine user actions. If you want to mirror the file's own `frozen` / `visible` flags into the parent, read them off `dxf-data` after `dxf-loaded`.
+
+The symmetric pattern is used by the upcoming `dxf-react` and `dxf-lit` wrappers — same `string[]` shape, the binding mechanism is the only thing that differs (`hiddenLayers + onHiddenLayersChange` / `hidden-layers` property + `hidden-layers-change` event).
+
 ## Rulers
 
 Set `showRulers` to render a horizontal ruler along the top edge of the canvas and a vertical ruler along the left edge. Both stay synchronized with pan / zoom, ticks adapt density based on the current zoom level, and a cursor marker (a line in `--dxfk-ruler-cursor`) tracks the mouse position on both axes.
@@ -682,7 +714,7 @@ Dark-theme styling no longer relies on `::v-deep` / `:deep()` reaching into `Vie
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `useDXFRenderer`        | Main orchestrator: parsing, display, resize, layer visibility, dark theme                                                                                                                           |
 | `useThreeScene`         | Three.js scene/renderer init with configurable antialiasing (MSAA/SMAA/FXAA/TAA/SSAA/none)                                                                                                          |
-| `useLayers`             | Layer visibility state management. Accepts `{ getStorageKey?: () => string \| null }` for `localStorage` persistence                                                                                |
+| `useLayers`             | Layer visibility state management. Options: `getStorageKey` (uncontrolled `localStorage` persistence), `getControlledHidden` + `onChange` (controlled-mode hooks for external state ownership — used by `v-model:hidden-layers` on `<DXFViewer>`). Exposes `setHiddenLayers(hidden)` and `hiddenLayerNames` for standalone consumers |
 | `useKeyboardNavigation` | Wires arrow-key pan, `+`/`-` zoom, and `0` reset on any focusable element. `attach`, `detach`, `setEnabled`                                                                                         |
 | `usePicking`            | Builds the picking index + associations, wires pointer listeners to a canvas, emits enriched `PickingEvent`s. Exposes `installPickingData`, `attach`, `getAssociations`, `findAssociationsByHandle` |
 | `useHighlight`          | Manages an overlay group of LineSegments per highlighted bbox. `init`, `setColor`, `highlight(entries)`, `clear`, `dispose`                                                                         |
