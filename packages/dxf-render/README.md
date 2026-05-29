@@ -404,6 +404,34 @@ Coverage: LINE, CIRCLE, ARC, ELLIPSE, POLYLINE / LWPOLYLINE (with bulge tessella
 
 INSERT aggregates return `fallbackToBBox: true` here — to highlight the contents of an INSERT instance, walk the aggregate's `PickingEntry.childIds` and call `buildHighlightGeometry` for each child entry. `dxf-vuer`'s `useHighlight` composable does exactly that.
 
+### Rectangle selection
+
+`findEntriesInRect(pickingIndex, rect, options?)` returns every `PickingEntry` whose bounding box satisfies a window- or crossing-style rectangle test. Pure data — no DOM events, no Three.js raycasting. The same helper powers the `entities-select` event in `dxf-vuer` and is intended for future React/Lit wrappers to reuse 1:1.
+
+```ts
+import { findEntriesInRect, type WorldRect } from "dxf-render";
+
+const rect: WorldRect = {
+  minX: 100, minY: 200,
+  maxX: 500, maxY: 600,
+};
+
+// AutoCAD convention: window = bbox fully inside, crossing = bbox overlaps.
+const entries = findEntriesInRect(pickingIndex, rect, { mode: "crossing" });
+for (const entry of entries) {
+  console.log(entry.handle, entry.type, entry.layer);
+}
+```
+
+Options:
+
+- `mode: "window" | "crossing"` — default `"crossing"`. `"window"` keeps only entries fully inside the rect; `"crossing"` keeps anything that overlaps.
+- `granularity: "aggregate" | "leaf"` — default `"aggregate"`. With `"aggregate"`, INSERT instances are returned as a single entry (the aggregate cover) and their child entries are skipped — mirroring AutoCAD's "an INSERT is one selectable block". `"leaf"` does the opposite: aggregates are skipped, every child entity is returned individually.
+
+`rect` lives in the **same world-coordinate space as `PickingEntry.bbox`** (raw DXF world, BEFORE any `originOffset` subtraction). Consumers that compute the rectangle from canvas mouse positions need to add `originOffset` back to the unprojected world point before calling.
+
+XLINE and RAY are intentionally absent from the picking index (infinite extent) and so are silently ignored. The result preserves the insertion order of `pickingIndex.entries`.
+
 ### Associations
 
 `buildAssociations(dxf)` derives links between entities **strictly from DXF data**, no geometric heuristics:

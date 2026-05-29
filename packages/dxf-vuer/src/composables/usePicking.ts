@@ -10,6 +10,7 @@ import {
   extractEntityText,
   type DxfData,
   type DxfEntity,
+  type PickingEntry,
   type PickingIndex,
   type EntityAssociation,
 } from "dxf-render";
@@ -221,6 +222,27 @@ export function usePicking() {
 
   const setEnabled = (value: boolean) => { enabled = value; };
 
+  /**
+   * Build a `PickingEvent` from a `PickingEntry`. Mirrors the payload produced
+   * by raycast picking — populates `text` from the entity (or its
+   * association) and resolves the first association for the entry's handle.
+   * Used by rectangle selection to surface the same event shape that
+   * `entity-click` / `entity-hover` consumers already handle.
+   */
+  const buildEventForEntry = (entry: PickingEntry): PickingEvent => {
+    const entity = entityIndex?.get(entry.handle);
+    const association = associationsByHandle.get(entry.handle)?.[0];
+    return {
+      handle: entry.handle,
+      pickId: entry.id,
+      type: entry.type,
+      layer: entry.layer,
+      text: association?.text ?? (entity ? extractEntityText(entity) : undefined),
+      entity,
+      association,
+    };
+  };
+
   /** Lookup by DXF handle — returns ALL instances (multiple for blocks reused via INSERT) */
   const getPickingEntries = (handle: string) => pickingIndex?.byHandle.get(handle) ?? [];
 
@@ -261,6 +283,7 @@ export function usePicking() {
     findAssociationsByHandle,
     getPickingGroup,
     setDebug,
+    buildEventForEntry,
   };
 }
 

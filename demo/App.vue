@@ -202,6 +202,7 @@
           :picking-debug="pickingDebug"
           :highlight-on-hover="highlightOnHover"
           :highlight-associated="highlightAssociated"
+          :rectangle-selection="rectangleSelection"
           :overlay-position="pickingPosition"
           :show-rulers="showRulers"
           :ruler-units="rulerUnits"
@@ -213,6 +214,7 @@
           @file-dropped="handleFileDropped"
           @entity-hover="handleEntityHover"
           @entity-click="handleEntityClick"
+          @entities-select="handleEntitiesSelect"
         >
           <template #overlay>
             <div v-if="pickingEnabled && hoveredEntity" class="hover-pill">
@@ -352,6 +354,64 @@
                 members)
               </span>
             </div>
+          </div>
+
+          <div class="settings-cell">
+            <header class="settings-cell-header">
+              <span class="settings-cell-title">
+                Rectangle selection
+                <span v-if="selectedEntities.length > 0" class="settings-badge">{{
+                  selectedEntities.length
+                }}</span>
+              </span>
+              <button
+                v-if="selectedEntities.length > 0"
+                class="settings-cell-action"
+                type="button"
+                @click="clearRectangleSelection"
+              >
+                Clear
+              </button>
+            </header>
+            <label class="picking-label">
+              <input
+                type="checkbox"
+                v-model="rectangleSelection"
+                :disabled="!pickingEnabled"
+              />
+              <span>Enable rectangle selection</span>
+            </label>
+            <p class="settings-cell-hint">
+              Hold <kbd>Shift</kbd> and drag on the canvas. Left&rarr;right = window (solid blue),
+              right&rarr;left = crossing (dashed green). <kbd>Esc</kbd> cancels an in-progress drag.
+            </p>
+            <template v-if="selectedEntities.length > 0">
+              <div class="rect-selection-summary">
+                <span
+                  v-for="[type, count] in selectionTypeCounts"
+                  :key="type"
+                  class="rect-selection-chip"
+                >
+                  {{ type }} <code>{{ count }}</code>
+                </span>
+              </div>
+              <ul class="rect-selection-list">
+                <li
+                  v-for="event in selectedEntitiesPreview"
+                  :key="event.pickId ?? event.handle"
+                  class="rect-selection-item"
+                  @click="zoomToSelectedEntity(event)"
+                >
+                  <span class="picking-tag">{{ event.type }}</span>
+                  <code class="rect-selection-handle">#{{ event.handle }}</code>
+                  <span class="rect-selection-layer">{{ event.layer }}</span>
+                  <span v-if="event.text" class="rect-selection-text">{{ event.text }}</span>
+                </li>
+                <li v-if="selectedEntities.length > selectedEntitiesPreview.length" class="rect-selection-more">
+                  …and {{ selectedEntities.length - selectedEntitiesPreview.length }} more
+                </li>
+              </ul>
+            </template>
           </div>
 
           <div class="settings-cell">
@@ -504,6 +564,8 @@ const pickingEnabled = ref(true);
 const pickingDebug = ref(false);
 const highlightOnHover = ref(true);
 const highlightAssociated = ref(true);
+const rectangleSelection = ref(true);
+const selectedEntities = ref<PickingEvent[]>([]);
 const hoveredEntity = ref<PickingEvent | null>(null);
 const clickedEntity = ref<PickingEvent | null>(null);
 const associations = ref<EntityAssociation[]>([]);
@@ -555,6 +617,37 @@ const handleEntityClick = (event: PickingEvent) => {
   clickedEntity.value = event;
 };
 
+const handleEntitiesSelect = (events: PickingEvent[]) => {
+  selectedEntities.value = events;
+  // Re-highlight via the imperative API so the selection survives the drag overlay vanishing.
+  if (dxfViewerRef.value && events.length > 0) {
+    dxfViewerRef.value.highlight(events.map((e) => e.handle));
+  } else {
+    dxfViewerRef.value?.clearHighlight();
+  }
+};
+
+const selectionTypeCounts = computed<[string, number][]>(() => {
+  const counts = new Map<string, number>();
+  for (const e of selectedEntities.value) {
+    counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+});
+
+const selectedEntitiesPreview = computed<PickingEvent[]>(() => {
+  return selectedEntities.value.slice(0, 10);
+});
+
+const clearRectangleSelection = () => {
+  selectedEntities.value = [];
+  dxfViewerRef.value?.clearHighlight();
+};
+
+const zoomToSelectedEntity = (event: PickingEvent) => {
+  dxfViewerRef.value?.zoomToEntity([event.handle]);
+};
+
 const groupedAssociations = computed(() => {
   const groups: Record<string, EntityAssociation[]> = {};
   for (const a of associations.value) {
@@ -588,6 +681,7 @@ const resetSettings = () => {
   pickingDebug.value = false;
   highlightOnHover.value = true;
   highlightAssociated.value = true;
+  rectangleSelection.value = true;
   showFileName.value = true;
   showCoordinates.value = true;
   showZoomLevel.value = true;
@@ -822,6 +916,7 @@ const handleDXFLoaded = (success: boolean) => {
 
 const handleDXFData = (data: DxfData | null) => {
   dxfData.value = data;
+  selectedEntities.value = [];
 };
 
 const resetView = () => {
@@ -1037,14 +1132,21 @@ const resetView = () => {
   border-left: 1px solid transparent;
 }
 
-.settings-cell:nth-child(2),
-.settings-cell:nth-child(4) {
+/* Right column (every even cell) gets a left divider */
+.settings-cell:nth-child(2n) {
   border-left-color: var(--border-color);
 }
 
-.settings-cell:nth-child(3),
-.settings-cell:nth-child(4) {
+/* Every cell past the first row gets a top divider */
+.settings-cell:nth-child(n + 3) {
   border-top-color: var(--border-color);
+}
+
+/* When the total number of cells is odd, the last one would sit alone in the
+   left column with a dangling open right side. Span it across both columns
+   so it gets the right edge of the panel as its visual boundary. */
+.settings-cell:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 .display-split {
@@ -1134,13 +1236,12 @@ const resetView = () => {
   .settings-grid {
     grid-template-columns: 1fr;
   }
-  .settings-cell:nth-child(2),
-  .settings-cell:nth-child(4) {
+  /* Single column on mobile — clear all left dividers, every cell after the
+     first gets a top divider so they stack with consistent separation. */
+  .settings-cell:nth-child(n) {
     border-left-color: transparent;
   }
-  .settings-cell:nth-child(2),
-  .settings-cell:nth-child(3),
-  .settings-cell:nth-child(4) {
+  .settings-cell:nth-child(n + 2) {
     border-top-color: var(--border-color);
   }
 }
@@ -1349,6 +1450,91 @@ const resetView = () => {
   font-size: 0.7rem;
 }
 
+.rect-selection-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 6px;
+}
+
+.rect-selection-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(64, 128, 255, 0.12);
+  border: 1px solid rgba(64, 128, 255, 0.35);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  color: var(--text-color);
+}
+
+.rect-selection-chip code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 0.7rem;
+}
+
+.rect-selection-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.rect-selection-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.rect-selection-item:last-child {
+  border-bottom: none;
+}
+
+.rect-selection-item:hover {
+  background: rgba(64, 128, 255, 0.08);
+}
+
+.rect-selection-handle {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.7rem;
+}
+
+.rect-selection-layer {
+  color: var(--text-secondary, #888);
+  font-size: 0.7rem;
+}
+
+.rect-selection-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary, #888);
+  font-style: italic;
+}
+
+.rect-selection-more {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  color: var(--text-secondary, #888);
+  text-align: center;
+  font-style: italic;
+}
+
 .associations-list {
   display: flex;
   flex-wrap: wrap;
@@ -1469,6 +1655,20 @@ const resetView = () => {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.app.dark .rect-selection-chip {
+  background: rgba(96, 156, 255, 0.18);
+  border-color: rgba(96, 156, 255, 0.4);
+}
+
+.app.dark .rect-selection-chip code,
+.app.dark .rect-selection-handle {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.app.dark .rect-selection-item:hover {
+  background: rgba(96, 156, 255, 0.14);
+}
+
 .hover-pill {
   display: inline-flex;
   align-items: center;
@@ -1568,13 +1768,11 @@ const resetView = () => {
   color: #aaa;
 }
 
-.app.dark .settings-cell:nth-child(2),
-.app.dark .settings-cell:nth-child(4) {
+.app.dark .settings-cell:nth-child(2n) {
   border-left-color: #444;
 }
 
-.app.dark .settings-cell:nth-child(3),
-.app.dark .settings-cell:nth-child(4) {
+.app.dark .settings-cell:nth-child(n + 3) {
   border-top-color: #444;
 }
 
@@ -1588,9 +1786,7 @@ const resetView = () => {
 }
 
 @media (max-width: 768px) {
-  .app.dark .settings-cell:nth-child(2),
-  .app.dark .settings-cell:nth-child(3),
-  .app.dark .settings-cell:nth-child(4) {
+  .app.dark .settings-cell:nth-child(n + 2) {
     border-top-color: #444;
   }
 }

@@ -247,6 +247,22 @@
     </div>
 
     <div
+      v-if="rectSelScreenRect"
+      class="dxfk-selection-rect"
+      :class="[
+        `dxfk-selection-rect--${rectSelScreenRect.mode}`,
+        classes?.selectionRect,
+      ]"
+      :style="{
+        left: rectSelScreenRect.x + 'px',
+        top: rectSelScreenRect.y + 'px',
+        width: rectSelScreenRect.width + 'px',
+        height: rectSelScreenRect.height + 'px',
+      }"
+      aria-hidden="true"
+    ></div>
+
+    <div
       v-if="isDragOver"
       class="dxfk-message-overlay dxfk-drop-overlay"
       :class="classes?.dropOverlay"
@@ -278,8 +294,19 @@ import { useLayers } from "../composables/useLayers";
 import { useLoadError } from "../composables/useLoadError";
 import { usePicking, type PickingEvent } from "../composables/usePicking";
 import { useHighlight } from "../composables/useHighlight";
+import {
+  useRectangleSelection,
+  type RectSelectionMode,
+  type RectSelectionModifier,
+  type RectSelectionResolvedMode,
+} from "../composables/useRectangleSelection";
 import { useKeyboardNavigation } from "../composables/useKeyboardNavigation";
-import type { DxfData, DxfLayer, PickingEntry, EntityAssociation } from "dxf-render";
+import type {
+  DxfData,
+  DxfLayer,
+  PickingEntry,
+  EntityAssociation,
+} from "dxf-render";
 import { getZoomBox, getZoomBoxForLayer, getUnitsToMmFactor } from "dxf-render";
 import type { OverlayPosition, ViewerClasses, RulerUnits } from "../types";
 import type { AntialiasingMode } from "dxf-render";
@@ -328,6 +355,9 @@ interface Props {
   classes?: ViewerClasses;
   showRulers?: boolean;
   rulerUnits?: RulerUnits;
+  rectangleSelection?: boolean;
+  rectangleSelectionModifier?: RectSelectionModifier;
+  rectangleSelectionMode?: RectSelectionMode;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -365,6 +395,9 @@ const props = withDefaults(defineProps<Props>(), {
   classes: () => ({}),
   showRulers: false,
   rulerUnits: "mm",
+  rectangleSelection: false,
+  rectangleSelectionModifier: "shift",
+  rectangleSelectionMode: "auto",
 });
 
 interface Emits {
@@ -376,6 +409,9 @@ interface Emits {
   (e: "file-dropped", fileName: string): void;
   (e: "entity-hover", event: PickingEvent | null): void;
   (e: "entity-click", event: PickingEvent): void;
+  (e: "entities-select", events: PickingEvent[]): void;
+  (e: "selection-start", mode: RectSelectionResolvedMode): void;
+  (e: "selection-end"): void;
 }
 
 const emit = defineEmits<Emits>();
@@ -426,6 +462,8 @@ const keyboardNav = useKeyboardNavigation({
 
 const picking = usePicking();
 const highlightCtl = useHighlight();
+const rectSelection = useRectangleSelection();
+const rectSelScreenRect = rectSelection.screenRect;
 let lastDxfForPicking: DxfData | null = null;
 
 // Currently selected entity surfaced to the built-in PropertiesPanel.
@@ -445,6 +483,9 @@ const setupPickingForDxf = (dxf: DxfData): void => {
   if (entityIdx && pickingIdx) {
     highlightCtl.installHighlightData(entityIdx, pickingIdx);
   }
+  if (pickingIdx) {
+    rectSelection.installRectData(pickingIdx, offset);
+  }
   if (props.pickingDebug) picking.setDebug(true);
   lastDxfForPicking = dxf;
 };
@@ -453,6 +494,7 @@ const teardownPicking = (): void => {
   highlightCtl.removeHighlightData();
   highlightCtl.dispose();
   picking.removePickingData(getScene());
+  rectSelection.removeRectData();
   lastDxfForPicking = null;
   selectedEntity.value = null;
 };
@@ -487,6 +529,42 @@ const collectHighlightEntries = (event: PickingEvent): PickingEntry[] => {
 const handleEntityClick = (event: PickingEvent): void => {
   selectedEntity.value = event;
   emit("entity-click", event);
+};
+
+const handleRectSelectionStart = (mode: RectSelectionResolvedMode): void => {
+  emit("selection-start", mode);
+};
+
+const handleRectSelectionSelect = (
+  entries: PickingEntry[],
+  _mode: RectSelectionResolvedMode,
+): void => {
+  const events = entries.map((entry) => picking.buildEventForEntry(entry));
+  emit("entities-select", events);
+};
+
+const handleRectSelectionEnd = (): void => {
+  emit("selection-end");
+};
+
+const attachRectSelectionIfReady = (): void => {
+  if (!props.rectangleSelection || !props.pickingEnabled) return;
+  const renderer = getRenderer();
+  const camera = getCamera();
+  if (!renderer || !camera) return;
+  rectSelection.attach(
+    renderer.domElement,
+    camera,
+    getControls(),
+    {
+      onStart: handleRectSelectionStart,
+      onSelect: handleRectSelectionSelect,
+      onEnd: handleRectSelectionEnd,
+    },
+  );
+  rectSelection.setModifier(props.rectangleSelectionModifier);
+  rectSelection.setMode(props.rectangleSelectionMode);
+  rectSelection.setEnabled(true);
 };
 
 const highlight = (handles: string[]): void => {
@@ -872,13 +950,35 @@ watch(
     picking.setEnabled(enabled);
     if (!enabled) {
       teardownPicking();
+      rectSelection.detach();
     } else if (lastDxfForPicking == null) {
       const dxf = props.dxfData ?? null;
       if (dxf && dxf.entities?.length) setupPickingForDxf(dxf);
     }
     // (Re-)attach pointer listeners to the canvas if picking just turned on
-    if (enabled) attachPickingIfReady();
+    if (enabled) {
+      attachPickingIfReady();
+      attachRectSelectionIfReady();
+    }
   },
+);
+
+watch(
+  () => props.rectangleSelection,
+  (enabled) => {
+    if (enabled) attachRectSelectionIfReady();
+    else rectSelection.detach();
+  },
+);
+
+watch(
+  () => props.rectangleSelectionModifier,
+  (key) => rectSelection.setModifier(key),
+);
+
+watch(
+  () => props.rectangleSelectionMode,
+  (mode) => rectSelection.setMode(mode),
 );
 
 watch(
@@ -926,6 +1026,7 @@ onMounted(() => {
     if (dxfContainer.value) {
       initThreeJS(dxfContainer.value, { enableControls: true, aaMode: props.antialiasing });
       attachPickingIfReady();
+      attachRectSelectionIfReady();
 
       const cam = getCamera();
       rulerCamera.value = cam ? markRaw(cam) : null;
@@ -961,6 +1062,7 @@ onBeforeUnmount(() => {
   }
 
   picking.detach();
+  rectSelection.detach();
   keyboardNav.detach();
   teardownPicking();
   cleanup();
@@ -1168,6 +1270,33 @@ defineExpose({
   font-size: 1rem;
   color: var(--dxfk-text-secondary, #757575);
   max-width: 300px;
+}
+
+.dxfk-selection-rect {
+  position: absolute;
+  pointer-events: none;
+  z-index: 15;
+  box-sizing: border-box;
+}
+
+.dxfk-selection-rect--window {
+  background-color: var(--dxfk-selection-rect-bg-window, rgba(64, 128, 255, 0.12));
+  border: 1px solid var(--dxfk-selection-rect-border-window, #4080ff);
+}
+
+.dxfk-selection-rect--crossing {
+  background-color: var(--dxfk-selection-rect-bg-crossing, rgba(64, 192, 64, 0.12));
+  border: 1px dashed var(--dxfk-selection-rect-border-crossing, #40c040);
+}
+
+.dxfk-viewer.dxfk-dark .dxfk-selection-rect--window {
+  --dxfk-selection-rect-bg-window: rgba(96, 156, 255, 0.18);
+  --dxfk-selection-rect-border-window: #609cff;
+}
+
+.dxfk-viewer.dxfk-dark .dxfk-selection-rect--crossing {
+  --dxfk-selection-rect-bg-crossing: rgba(96, 220, 96, 0.18);
+  --dxfk-selection-rect-border-crossing: #60dc60;
 }
 
 .dxfk-loading-overlay {

@@ -15,6 +15,18 @@ export { useThreeScene } from "./composables/useThreeScene";
 export { useLayers } from "./composables/useLayers";
 export { usePicking, type PickingEvent } from "./composables/usePicking";
 export { useHighlight } from "./composables/useHighlight";
+export {
+  useRectangleSelection,
+  resolveSelectionMode,
+  normaliseScreenRect,
+  buildWorldRect,
+  type RectSelectionMode,
+  type RectSelectionResolvedMode,
+  type RectSelectionModifier,
+  type RectSelectionCallbacks,
+  type RectScreenRect,
+  type OrbitLikeControls,
+} from "./composables/useRectangleSelection";
 
 // Types
 export type { OverlayPosition, ViewerClasses, RulerUnits } from "./types";

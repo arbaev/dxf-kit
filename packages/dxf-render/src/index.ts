@@ -35,6 +35,11 @@ export {
   type FindEntitiesByLayerOptions,
 } from "./utils/findEntitiesByLayer";
 export { findEntitiesByType } from "./utils/findEntitiesByType";
+export {
+  findEntriesInRect,
+  type WorldRect,
+  type FindInRectOptions,
+} from "./utils/rectangleSelection";
 
 // Associations
 export { buildAssociations } from "./utils/buildAssociations";

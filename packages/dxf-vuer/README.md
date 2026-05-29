@@ -88,6 +88,9 @@ async function loadFile(file) {
 | `classes`              | `ViewerClasses`    | `{}`              | Headless UI-style class map. Each key adds a class onto the matching `.dxfk-*` root element (e.g. `{ toolbar: 'my-toolbar' }`). See [Customizing styles](#customizing-styles) |
 | `showRulers`           | `boolean`          | `false`           | Show horizontal + vertical rulers along the top/left edges of the canvas with adaptive tick density, cursor marker, and a corner unit badge                              |
 | `rulerUnits`           | `RulerUnits`       | `"mm"`            | Units displayed on ruler tick labels. `"mm"`/`"inch"` convert via `$INSUNITS`; on a Unitless file (`$INSUNITS=0`) raw values are treated as the chosen unit 1:1          |
+| `rectangleSelection`         | `boolean`                          | `false`           | Enable modifier-drag rectangle selection. Requires `pickingEnabled` to function (the picking index is the source of bboxes)                                              |
+| `rectangleSelectionModifier` | `"shift" \| "ctrl" \| "alt"`       | `"shift"`         | Modifier key that arms the rectangle drag. While held, OrbitControls panning is suspended and the cursor turns into a crosshair                                          |
+| `rectangleSelectionMode`     | `"auto" \| "window" \| "crossing"` | `"auto"`          | `auto` — drag direction decides (AutoCAD): L→R = window (fully inside), R→L = crossing (any overlap). The other values lock the semantic regardless of drag direction    |
 
 `OverlayPosition` = `"top-left"` | `"top-center"` | `"top-right"` | `"bottom-left"` | `"bottom-center"` | `"bottom-right"`
 
@@ -150,6 +153,9 @@ async function loadFile(file) {
 | `file-dropped`         | `string`               | File name when a file is dropped                                                     |
 | `entity-hover`         | `PickingEvent \| null` | Hover changed (only when `pickingEnabled`). `null` when the cursor leaves the entity |
 | `entity-click`         | `PickingEvent`         | Tap on an entity. Mousedown→up that moves more than 4px is treated as pan, not click |
+| `entities-select`      | `PickingEvent[]`       | Final result of a rectangle drag (only when `rectangleSelection`). Empty array if the rect didn't cover anything |
+| `selection-start`      | `"window" \| "crossing"` | Fired when a rectangle drag passes the 4px threshold. Payload is the resolved mode |
+| `selection-end`        | —                      | Fired after `entities-select` or when the drag is cancelled (Esc) |
 
 ## DXFViewer Methods (via `ref`)
 
@@ -322,6 +328,51 @@ function selectFromGrid(handle: string) {
   />
 </template>
 ```
+
+### Example: rectangle selection (window / crossing)
+
+Hold the modifier key (Shift by default) and drag on the canvas to select multiple entities at once. The drag direction picks the AutoCAD semantic:
+
+- **Left → right** = window — only entities whose bbox is **fully inside** the rectangle (drawn as a solid blue overlay).
+- **Right → left** = crossing — any entity whose bbox **touches** the rectangle (drawn as a dashed green overlay).
+
+While the modifier is held the canvas cursor turns into a crosshair and panning is suspended; releasing the modifier restores normal pan/zoom. `Esc` cancels an in-progress drag without firing `entities-select`. Drags shorter than 4 px are silently dropped, so a stray Shift-click won't blow away the selection.
+
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+import { DXFViewer } from "dxf-vuer";
+import type { PickingEvent } from "dxf-vuer";
+
+const viewer = ref<InstanceType<typeof DXFViewer> | null>(null);
+const dxfData = ref(null);
+const selection = ref<PickingEvent[]>([]);
+
+function onSelect(events: PickingEvent[]) {
+  selection.value = events;
+  console.log(`selected ${events.length} entities`);
+  // Re-highlight the selection through the imperative API so it survives
+  // the drag overlay disappearing.
+  viewer.value?.highlight(events.map((e) => e.handle));
+}
+</script>
+
+<template>
+  <DXFViewer
+    ref="viewer"
+    :dxf-data="dxfData"
+    picking-enabled
+    rectangle-selection
+    rectangle-selection-modifier="shift"
+    rectangle-selection-mode="auto"
+    @entities-select="onSelect"
+  />
+</template>
+```
+
+Both `pickingEnabled` and `rectangleSelection` must be true — the rectangle helper reuses the same `PickingIndex` that drives raycast picking. The `entities-select` payload uses the same `PickingEvent` shape as `entity-click`, so consumers can run both through the same handler.
+
+By default INSERT instances are returned as a single aggregate entry (mirroring AutoCAD's "an INSERT is one selectable block"). Use the pure helper `findEntriesInRect` directly with `{ granularity: "leaf" }` from `dxf-render` if you need the individual child entities.
 
 ### Example: find-and-zoom (text search)
 
@@ -497,6 +548,10 @@ Available variables:
 | `--dxfk-border-color`       | `#e0e0e0`   | Borders, dividers                                       |
 | `--dxfk-border-radius`      | `4px`       | All rounded corners                                     |
 | `--dxfk-spacing-xs/sm/md/lg`| `4/8/16/24` | Internal paddings/margins                               |
+| `--dxfk-selection-rect-bg-window`     | `rgba(64,128,255,.12)` | Window-mode (L→R) rectangle fill   |
+| `--dxfk-selection-rect-border-window` | `#4080ff`              | Window-mode rectangle border       |
+| `--dxfk-selection-rect-bg-crossing`   | `rgba(64,192,64,.12)`  | Crossing-mode (R→L) rectangle fill |
+| `--dxfk-selection-rect-border-crossing` | `#40c040`            | Crossing-mode rectangle border     |
 
 ### 2. Hook classes
 
@@ -527,6 +582,9 @@ Stable hook classes:
 | `.dxfk-ruler-h`                | Horizontal ruler (top edge of canvas) — gated by `showRulers`|
 | `.dxfk-ruler-v`                | Vertical ruler (left edge of canvas) — gated by `showRulers` |
 | `.dxfk-ruler-corner`           | 24×24 badge in the top-left corner showing the unit label    |
+| `.dxfk-selection-rect`         | Rectangle-drag overlay (gated by `rectangleSelection`)       |
+| `.dxfk-selection-rect--window` | Modifier — added when the drag resolves to window mode       |
+| `.dxfk-selection-rect--crossing` | Modifier — added when the drag resolves to crossing mode   |
 | `.dxfk-dark`                   | Modifier — added to `.dxfk-viewer` / `.dxfk-toolbar` / `.dxfk-layer-panel` / `.dxfk-ruler-*` when `darkTheme` is on |
 
 These class names are part of the public API — they won't change between patch / minor versions.
@@ -585,6 +643,7 @@ Available keys (`ViewerClasses` interface, all optional):
 | `rulerHorizontal`    | `.dxfk-ruler-h`                              |
 | `rulerVertical`      | `.dxfk-ruler-v`                              |
 | `rulerCorner`        | `.dxfk-ruler-corner`                         |
+| `selectionRect`      | `.dxfk-selection-rect` (rectangle drag overlay) |
 
 Standalone components (`FileUploader`, `UnsupportedEntities`, `DXFStatistics`, `LayerPanel`, `ViewerToolbar`) accept a regular `class` attribute thanks to Vue's class fallthrough — no separate `classes` prop is needed when you compose them yourself:
 
@@ -627,6 +686,7 @@ Dark-theme styling no longer relies on `::v-deep` / `:deep()` reaching into `Vie
 | `useKeyboardNavigation` | Wires arrow-key pan, `+`/`-` zoom, and `0` reset on any focusable element. `attach`, `detach`, `setEnabled`                                                                                         |
 | `usePicking`            | Builds the picking index + associations, wires pointer listeners to a canvas, emits enriched `PickingEvent`s. Exposes `installPickingData`, `attach`, `getAssociations`, `findAssociationsByHandle` |
 | `useHighlight`          | Manages an overlay group of LineSegments per highlighted bbox. `init`, `setColor`, `highlight(entries)`, `clear`, `dispose`                                                                         |
+| `useRectangleSelection` | Modifier+drag rectangle selection. Reactive `screenRect` + `isDragging` for the visual overlay; `attach(canvas, camera, controls, callbacks)` + `installRectData(pickingIndex, originOffset)`. Wraps `findEntriesInRect` from `dxf-render` |
 
 ## Re-exports
 

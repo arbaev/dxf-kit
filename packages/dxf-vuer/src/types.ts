@@ -56,4 +56,6 @@ export interface ViewerClasses {
   rulerVertical?: string;
   /** Ruler corner badge (top-left, shows units label) — applied to `.dxfk-ruler-corner`. */
   rulerCorner?: string;
+  /** Rectangle-selection drag overlay — applied to `.dxfk-selection-rect`. */
+  selectionRect?: string;
 }
