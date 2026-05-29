@@ -82,7 +82,7 @@ async function loadFile(file) {
 | `overlayPosition`      | `OverlayPosition`  | `"top-center"`    | Position of `#overlay` slot content                                                                                                                                     |
 | `pickingEnabled`       | `boolean`          | `false`           | Enable hover/click events + raycasting (off by default — opt-in to interactivity)                                                                                       |
 | `highlightOnHover`     | `boolean`          | `true`            | Draw a built-in highlight overlay on the hovered entity. Turn off if you render selection from your own UI                                                              |
-| `highlightAssociated`  | `boolean`          | `true`            | When the hovered entity participates in an association (MLEADER / LEADER+TEXT / INSERT+ATTRIB / DIMENSION), highlight all its members instead of just the entity itself |
+| `highlightAssociated`  | `boolean`          | `true`            | When the hovered entity participates in an association (MLEADER / LEADER+TEXT / INSERT+ATTRIB / DIMENSION / ACAD_GROUP), highlight all its members instead of just the entity itself |
 | `highlightColor`       | `string`           | `"#ffaa00"`       | Color used by the built-in hover highlight                                                                                                                              |
 | `keyboardNavigation`   | `boolean`          | `true`            | Enable keyboard pan/zoom (arrow keys, `+`/`-`, `0`). Listener fires only when the canvas is focused                                                                     |
 | `persistLayersKey`     | `string`           | `""`              | When set, layer visibility is persisted to `localStorage` under `${persistLayersKey}:${fileName \|\| "default"}`. Empty string disables persistence. Ignored when `hiddenLayers` is provided (parent owns the state) |
@@ -268,10 +268,18 @@ The same overlay is also used by `<LayerPanel>`: hovering a layer row highlights
 | `leader`        | LEADER ↔ TEXT/MTEXT via DXF code 340 (`annotationHandle`) | LEADER + annotation entity |
 | `block-attribs` | INSERT with one or more ATTRIB children                   | INSERT + all ATTRIBs       |
 | `dimension`     | DIMENSION text override or `actualMeasurement`            | the DIMENSION itself       |
+| `group`         | ACAD_GROUP record from the OBJECTS section                | every member entity        |
 
 Real-world note: not every LEADER in a DXF carries the 340 link — it's optional in
 the format. `buildAssociations` deliberately doesn't guess via geometry; a future
 opt-in spatial heuristic is on the [roadmap](https://github.com/arbaev/dxf-kit/blob/main/todo/roadmap.md).
+
+For `kind: "group"`, `association.primary` is the handle of the GROUP **object**
+(not a real entity — it cannot be raycast or highlighted), and `association.members`
+contains only the member entity handles — `primary` is intentionally excluded.
+For every other kind, `members` still includes `primary` as before. The raw
+parsed groups are also available at `dxf.objects?.groups` (`Record<string, DxfGroup>`)
+if you want to bypass `buildAssociations`.
 
 ### Example: console-logging hovers and clicks
 

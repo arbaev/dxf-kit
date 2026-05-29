@@ -18,7 +18,7 @@ For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer)
 - **Most entities** — 22 rendered types including all dimension variants, LEADER, MULTILEADER, MLINE, REGION (contour via HATCH boundary)
 - **Variable-width polylines** — per-vertex tapering, arrows, donuts rendered as mesh with miter joins
 - **Accurate rendering** — linetype patterns, OCS transforms, hatch patterns, proper color resolution
-- **Picking & associations** — bbox-based raycast index plus DXF-driven entity links (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION)
+- **Picking & associations** — bbox-based raycast index plus DXF-driven entity links (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION, ACAD_GROUP)
 - **Two entry points** — full renderer or parser-only (zero deps, works in Node.js)
 - **Battle-tested** — 1141 tests covering parser, renderer, and utilities
 - **Modern stack** — TypeScript native, ES modules, tree-shakeable, Vite-built
@@ -436,23 +436,31 @@ XLINE and RAY are intentionally absent from the picking index (infinite extent) 
 
 `buildAssociations(dxf)` derives links between entities **strictly from DXF data**, no geometric heuristics:
 
-| Kind            | How it's sourced                                          |
-| --------------- | --------------------------------------------------------- |
-| `mleader`       | MULTILEADER inline `contextData` text (DXF code 304)      |
-| `leader`        | LEADER's `annotationHandle` (DXF code 340) → TEXT/MTEXT   |
-| `block-attribs` | INSERT entity with one or more ATTRIB children            |
-| `dimension`     | DIMENSION text override (or `actualMeasurement` fallback) |
+| Kind            | How it's sourced                                                              |
+| --------------- | ----------------------------------------------------------------------------- |
+| `mleader`       | MULTILEADER inline `contextData` text (DXF code 304)                          |
+| `leader`        | LEADER's `annotationHandle` (DXF code 340) → TEXT/MTEXT                       |
+| `block-attribs` | INSERT entity with one or more ATTRIB children                                |
+| `dimension`     | DIMENSION text override (or `actualMeasurement` fallback)                     |
+| `group`         | ACAD_GROUP record from the OBJECTS section; name resolved via ACAD_GROUP dict |
 
 ```ts
 interface EntityAssociation {
   id: string; // stable, e.g. "leader:B1"
   kind: AssociationKind; // 'mleader' | 'leader' | 'block-attribs' | 'dimension' | 'group'
-  primary: string; // primary entity handle
-  members: string[]; // all related handles, including primary
+  primary: string; // primary handle (see note below for group)
+  members: string[]; // related handles — see note below for group
   text?: string;
   source: AssociationSource; // 'inline' | 'handle-ref' | 'attribs' | 'group-dict'
 }
 ```
+
+For `mleader` / `leader` / `block-attribs` / `dimension`, `primary` is a real
+entity handle and `members` includes it. **For `kind: "group"`, `primary` is
+the handle of the GROUP object itself** — not a renderable entity — so it is
+excluded from `members`, which contains only the member entity handles. Calling
+`viewer.highlight([association.primary])` for a group has no visible effect;
+use `association.members` instead.
 
 A handle can participate in multiple associations; index by member if you need reverse lookup:
 
@@ -473,7 +481,11 @@ for (const a of associations) {
 const linkedToBd8 = byHandle.get("BD8");
 ```
 
-> ACAD_GROUP entries from the DXF OBJECTS section are not parsed yet — that source is on the roadmap.
+ACAD_GROUP records are exposed at `dxf.objects.groups` (typed as
+`Record<string, DxfGroup>`) for consumers that want the raw data without going
+through `buildAssociations`. Each `DxfGroup` carries its `handle`, optional
+`name` and `description`, `isUnnamed` / `isSelectable` flags, and
+`entityHandles[]`.
 
 ### Text search
 

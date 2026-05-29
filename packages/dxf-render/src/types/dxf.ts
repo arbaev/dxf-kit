@@ -591,8 +591,33 @@ export interface DxfMLeaderStyle {
   blockColorRaw?: number;
 }
 
+/**
+ * Parsed ACAD_GROUP record from the OBJECTS section.
+ *
+ * Members are stored as raw handle references (DXF code 340). Anonymous groups
+ * (flag 70 = 1) have names that start with `*`; `name` is resolved from the
+ * ACAD_GROUP dictionary in the Named Object Dictionary and may be `undefined`
+ * when the group is not registered there.
+ */
+export interface DxfGroup {
+  /** Handle of the GROUP object itself (DXF code 5, uppercase). */
+  handle: string;
+  /** Group name resolved via the ACAD_GROUP dictionary. */
+  name?: string;
+  /** Description (DXF code 300). */
+  description?: string;
+  /** DXF code 70 — `1` = anonymous (name starts with `*`). */
+  isUnnamed: boolean;
+  /** DXF code 71 — `1` = selectable. */
+  isSelectable: boolean;
+  /** Member entity handles (DXF code 340), in order of appearance. Uppercase. */
+  entityHandles: string[];
+}
+
 export interface DxfObjects {
   mLeaderStyles?: Record<string, DxfMLeaderStyle>;
+  /** ACAD_GROUP records, keyed by group handle (uppercase). */
+  groups?: Record<string, DxfGroup>;
 }
 
 export interface DxfData {

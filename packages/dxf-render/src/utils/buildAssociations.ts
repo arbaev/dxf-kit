@@ -11,9 +11,9 @@ import { buildEntityIndex, extractEntityText } from "./entityIndex";
  * - LEADER     → `leader`  (handle-ref via code 340 to TEXT/MTEXT)
  * - INSERT     → `block-attribs` (ATTRIB array attached to the insert)
  * - DIMENSION  → `dimension` (inline text/measurement on the entity itself)
- *
- * TODO: ACAD_GROUP entries from the OBJECTS section — the section is not yet
- * parsed; once it is, emit `group` associations from each ACAD_GROUP record.
+ * - ACAD_GROUP → `group`     (member handles via code 340, name from the
+ *                             ACAD_GROUP dictionary; `primary` is the GROUP
+ *                             handle and is NOT included in `members`)
  */
 export function buildAssociations(dxf: DxfData): EntityAssociation[] {
   const out: EntityAssociation[] = [];
@@ -101,6 +101,27 @@ export function buildAssociations(dxf: DxfData): EntityAssociation[] {
         break;
       }
     }
+  }
+
+  for (const group of Object.values(dxf.objects?.groups ?? {})) {
+    const primary = normalizeHandle(group.handle);
+    if (!primary) continue;
+
+    const validMembers: string[] = [];
+    for (const raw of group.entityHandles) {
+      const h = normalizeHandle(raw);
+      if (h && index.has(h)) validMembers.push(h);
+    }
+    if (validMembers.length === 0) continue;
+
+    out.push({
+      id: `group:${primary}`,
+      kind: "group",
+      primary,
+      members: validMembers,
+      text: group.name,
+      source: "group-dict",
+    });
   }
 
   return out;
