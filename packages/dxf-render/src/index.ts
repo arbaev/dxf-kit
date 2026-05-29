@@ -95,6 +95,11 @@ export {
   toRadians,
   type MeasurePoint,
 } from "./utils/measurements";
+export {
+  groupLayersByPrefix,
+  type LayerGroup,
+  type GroupLayersByPrefixOptions,
+} from "./utils/groupLayersByPrefix";
 
 // Constants
 export * from "./constants";
