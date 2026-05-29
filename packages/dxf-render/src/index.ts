@@ -86,6 +86,15 @@ export {
   applyLinetypePattern,
 } from "./utils/linetypeResolver";
 export { default as ACI_PALETTE } from "./parser/acadColorIndex";
+export {
+  measureDistance,
+  measureArea,
+  measureSignedArea,
+  measureAngle,
+  toDegrees,
+  toRadians,
+  type MeasurePoint,
+} from "./utils/measurements";
 
 // Constants
 export * from "./constants";

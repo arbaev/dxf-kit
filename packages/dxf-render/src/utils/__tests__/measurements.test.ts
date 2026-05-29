@@ -1,0 +1,264 @@
+import { describe, it, expect } from "vitest";
+import {
+  measureDistance,
+  measureArea,
+  measureSignedArea,
+  measureAngle,
+  toDegrees,
+  toRadians,
+  type MeasurePoint,
+} from "../measurements";
+
+describe("measureDistance", () => {
+  it("returns 0 for identical points", () => {
+    expect(measureDistance({ x: 0, y: 0 }, { x: 0, y: 0 })).toBe(0);
+    expect(measureDistance({ x: 5, y: 7, z: 3 }, { x: 5, y: 7, z: 3 })).toBe(0);
+  });
+
+  it("computes 2D distance (3-4-5 triangle)", () => {
+    expect(measureDistance({ x: 0, y: 0 }, { x: 3, y: 4 })).toBe(5);
+  });
+
+  it("computes 3D distance (1-2-2 → 3)", () => {
+    expect(measureDistance({ x: 0, y: 0, z: 0 }, { x: 1, y: 2, z: 2 })).toBe(3);
+  });
+
+  it("treats missing z as 0 (mixed 2D/3D inputs)", () => {
+    expect(measureDistance({ x: 0, y: 0 }, { x: 3, y: 4, z: 0 })).toBe(5);
+    expect(measureDistance({ x: 0, y: 0, z: 0 }, { x: 3, y: 4 })).toBe(5);
+  });
+
+  it("is symmetric", () => {
+    const a: MeasurePoint = { x: 1.5, y: -2.5, z: 0.5 };
+    const b: MeasurePoint = { x: -3, y: 7.25, z: 4 };
+    expect(measureDistance(a, b)).toBeCloseTo(measureDistance(b, a));
+  });
+
+  it("handles negative coordinates", () => {
+    expect(measureDistance({ x: -3, y: -4 }, { x: 0, y: 0 })).toBe(5);
+  });
+
+  it("returns 0 for non-finite coordinates", () => {
+    expect(measureDistance({ x: NaN, y: 0 }, { x: 0, y: 0 })).toBe(0);
+    expect(measureDistance({ x: 0, y: 0 }, { x: Infinity, y: 0 })).toBe(0);
+  });
+});
+
+describe("measureSignedArea", () => {
+  it("returns 0 for fewer than 3 points", () => {
+    expect(measureSignedArea([])).toBe(0);
+    expect(measureSignedArea([{ x: 0, y: 0 }])).toBe(0);
+    expect(measureSignedArea([{ x: 0, y: 0 }, { x: 1, y: 0 }])).toBe(0);
+  });
+
+  it("returns positive area for CCW triangle", () => {
+    const tri: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 4, y: 0 },
+      { x: 0, y: 3 },
+    ];
+    expect(measureSignedArea(tri)).toBe(6);
+  });
+
+  it("returns negative area for CW triangle", () => {
+    const tri: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 0, y: 3 },
+      { x: 4, y: 0 },
+    ];
+    expect(measureSignedArea(tri)).toBe(-6);
+  });
+
+  it("computes square area (CCW)", () => {
+    const sq: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+      { x: 2, y: 2 },
+      { x: 0, y: 2 },
+    ];
+    expect(measureSignedArea(sq)).toBe(4);
+  });
+
+  it("returns 0 for collinear points", () => {
+    const line: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+      { x: 3, y: 0 },
+    ];
+    expect(measureSignedArea(line)).toBe(0);
+  });
+
+  it("ignores z coordinate", () => {
+    const tri2D: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 4, y: 0 },
+      { x: 0, y: 3 },
+    ];
+    const tri3D: MeasurePoint[] = [
+      { x: 0, y: 0, z: 100 },
+      { x: 4, y: 0, z: -50 },
+      { x: 0, y: 3, z: 7 },
+    ];
+    expect(measureSignedArea(tri3D)).toBe(measureSignedArea(tri2D));
+  });
+
+  it("yields the same value whether the polygon is open or closed", () => {
+    const open: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 4, y: 0 },
+      { x: 0, y: 3 },
+    ];
+    const closed: MeasurePoint[] = [...open, { x: 0, y: 0 }];
+    // Closed form has 4 vertices but the duplicated edge contributes 0,
+    // and the wrap-around (last → first) is also 0 since they coincide.
+    expect(measureSignedArea(closed)).toBe(measureSignedArea(open));
+  });
+
+  it("returns 0 for non-finite coordinates", () => {
+    const bad: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: NaN, y: 0 },
+      { x: 0, y: 3 },
+    ];
+    expect(measureSignedArea(bad)).toBe(0);
+  });
+});
+
+describe("measureArea", () => {
+  it("returns 0 for degenerate inputs", () => {
+    expect(measureArea([])).toBe(0);
+    expect(measureArea([{ x: 0, y: 0 }, { x: 1, y: 1 }])).toBe(0);
+  });
+
+  it("returns absolute value of signed area (CCW)", () => {
+    const tri: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 4, y: 0 },
+      { x: 0, y: 3 },
+    ];
+    expect(measureArea(tri)).toBe(6);
+  });
+
+  it("returns absolute value of signed area (CW)", () => {
+    const tri: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 0, y: 3 },
+      { x: 4, y: 0 },
+    ];
+    expect(measureArea(tri)).toBe(6);
+  });
+
+  it("computes a 10x10 square", () => {
+    const sq: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+    ];
+    expect(measureArea(sq)).toBe(100);
+  });
+
+  it("computes a non-convex (L-shape) polygon area", () => {
+    // L-shape: 3x3 square with a 1x1 notch in the top-right corner.
+    // Expected area = 9 - 1 = 8.
+    const lshape: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 3, y: 0 },
+      { x: 3, y: 2 },
+      { x: 2, y: 2 },
+      { x: 2, y: 3 },
+      { x: 0, y: 3 },
+    ];
+    expect(measureArea(lshape)).toBe(8);
+  });
+});
+
+describe("measureAngle", () => {
+  it("returns 90° (π/2) for perpendicular rays", () => {
+    const vertex: MeasurePoint = { x: 0, y: 0 };
+    const p1: MeasurePoint = { x: 1, y: 0 };
+    const p2: MeasurePoint = { x: 0, y: 1 };
+    expect(measureAngle(vertex, p1, p2)).toBeCloseTo(Math.PI / 2);
+  });
+
+  it("returns 0 for coincident rays", () => {
+    const vertex: MeasurePoint = { x: 0, y: 0 };
+    const p1: MeasurePoint = { x: 5, y: 0 };
+    const p2: MeasurePoint = { x: 10, y: 0 };
+    expect(measureAngle(vertex, p1, p2)).toBe(0);
+  });
+
+  it("returns π for opposite rays", () => {
+    const vertex: MeasurePoint = { x: 0, y: 0 };
+    const p1: MeasurePoint = { x: 1, y: 0 };
+    const p2: MeasurePoint = { x: -1, y: 0 };
+    expect(measureAngle(vertex, p1, p2)).toBeCloseTo(Math.PI);
+  });
+
+  it("returns 60° for an equilateral triangle vertex", () => {
+    const vertex: MeasurePoint = { x: 0, y: 0 };
+    const p1: MeasurePoint = { x: 1, y: 0 };
+    const p2: MeasurePoint = { x: 0.5, y: Math.sqrt(3) / 2 };
+    expect(measureAngle(vertex, p1, p2)).toBeCloseTo(Math.PI / 3);
+  });
+
+  it("is unsigned (order of p1/p2 doesn't matter)", () => {
+    const vertex: MeasurePoint = { x: 0, y: 0 };
+    const p1: MeasurePoint = { x: 1, y: 0 };
+    const p2: MeasurePoint = { x: 0, y: 1 };
+    expect(measureAngle(vertex, p1, p2)).toBeCloseTo(
+      measureAngle(vertex, p2, p1),
+    );
+  });
+
+  it("returns 0 when vertex coincides with p1 or p2", () => {
+    const v: MeasurePoint = { x: 5, y: 5 };
+    expect(measureAngle(v, v, { x: 10, y: 10 })).toBe(0);
+    expect(measureAngle(v, { x: 10, y: 10 }, v)).toBe(0);
+  });
+
+  it("handles 3D vectors", () => {
+    const vertex: MeasurePoint = { x: 0, y: 0, z: 0 };
+    const p1: MeasurePoint = { x: 1, y: 0, z: 0 };
+    const p2: MeasurePoint = { x: 0, y: 0, z: 1 };
+    expect(measureAngle(vertex, p1, p2)).toBeCloseTo(Math.PI / 2);
+  });
+
+  it("survives floating-point noise that would push acos out of domain", () => {
+    // Nearly-coincident rays with tiny fp error in the inputs.
+    const vertex: MeasurePoint = { x: 0, y: 0 };
+    const p1: MeasurePoint = { x: 1, y: 0 };
+    const p2: MeasurePoint = { x: 1 + 1e-16, y: 0 };
+    const a = measureAngle(vertex, p1, p2);
+    expect(Number.isFinite(a)).toBe(true);
+    expect(a).toBeCloseTo(0);
+  });
+
+  it("returns 0 for non-finite coordinates", () => {
+    const vertex: MeasurePoint = { x: 0, y: 0 };
+    expect(measureAngle(vertex, { x: NaN, y: 0 }, { x: 0, y: 1 })).toBe(0);
+  });
+});
+
+describe("toDegrees / toRadians", () => {
+  it("toDegrees of standard angles", () => {
+    expect(toDegrees(0)).toBe(0);
+    expect(toDegrees(Math.PI)).toBeCloseTo(180);
+    expect(toDegrees(Math.PI / 2)).toBeCloseTo(90);
+    expect(toDegrees(Math.PI / 4)).toBeCloseTo(45);
+  });
+
+  it("toRadians of standard angles", () => {
+    expect(toRadians(0)).toBe(0);
+    expect(toRadians(180)).toBeCloseTo(Math.PI);
+    expect(toRadians(90)).toBeCloseTo(Math.PI / 2);
+    expect(toRadians(45)).toBeCloseTo(Math.PI / 4);
+  });
+
+  it("round-trip: toDegrees(toRadians(x)) === x", () => {
+    for (const d of [0, 30, 45, 90, 135, 180, 270, 359.999]) {
+      expect(toDegrees(toRadians(d))).toBeCloseTo(d);
+    }
+  });
+});

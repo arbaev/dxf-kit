@@ -516,6 +516,50 @@ findEntitiesByType(dxf, ["TEXT", "MTEXT"]);
 findEntitiesByType(dxf, "DIMENSION");
 ```
 
+### Measurements
+
+Framework-agnostic geometry math for CAD measurement tools (linear ruler, area, angle). No Three.js / DOM dependencies — intended to back upcoming linear-ruler / area / angle tools in `dxf-vuer` and future React/Lit wrappers.
+
+```ts
+import {
+  measureDistance,
+  measureArea,
+  measureSignedArea,
+  measureAngle,
+  toDegrees,
+  toRadians,
+  type MeasurePoint,
+} from "dxf-render";
+
+// Euclidean distance (2D or 3D; missing z is treated as 0)
+measureDistance({ x: 0, y: 0 }, { x: 3, y: 4 }); // → 5
+measureDistance({ x: 0, y: 0, z: 0 }, { x: 1, y: 2, z: 2 }); // → 3
+
+// Polygon area via Shoelace; z is ignored
+const square: MeasurePoint[] = [
+  { x: 0, y: 0 }, { x: 10, y: 0 },
+  { x: 10, y: 10 }, { x: 0, y: 10 },
+];
+measureArea(square);        // → 100
+measureSignedArea(square);  // → +100 (CCW); negative for CW winding
+
+// Angle at the vertex between two rays, in radians [0, π]
+const a = measureAngle(
+  { x: 0, y: 0 }, // vertex
+  { x: 1, y: 0 }, // p1
+  { x: 0, y: 1 }, // p2
+);
+toDegrees(a); // → 90
+```
+
+`MeasurePoint` is `{ x: number; y: number; z?: number }` — compatible with `DxfVertex` and `THREE.Vector3`-like objects, so you can pass DXF coordinates or unprojected canvas points directly.
+
+Degenerate inputs are handled safely:
+
+- `measureDistance` returns `0` for identical points and for any non-finite coordinate.
+- `measureArea` / `measureSignedArea` return `0` for fewer than 3 points, for collinear polygons, and for non-finite coordinates. Open polygons (last vertex ≠ first) and closed polygons (last vertex == first) yield the same value.
+- `measureAngle` clamps the cosine into `[-1, 1]` to absorb floating-point noise that would otherwise push `Math.acos` out of its domain, and returns `0` when `vertex` coincides with `p1` or `p2`.
+
 ### Fonts
 
 - `loadDefaultFont(): Promise<Font>` — load embedded Liberation Sans Regular
@@ -528,6 +572,7 @@ findEntitiesByType(dxf, "DIMENSION");
 - `resolveEntityLinetype()` — resolve entity linetype
 - `collectDXFStatistics()` — collect file statistics
 - `getInsUnitsScale()` — unit conversion factor
+- `measureDistance()` / `measureArea()` / `measureAngle()` — see [Measurements](#measurements)
 
 ### Types
 
