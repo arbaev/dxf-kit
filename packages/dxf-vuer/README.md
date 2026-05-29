@@ -162,6 +162,7 @@ async function loadFile(file) {
 | `entities-select`      | `PickingEvent[]`       | Final result of a rectangle drag (only when `rectangleSelection`). Empty array if the rect didn't cover anything |
 | `selection-start`      | `"window" \| "crossing"` | Fired when a rectangle drag passes the 4px threshold. Payload is the resolved mode |
 | `selection-end`        | —                      | Fired after `entities-select` or when the drag is cancelled (Esc) |
+| `layer-hover`          | `string \| null`       | Fires the layer name on `<LayerPanel>` row `mouseenter` and `null` on `mouseleave` (frozen rows do not fire). When `highlightOnHover` + `pickingEnabled` are on, the viewer also highlights all entities on the hovered layer via `findEntitiesByLayer` + the precise-geometry overlay. The event itself fires regardless of those gates |
 | `update:hiddenLayers`  | `string[]`             | Sent on every internal layer toggle / show-all / hide-all (only when `hiddenLayers` is provided). Powers `v-model:hidden-layers` |
 | `update:measureDistance` | `boolean`            | Sent when the toolbar's ruler button toggles or `toggleMeasureDistance()` is called. Powers `v-model:measure-distance`           |
 | `measure`              | `MeasureResult`        | Fires after the second click of a distance measurement. Payload: `{ kind: "distance", p1, p2, valueRaw, value, units }` (`value` is scaled to displayed units, `valueRaw` is in raw DXF units) |
@@ -252,6 +253,10 @@ Three props control it:
 | `highlightAssociated` | When `true` (default), hovering an entity that participates in an association highlights **all members** (e.g. LEADER + linked MTEXT). When `false`, only the hovered entity is highlighted. Has no effect if `highlightOnHover` is off |
 
 For consumers building a fully custom selection visual, the same machinery is available framework-agnostic as `buildHighlightGeometry(entity, worldMatrix)` from `dxf-render` — it returns the polyline point arrays without allocating Three.js objects.
+
+#### Highlight on layer hover
+
+The same overlay is also used by `<LayerPanel>`: hovering a layer row highlights **every entity** on that layer. The viewer emits a `layer-hover(layerName | null)` event (the name on `mouseenter`, `null` on `mouseleave`); when `highlightOnHover` and `pickingEnabled` are both on, it also resolves the handles via `findEntitiesByLayer` (re-exported from `dxf-render`) and calls the internal `highlight()`. Frozen rows do not emit. External listeners can wire the event for custom UI even when the internal highlight is disabled.
 
 ### Associations
 

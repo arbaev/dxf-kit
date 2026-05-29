@@ -154,6 +154,8 @@
                 @click="!layer.frozen && $emit('toggle-layer', layer.name)"
                 @keydown.enter.prevent="!layer.frozen && $emit('toggle-layer', layer.name)"
                 @keydown.space.prevent="!layer.frozen && $emit('toggle-layer', layer.name)"
+                @mouseenter="!layer.frozen && $emit('layer-hover', layer.name)"
+                @mouseleave="!layer.frozen && $emit('layer-hover', null)"
               >
                 <svg v-if="layer.frozen" class="dxfk-layer-icon-frozen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="12" y1="2" x2="12" y2="22" />
@@ -198,6 +200,8 @@
             @click="!layer.frozen && $emit('toggle-layer', layer.name)"
             @keydown.enter.prevent="!layer.frozen && $emit('toggle-layer', layer.name)"
             @keydown.space.prevent="!layer.frozen && $emit('toggle-layer', layer.name)"
+            @mouseenter="!layer.frozen && $emit('layer-hover', layer.name)"
+            @mouseleave="!layer.frozen && $emit('layer-hover', null)"
           >
             <svg v-if="layer.frozen" class="dxfk-layer-icon-frozen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="2" x2="12" y2="22" />
@@ -242,6 +246,8 @@
             @click="!layer.frozen && $emit('toggle-layer', layer.name)"
             @keydown.enter.prevent="!layer.frozen && $emit('toggle-layer', layer.name)"
             @keydown.space.prevent="!layer.frozen && $emit('toggle-layer', layer.name)"
+            @mouseenter="!layer.frozen && $emit('layer-hover', layer.name)"
+            @mouseleave="!layer.frozen && $emit('layer-hover', null)"
           >
             <!-- Frozen: snowflake icon -->
             <svg
@@ -345,6 +351,7 @@ const emit = defineEmits<{
   (e: "toggle-layer", layerName: string): void;
   (e: "show-all"): void;
   (e: "hide-all"): void;
+  (e: "layer-hover", layerName: string | null): void;
 }>();
 
 const isExpanded = ref(true);

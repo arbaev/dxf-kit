@@ -157,6 +157,7 @@
           @toggle-layer="handleToggleLayer"
           @show-all="handleShowAllLayers"
           @hide-all="handleHideAllLayers"
+          @layer-hover="handleLayerHover"
         />
 
         <PropertiesPanel
@@ -338,7 +339,7 @@ import type {
   PickingEntry,
   EntityAssociation,
 } from "dxf-render";
-import { getZoomBox, getZoomBoxForLayer, getUnitsToMmFactor } from "dxf-render";
+import { getZoomBox, getZoomBoxForLayer, getUnitsToMmFactor, findEntitiesByLayer } from "dxf-render";
 import type { OverlayPosition, ViewerClasses, RulerUnits } from "../types";
 import type { AntialiasingMode, GroupLayersByPrefixOptions } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
@@ -450,6 +451,7 @@ interface Emits {
   (e: "file-dropped", fileName: string): void;
   (e: "entity-hover", event: PickingEvent | null): void;
   (e: "entity-click", event: PickingEvent): void;
+  (e: "layer-hover", layerName: string | null): void;
   (e: "entities-select", events: PickingEvent[]): void;
   (e: "selection-start", mode: RectSelectionResolvedMode): void;
   (e: "selection-end"): void;
@@ -576,6 +578,28 @@ const collectHighlightEntries = (event: PickingEvent): PickingEntry[] => {
 const handleEntityClick = (event: PickingEvent): void => {
   selectedEntity.value = event;
   emit("entity-click", event);
+};
+
+const handleLayerHover = (layerName: string | null): void => {
+  emit("layer-hover", layerName);
+  if (!props.highlightOnHover) return;
+  if (!layerName) {
+    highlightCtl.clear();
+    renderScene();
+    return;
+  }
+  const dxf = activeDxf.value;
+  if (!dxf) return;
+  const handles = findEntitiesByLayer(dxf, layerName);
+  if (handles.length === 0) {
+    highlightCtl.clear();
+    renderScene();
+    return;
+  }
+  const entries: PickingEntry[] = [];
+  for (const h of handles) entries.push(...picking.getPickingEntries(h));
+  highlightCtl.highlight(entries);
+  renderScene();
 };
 
 const handleRectSelectionStart = (mode: RectSelectionResolvedMode): void => {
