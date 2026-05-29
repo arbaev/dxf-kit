@@ -187,6 +187,7 @@
           :show-zoom-level="showZoomLevel"
           :show-debug-info="showDebugInfo"
           :show-layer-panel="showLayerPanel"
+          :group-layers="groupLayers"
           :show-properties-panel="showPropertiesPanel"
           :allow-drop="true"
           :auto-fit="true"
@@ -310,8 +311,13 @@
                     <option value="inch">Inches</option>
                   </select>
                 </label>
+                <label class="picking-label">
+                  <input type="checkbox" v-model="groupLayers" :disabled="!showLayerPanel" />
+                  <span>Group layers by prefix</span>
+                </label>
                 <p class="settings-cell-hint">
-                  Horizontal + vertical rulers in model-space coordinates. Adaptive tick step.
+                  Rulers: adaptive tick step. Group layers: auto-bucket by name prefix
+                  (<code>A-WALL</code> + <code>A-DOOR</code> → group <code>A</code>).
                 </p>
               </div>
             </div>
@@ -821,6 +827,7 @@ const resetSettings = () => {
   showPropertiesPanel.value = true;
   showRulers.value = true;
   rulerUnits.value = "mm";
+  groupLayers.value = true;
   fileNamePosition.value = "top-left";
   toolbarPosition.value = "top-right";
   coordinatesPosition.value = "bottom-left";
@@ -844,6 +851,7 @@ const showLayerPanel = ref(true);
 const showPropertiesPanel = ref(true);
 const showRulers = ref(true);
 const rulerUnits = ref<"dxf-units" | "mm" | "inch">("mm");
+const groupLayers = ref(true);
 
 // Overlay positions
 const overlayPositions: OverlayPosition[] = [

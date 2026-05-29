@@ -153,6 +153,7 @@
           :class="classes?.layerPanel"
           :layers="layerList"
           :dark-theme="darkTheme"
+          :group-layers="groupLayers"
           @toggle-layer="handleToggleLayer"
           @show-all="handleShowAllLayers"
           @hide-all="handleHideAllLayers"
@@ -339,7 +340,7 @@ import type {
 } from "dxf-render";
 import { getZoomBox, getZoomBoxForLayer, getUnitsToMmFactor } from "dxf-render";
 import type { OverlayPosition, ViewerClasses, RulerUnits } from "../types";
-import type { AntialiasingMode } from "dxf-render";
+import type { AntialiasingMode, GroupLayersByPrefixOptions } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
 import PropertiesPanel from "./PropertiesPanel.vue";
 import ViewerToolbar from "./ViewerToolbar.vue";
@@ -363,6 +364,7 @@ interface Props {
   showFileName?: boolean;
   showExportButton?: boolean;
   showLayerPanel?: boolean;
+  groupLayers?: boolean | GroupLayersByPrefixOptions;
   showPropertiesPanel?: boolean;
   allowDrop?: boolean;
   darkTheme?: boolean;
@@ -408,6 +410,7 @@ const props = withDefaults(defineProps<Props>(), {
   showFileName: true,
   showExportButton: false,
   showLayerPanel: true,
+  groupLayers: false,
   showPropertiesPanel: false,
   allowDrop: false,
   darkTheme: false,

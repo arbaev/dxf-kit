@@ -68,6 +68,7 @@ async function loadFile(file) {
 | `showZoomLevel`        | `boolean`          | `false`           | Show zoom percentage (100% = fit-to-view)                                                                                                                               |
 | `showDebugInfo`        | `boolean`          | `false`           | Show debug overlay (FPS, draw calls, lines, triangles)                                                                                                                  |
 | `showLayerPanel`       | `boolean`          | `true`            | Show the layers panel (auto-hidden when the drawing has no layers)                                                                                                      |
+| `groupLayers`          | `boolean \| GroupLayersByPrefixOptions` | `false`           | Auto-group layers by name prefix in `<LayerPanel>` (`A-WALL`, `A-DOOR` → group `A`). Pass `true` for the defaults (`separator: /[-_]/`, `minGroupSize: 2`) or an options object to customize |
 | `allowDrop`            | `boolean`          | `false`           | Enable drag-and-drop file loading                                                                                                                                       |
 | `darkTheme`            | `boolean`          | `false`           | Dark theme for viewer and scene                                                                                                                                         |
 | `autoFit`              | `boolean`          | `true`            | Auto-fit camera to drawing on load                                                                                                                                      |
@@ -713,6 +714,16 @@ Stable hook classes:
 | `.dxfk-layer-panel-action`     | All / None buttons                                           |
 | `.dxfk-layer-filter`           | Layer filter `<input>`                                       |
 | `.dxfk-layer-item`             | One row per layer                                            |
+| `.dxfk-layer-item--in-group`   | Modifier — added to rows that live inside a group body       |
+| `.dxfk-layer-group`            | Root of one group (gated by `groupLayers`)                   |
+| `.dxfk-layer-group--collapsed` | Modifier — collapsed state                                   |
+| `.dxfk-layer-group-header`     | Group header (collapse zone + name + counter + eye-toggle)   |
+| `.dxfk-layer-group-name`       | Prefix label inside the group header                         |
+| `.dxfk-layer-group-count`      | `visible / total · entities` counter                         |
+| `.dxfk-layer-group-collapse`   | `+` / `−` button inside the group header                     |
+| `.dxfk-layer-group-toggle`     | Batch eye-toggle button (group show/hide all)                |
+| `.dxfk-layer-group-toggle--all-visible` / `--mixed` / `--all-hidden` / `--all-frozen` | Eye-toggle state modifiers |
+| `.dxfk-layer-group-body`       | Wrapper around the layer rows inside an expanded group       |
 | `.dxfk-file-uploader`          | Root of `FileUploader`                                       |
 | `.dxfk-file-uploader-button`   | Upload button inside `FileUploader`                          |
 | `.dxfk-statistics`             | Root of `DXFStatistics`                                      |
