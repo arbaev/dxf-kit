@@ -2,6 +2,9 @@ import { ref } from "vue";
 import * as THREE from "three";
 import {
   findSnapPoint,
+  SNAP_TOLERANCE_PX,
+  SNAP_MARKER_PX,
+  SNAP_OVERLAY_RENDER_ORDER,
   type PickingIndex,
   type DxfEntity,
   type MeasurePoint,
@@ -26,11 +29,6 @@ import {
  * which both returns the (possibly snapped) point and updates the marker.
  */
 
-/** Aperture radius in screen pixels — how close the cursor must be to snap. */
-const DEFAULT_TOLERANCE_PX = 12;
-/** On-screen marker glyph size in pixels. */
-const MARKER_PX = 11;
-
 const ALL_TYPES: readonly SnapType[] = [
   "endpoint",
   "midpoint",
@@ -52,7 +50,7 @@ export function useSnap() {
   let pickingIndex: PickingIndex | null = null;
   let entityIndex: Map<string, DxfEntity> | null = null;
   let enabled = false;
-  let tolerancePx = DEFAULT_TOLERANCE_PX;
+  let tolerancePx = SNAP_TOLERANCE_PX;
   let color = "#ff6b1a";
   // Set of visible layer names; `null` = no filtering (snap on any layer).
   let visibleLayers: Set<string> | null = null;
@@ -73,7 +71,7 @@ export function useSnap() {
     if (!scene || overlayGroup) return;
     overlayGroup = new THREE.Group();
     overlayGroup.name = "dxf-snap-overlay";
-    overlayGroup.renderOrder = 1000; // above measurement overlays (999)
+    overlayGroup.renderOrder = SNAP_OVERLAY_RENDER_ORDER; // above measurement overlays
     overlayGroup.visible = false;
     scene.add(overlayGroup);
 
@@ -98,7 +96,7 @@ export function useSnap() {
       ? new THREE.LineSegments(geom, material)
       : new THREE.LineLoop(geom, material);
     obj.visible = false;
-    obj.renderOrder = 1000;
+    obj.renderOrder = SNAP_OVERLAY_RENDER_ORDER;
     overlayGroup.add(obj);
     glyphs.set(type, obj);
   };
@@ -126,7 +124,7 @@ export function useSnap() {
     if (!overlayGroup) return;
     const offset = getOriginOffsetFn();
     overlayGroup.position.set(snap.point.x - offset.x, snap.point.y - offset.y, 0);
-    const s = wpp * MARKER_PX;
+    const s = wpp * SNAP_MARKER_PX;
     overlayGroup.scale.set(s, s, 1);
     for (const [type, obj] of glyphs) obj.visible = type === snap.type;
     overlayGroup.visible = true;

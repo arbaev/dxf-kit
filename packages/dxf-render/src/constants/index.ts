@@ -71,3 +71,7 @@ export const AUTO_LTSCALE_MIN_EXTENT = 100;
 // from solid lines. Without this cap, long curves with fine patterns can produce
 // millions of dash vertices (e.g. a large circle with a short pattern cycle).
 export const MAX_LINETYPE_REPETITIONS = 2000;
+
+// Shared pointer-interaction tuning (click/drag thresholds, snap aperture,
+// angle-arc bounds, overlay render order) — consumed by every framework wrapper.
+export * from "./interaction";

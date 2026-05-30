@@ -369,23 +369,9 @@ import {
   type RectSelectionResolvedMode,
 } from "../composables/useRectangleSelection";
 import { useKeyboardNavigation } from "../composables/useKeyboardNavigation";
-import {
-  useMeasurement,
-  formatMeasureValue,
-  type MeasureResult,
-  type MeasureUnits,
-} from "../composables/useMeasurement";
-import {
-  useAreaMeasurement,
-  formatAreaValue,
-  type AreaMeasureResult,
-  type AreaUnitScales,
-} from "../composables/useAreaMeasurement";
-import {
-  useAngleMeasurement,
-  formatAngleValue,
-  type AngleMeasureResult,
-} from "../composables/useAngleMeasurement";
+import { useMeasurement, type MeasureResult } from "../composables/useMeasurement";
+import { useAreaMeasurement, type AreaMeasureResult } from "../composables/useAreaMeasurement";
+import { useAngleMeasurement, type AngleMeasureResult } from "../composables/useAngleMeasurement";
 import type {
   DxfData,
   DxfLayer,
@@ -396,16 +382,16 @@ import type {
 import {
   getZoomBox,
   getZoomBoxForLayer,
-  getUnitsToMmFactor,
   findEntitiesByLayer,
-  measureArea,
-  measurePerimeter,
-  measureDirectedAngle,
-  toDegrees,
   buildPickingIndex,
   buildEntityIndex,
 } from "dxf-render";
 import { useSnap } from "../composables/useSnap";
+import { useViewerUnits } from "../composables/useViewerUnits";
+import { useMeasureLabels } from "../composables/useMeasureLabels";
+import { useCursorCoordinates } from "../composables/useCursorCoordinates";
+import { useDragAndDrop } from "../composables/useDragAndDrop";
+import { useFullscreen } from "../composables/useFullscreen";
 import type {
   OverlayPosition,
   ViewerClasses,
@@ -554,7 +540,7 @@ interface Emits {
 const emit = defineEmits<Emits>();
 
 const dxfContainer = ref<HTMLDivElement | null>(null);
-const isFullscreen = ref(false);
+const { isFullscreen, toggleFullscreen } = useFullscreen(() => dxfContainer.value);
 
 // Refs used to feed live camera/controls into the Ruler component once Three.js
 // is initialised. Kept non-reactive on the inside via `markRaw`-friendly usage.
@@ -895,77 +881,22 @@ const formatK = (n: number): string => {
   return String(n);
 };
 
-// Cursor world coordinates
-const cursorX = ref(0);
-const cursorY = ref(0);
-const isCursorVisible = ref(false);
+// Cursor world coordinates (coordinates overlay + ruler cursor marker)
+const { cursorX, cursorY, isCursorVisible, cursorWorld, handleMouseMove, handleMouseLeave } =
+  useCursorCoordinates({
+    getContainer: () => dxfContainer.value,
+    getCamera,
+    getOriginOffset,
+    isTracking: () => props.showCoordinates || props.showRulers,
+  });
 
-const handleMouseMove = (e: MouseEvent) => {
-  if (!props.showCoordinates && !props.showRulers) return;
-  const container = dxfContainer.value;
-  const camera = getCamera();
-  if (!container || !camera) return;
-
-  const rect = container.getBoundingClientRect();
-  const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-  const worldPos = new THREE.Vector3(ndcX, ndcY, 0).unproject(camera);
-
-  // Add back origin offset to display original DXF coordinates
-  const offset = getOriginOffset();
-  cursorX.value = worldPos.x + offset.x;
-  cursorY.value = worldPos.y + offset.y;
-  isCursorVisible.value = true;
-};
-
-const handleMouseLeave = () => {
-  isCursorVisible.value = false;
-};
-
-// Drag-and-drop
-const isDragOver = ref(false);
-let dragLeaveTimer: ReturnType<typeof setTimeout> | null = null;
-
-const handleDragOver = (e: DragEvent) => {
-  if (!props.allowDrop) return;
-  if (dragLeaveTimer) {
-    clearTimeout(dragLeaveTimer);
-    dragLeaveTimer = null;
-  }
-  isDragOver.value = true;
-  if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-};
-
-const handleDragLeave = () => {
-  if (!props.allowDrop) return;
-  // Debounce to avoid flicker when dragging over child elements
-  dragLeaveTimer = setTimeout(() => {
-    isDragOver.value = false;
-  }, 50);
-};
-
-const handleDrop = async (e: DragEvent) => {
-  if (!props.allowDrop) return;
-  isDragOver.value = false;
-  const file = e.dataTransfer?.files[0];
-  if (!file) return;
-  emit("file-dropped", file.name);
-  const text = await file.text();
-  loadDXFFromText(text);
-};
-
-const toggleFullscreen = async () => {
-  if (!dxfContainer.value) return;
-  if (!document.fullscreenElement) {
-    await dxfContainer.value.requestFullscreen();
-  } else {
-    await document.exitFullscreen();
-  }
-};
-
-const onFullscreenChange = () => {
-  isFullscreen.value = !!document.fullscreenElement;
-};
+// Drag-and-drop file loading (+ shared buffer/blob entry points)
+const { isDragOver, handleDragOver, handleDragLeave, handleDrop, loadDXFFromBuffer, loadDXFFromBlob } =
+  useDragAndDrop({
+    allowDrop: () => props.allowDrop,
+    loadText: (text) => loadDXFFromText(text),
+    onFileDropped: (name) => emit("file-dropped", name),
+  });
 
 const {
   layerList,
@@ -1008,190 +939,35 @@ const loadedDxfRef = ref<DxfData | null>(null);
 
 const activeDxf = computed<DxfData | null>(() => props.dxfData ?? loadedDxfRef.value);
 
-// Scale factor applied to world coords to produce the value rendered on rulers.
-// "dxf-units" — no conversion. "mm"/"inch" — go through $INSUNITS; when the file
-// is Unitless ($INSUNITS=0) we treat one DXF unit as one millimetre 1:1.
-const rulerUnitsScale = computed<number>(() => {
-  if (props.rulerUnits === "dxf-units") return 1;
-  const insUnits = activeDxf.value?.header?.$INSUNITS ?? 0;
-  const toMm = insUnits === 0 ? 1 : getUnitsToMmFactor(insUnits) || 1;
-  return props.rulerUnits === "inch" ? toMm / 25.4 : toMm;
+// $INSUNITS-based scale factors + labels shared by the rulers and the three
+// measurement tools (distance / area / angle).
+const {
+  rulerUnitsScale,
+  rulerUnitsLabel,
+  currentMeasureUnits,
+  measureUnitsScale,
+  areaUnitScales,
+} = useViewerUnits({
+  activeDxf,
+  rulerUnits: () => props.rulerUnits,
+  measureUnits: () => props.measureUnits,
+  measureAreaUnits: () => props.measureAreaUnits,
 });
 
-const rulerUnitsLabel = computed<string>(() => {
-  if (props.rulerUnits === "mm") return "mm";
-  if (props.rulerUnits === "inch") return "in";
-  return "—";
-});
-
-// Units the measurement label renders in. Defaults to `rulerUnits` (so a single
-// "switch units" control governs both surfaces), can be overridden per-prop.
-const currentMeasureUnits = computed<MeasureUnits>(
-  () => props.measureUnits ?? props.rulerUnits,
-);
-
-// Same conversion chain as `rulerUnitsScale`, but driven by `currentMeasureUnits`
-// so the label respects the prop override.
-const measureUnitsScale = computed<number>(() => {
-  const units = currentMeasureUnits.value;
-  if (units === "dxf-units") return 1;
-  const insUnits = activeDxf.value?.header?.$INSUNITS ?? 0;
-  const toMm = insUnits === 0 ? 1 : getUnitsToMmFactor(insUnits) || 1;
-  return units === "inch" ? toMm / 25.4 : toMm;
-});
-
-// HTML-overlay label placed at the midpoint of the in-flight or completed
-// segment. Re-computed reactively against camera position / state changes —
-// pan / zoom triggers re-render which causes the label to reposition.
-const measureLabel = computed<{ left: number; top: number; text: string } | null>(() => {
-  // Reactive dep on camera pan/zoom — value unused, only the read matters.
-  void cameraTick.value;
-  const st = measureState.value;
-  if (st.points.length === 0) return null;
-  const p1 = st.points[0];
-  const p2 = st.points[1] ?? st.hoverWorld;
-  if (!p2) return null;
-  const cam = getCamera();
-  const container = dxfContainer.value;
-  if (!cam || !container) return null;
-  // Read offset eagerly (not as a Vue ref) — same lifecycle as cursorWorld
-  // computed in handleMouseMove.
-  const offset = getOriginOffset();
-  const mid = new THREE.Vector3(
-    (p1.x + p2.x) / 2 - offset.x,
-    (p1.y + p2.y) / 2 - offset.y,
-    0,
-  );
-  mid.project(cam);
-  const rect = container.getBoundingClientRect();
-  const left = (mid.x + 1) * 0.5 * rect.width;
-  const top = (-mid.y + 1) * 0.5 * rect.height;
-  const dx = p2.x - p1.x;
-  const dy = p2.y - p1.y;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  const scaled = distance * measureUnitsScale.value;
-  return {
-    left,
-    top,
-    text: formatMeasureValue(scaled, currentMeasureUnits.value),
-  };
-});
-
-// Resolve the area-measurement units into scale factors + suffix labels.
-// `'auto'` mirrors `rulerUnits`; explicit square units (`m²`, `ft²`, …) convert
-// through `$INSUNITS`. Area scales with the square of the linear factor, the
-// perimeter with the linear factor itself.
-const areaUnitScales = computed<AreaUnitScales>(() => {
-  const insUnits = activeDxf.value?.header?.$INSUNITS ?? 0;
-  const toMm = insUnits === 0 ? 1 : getUnitsToMmFactor(insUnits) || 1;
-  let target: AreaUnits | "dxf" = props.measureAreaUnits ?? "auto";
-  if (target === "auto") {
-    target =
-      props.rulerUnits === "mm" ? "mm²" : props.rulerUnits === "inch" ? "in²" : "dxf";
-  }
-  let lin: number;
-  let areaLabel: string;
-  let lengthLabel: string;
-  switch (target) {
-    case "mm²": lin = toMm; areaLabel = "mm²"; lengthLabel = "mm"; break;
-    case "m²": lin = toMm / 1000; areaLabel = "m²"; lengthLabel = "m"; break;
-    case "in²": lin = toMm / 25.4; areaLabel = "in²"; lengthLabel = "in"; break;
-    case "ft²": lin = toMm / 304.8; areaLabel = "ft²"; lengthLabel = "ft"; break;
-    default: lin = 1; areaLabel = ""; lengthLabel = ""; break; // dxf-units
-  }
-  return { areaScale: lin * lin, perimeterScale: lin, areaLabel, lengthLabel };
-});
-
-// HTML-overlay label for the area tool, placed at the polygon centroid. Shows
-// the perimeter from the "two" state onward and the area once ≥3 vertices are
-// placed (a 2-point shape isn't a polygon yet → area held at "—").
-const areaLabel = computed<{
-  left: number;
-  top: number;
-  areaText: string;
-  perimeterText: string;
-} | null>(() => {
-  void cameraTick.value;
-  const st = areaState.value;
-  const committed = st.points;
-  if (committed.length < 2 && !st.closed) return null;
-  const poly = st.closed
-    ? committed
-    : st.hoverWorld
-      ? [...committed, st.hoverWorld]
-      : committed;
-  if (poly.length < 2) return null;
-  const cam = getCamera();
-  const container = dxfContainer.value;
-  if (!cam || !container) return null;
-  const offset = getOriginOffset();
-  let cx = 0;
-  let cy = 0;
-  for (const p of poly) {
-    cx += p.x;
-    cy += p.y;
-  }
-  cx /= poly.length;
-  cy /= poly.length;
-  const center = new THREE.Vector3(cx - offset.x, cy - offset.y, 0);
-  center.project(cam);
-  const rect = container.getBoundingClientRect();
-  const left = (center.x + 1) * 0.5 * rect.width;
-  const top = (-center.y + 1) * 0.5 * rect.height;
-  const scales = areaUnitScales.value;
-  const showArea = committed.length >= 3;
-  const areaRaw = measureArea(poly);
-  const perimeterRaw = measurePerimeter(poly);
-  return {
-    left,
-    top,
-    areaText: showArea ? formatAreaValue(areaRaw * scales.areaScale, scales.areaLabel) : "—",
-    perimeterText: formatAreaValue(perimeterRaw * scales.perimeterScale, scales.lengthLabel),
-  };
-});
-
-// HTML-overlay label for the angle tool, placed just outside the vertex along
-// the angle bisector. Renders the live directed angle once both rays exist
-// (vertex + first ray committed, second ray = cursor while drafting, or the
-// committed third point once closed).
-const angleLabel = computed<{ left: number; top: number; text: string } | null>(() => {
-  void cameraTick.value;
-  const st = angleState.value;
-  const pts = st.points;
-  const vertex = pts[0];
-  if (!vertex) return null;
-  let p1: MeasurePoint | null = null;
-  let p2: MeasurePoint | null = null;
-  if (st.closed && pts.length >= 3) {
-    p1 = pts[1];
-    p2 = pts[2];
-  } else if (pts.length === 2) {
-    p1 = pts[1];
-    p2 = st.hoverWorld;
-  }
-  if (!p1 || !p2) return null;
-  const cam = getCamera();
-  const container = dxfContainer.value;
-  if (!cam || !container) return null;
-  const offset = getOriginOffset();
-  const directed = measureDirectedAngle(vertex, p1, p2);
-  const a1 = Math.atan2(p1.y - vertex.y, p1.x - vertex.x);
-  const bisector = a1 + directed / 2;
-  // Project the vertex to screen, then push the label out along the bisector.
-  const v = new THREE.Vector3(vertex.x - offset.x, vertex.y - offset.y, 0);
-  v.project(cam);
-  const rect = container.getBoundingClientRect();
-  const vLeft = (v.x + 1) * 0.5 * rect.width;
-  const vTop = (-v.y + 1) * 0.5 * rect.height;
-  const pxOut = 44;
-  // Screen Y grows downward, so the world-Y bisector component flips sign.
-  const left = vLeft + Math.cos(bisector) * pxOut;
-  const top = vTop - Math.sin(bisector) * pxOut;
-  return {
-    left,
-    top,
-    text: formatAngleValue(toDegrees(directed), props.measureAngleUnits),
-  };
+// HTML-overlay labels for the three measurement tools, projected to screen and
+// repositioned on camera pan/zoom via the cameraTick this composable owns
+// (bumped from the controls.change subscription in onMounted).
+const { bumpCameraTick, measureLabel, areaLabel, angleLabel } = useMeasureLabels({
+  getCamera,
+  getContainer: () => dxfContainer.value,
+  getOriginOffset,
+  measureState,
+  areaState,
+  angleState,
+  measureUnitsScale,
+  currentMeasureUnits,
+  areaUnitScales,
+  measureAngleUnits: () => props.measureAngleUnits,
 });
 
 // Reactive snapshot of the scene's originOffset. `getOriginOffset()` returns a
@@ -1199,20 +975,12 @@ const angleLabel = computed<{ left: number; top: number; text: string } | null>(
 // it into a ref and refresh after every successful displayDXF() call.
 const rulerOriginOffset = ref({ x: 0, y: 0 });
 
-// Bumped on every `controls.change` so screen-space-projecting computeds
-// (e.g. `measureLabel`) re-evaluate when the camera pans / zooms but no
-// Vue ref otherwise changed. Three.js scene overlays already follow the
-// camera natively — this ref exists purely to drag Vue's reactivity along.
-const cameraTick = ref(0);
-
 const refreshRulerOriginOffset = () => {
   const oo = getOriginOffset();
   if (rulerOriginOffset.value.x !== oo.x || rulerOriginOffset.value.y !== oo.y) {
     rulerOriginOffset.value = { x: oo.x, y: oo.y };
   }
 };
-
-const cursorWorld = computed(() => ({ x: cursorX.value, y: cursorY.value }));
 
 const handleResetView = () => {
   resetView();
@@ -1345,29 +1113,6 @@ const loadDXFFromData = async (dxfData: DxfData) => {
     loadingPhase.value = "";
     isLoading.value = false;
   }
-};
-
-const decodeBuffer = (buffer: ArrayBuffer): string => {
-  const view = new Uint8Array(buffer);
-  // UTF-16 LE BOM (DXF files saved by AutoCAD with non-ASCII content)
-  if (view.length >= 2 && view[0] === 0xff && view[1] === 0xfe) {
-    return new TextDecoder("utf-16le").decode(buffer);
-  }
-  // UTF-16 BE BOM
-  if (view.length >= 2 && view[0] === 0xfe && view[1] === 0xff) {
-    return new TextDecoder("utf-16be").decode(buffer);
-  }
-  // UTF-8 (with or without BOM — TextDecoder strips it automatically)
-  return new TextDecoder("utf-8").decode(buffer);
-};
-
-const loadDXFFromBuffer = async (buffer: ArrayBuffer) => {
-  await loadDXFFromText(decodeBuffer(buffer));
-};
-
-const loadDXFFromBlob = async (blob: Blob) => {
-  const buffer = await blob.arrayBuffer();
-  await loadDXFFromBuffer(buffer);
 };
 
 const loadDXFFromUrl = async (url: string) => {
@@ -1573,17 +1318,16 @@ const attachPickingIfReady = (): void => {
 let resizeObserver: ResizeObserver | null = null;
 
 onMounted(() => {
-  document.addEventListener("fullscreenchange", onFullscreenChange);
   nextTick(() => {
     if (dxfContainer.value) {
       initThreeJS(dxfContainer.value, { enableControls: true, aaMode: props.antialiasing });
 
-      // Bump cameraTick on every controls change so screen-projecting
-      // computeds (measureLabel) re-evaluate as the camera moves.
+      // Bump the measure-label cameraTick on every controls change so the
+      // screen-projecting label computeds re-evaluate as the camera moves.
       const ctrlsForTick = getControls();
       if (ctrlsForTick) {
         ctrlsForTick.addEventListener("change", () => {
-          cameraTick.value++;
+          bumpCameraTick();
         });
       }
 
@@ -1618,7 +1362,6 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  document.removeEventListener("fullscreenchange", onFullscreenChange);
   if (resizeObserver) {
     resizeObserver.disconnect();
     resizeObserver = null;

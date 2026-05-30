@@ -649,6 +649,29 @@ Degenerate inputs are handled safely:
 - `measureAngle` clamps the cosine into `[-1, 1]` to absorb floating-point noise that would otherwise push `Math.acos` out of its domain, and returns `0` when `vertex` coincides with `p1` or `p2`.
 - `measureDirectedAngle` returns the directed counter-clockwise sweep in `[0, 2π)` (2D — `z` ignored). It preserves direction, so `measureDirectedAngle(v, b, a)` equals `2π − measureDirectedAngle(v, a, b)` (off the `0`/`2π` boundary) — use it when the sweep direction matters (e.g. an angle tool that distinguishes an angle from its reflex). Returns `0` for a coincident vertex or non-finite coordinates.
 
+### Interaction constants
+
+Framework-agnostic pixel / timing budgets for pointer tools (picking, rectangle selection, snap, measurement). They're exported so a wrapper — `dxf-vuer` or your own React / Lit binding — shares one source of truth instead of re-declaring the literals. Most consumers never need these; they matter when you build a custom interaction layer on top of the picking / snap / measurement primitives.
+
+```ts
+import {
+  CLICK_DISTANCE_THRESHOLD_PX,   // 4  — px move above which a press is a pan, not a click
+  DOUBLE_CLICK_MS,               // 350 — max gap between taps for a double-click
+  DOUBLE_CLICK_DISTANCE_PX,      // 6  — max px gap between taps for a double-click
+  ORIGIN_SNAP_RADIUS_PX,         // 12 — px radius to click-close an area polygon on its first vertex
+  SNAP_TOLERANCE_PX,             // 12 — object-snap aperture
+  SNAP_MARKER_PX,                // 11 — on-screen snap marker glyph size
+  ANGLE_ARC_RADIUS_FRACTION,     // 0.4 — angle arc radius as a fraction of the shorter ray
+  ANGLE_ARC_MIN_PX,              // 24 — arc radius lower clamp (px)
+  ANGLE_ARC_MAX_PX,              // 80 — arc radius upper clamp (px)
+  ANGLE_ARC_SEGMENTS_PER_TURN,   // 64 — arc tessellation per full turn
+  MEASUREMENT_OVERLAY_RENDER_ORDER, // 999  — measurement overlay renderOrder
+  SNAP_OVERLAY_RENDER_ORDER,        // 1000 — snap marker renderOrder (above measurement)
+} from "dxf-render";
+```
+
+`SNAP_TOLERANCE_PX` / `SNAP_MARKER_PX` are screen pixels — convert the aperture to world units before calling `findSnapPoint` (constant scale for an orthographic camera). The render-order pair encodes a layering invariant: the snap marker always draws above the measurement overlays.
+
 ### Fonts
 
 - `loadDefaultFont(): Promise<Font>` — load embedded Liberation Sans Regular

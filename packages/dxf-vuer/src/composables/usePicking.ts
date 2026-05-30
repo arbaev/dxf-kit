@@ -8,6 +8,7 @@ import {
   buildEntityIndex,
   buildAssociations,
   extractEntityText,
+  CLICK_DISTANCE_THRESHOLD_PX,
   type DxfData,
   type DxfEntity,
   type PickingEntry,
@@ -32,8 +33,6 @@ export interface PickingEvent {
   association?: EntityAssociation;
 }
 
-/** Pixel distance threshold above which a mousedown→mouseup is treated as pan, not click. */
-const CLICK_DISTANCE_THRESHOLD = 4;
 /** Hover throttle: at most one raycast per frame */
 const HOVER_THROTTLE_MS = 16;
 
@@ -123,7 +122,7 @@ export function usePicking() {
     if (!enabled || !onClickCb) return;
     const dx = e.clientX - mouseDownX;
     const dy = e.clientY - mouseDownY;
-    if (Math.hypot(dx, dy) > CLICK_DISTANCE_THRESHOLD) return;
+    if (Math.hypot(dx, dy) > CLICK_DISTANCE_THRESHOLD_PX) return;
     const event = pickAtClientXY(e.clientX, e.clientY);
     if (event) onClickCb(event);
   };

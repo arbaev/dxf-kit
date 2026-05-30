@@ -2,6 +2,7 @@ import { ref, shallowRef } from "vue";
 import * as THREE from "three";
 import {
   findEntriesInRect,
+  CLICK_DISTANCE_THRESHOLD_PX,
   type PickingEntry,
   type PickingIndex,
   type WorldRect,
@@ -48,9 +49,6 @@ export interface RectSelectionCallbacks {
   /** Fired when the drag was aborted (Esc) — no `onSelect` preceded this. */
   onCancel?: () => void;
 }
-
-/** Minimum drag distance (in CSS pixels) before we treat a press as a rectangle drag. */
-const DRAG_THRESHOLD_PX = 4;
 
 /**
  * Resolve the final selection mode given the user-supplied option and the
@@ -110,7 +108,7 @@ export function buildWorldRect(
  *      crosshair, OrbitControls panning is disabled.
  *   2. User presses the primary button → we record `startScreen` and wait
  *      for movement.
- *   3. On the first pointermove past `DRAG_THRESHOLD_PX` we fire `onStart`
+ *   3. On the first pointermove past `CLICK_DISTANCE_THRESHOLD_PX` we fire `onStart`
  *      and start updating `screenRect`.
  *   4. On pointerup we resolve the final mode (auto → window/crossing by
  *      direction), call `findEntriesInRect`, fire `onSelect` + `onEnd`.
@@ -248,7 +246,7 @@ export function useRectangleSelection() {
     if (!enabled || !startScreen) return;
     const dx = e.clientX - startScreen.x;
     const dy = e.clientY - startScreen.y;
-    if (!isDragging.value && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+    if (!isDragging.value && Math.hypot(dx, dy) < CLICK_DISTANCE_THRESHOLD_PX) return;
     if (!isDragging.value) {
       isDragging.value = true;
       const mode = resolveSelectionMode(

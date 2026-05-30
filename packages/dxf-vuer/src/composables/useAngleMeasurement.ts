@@ -1,16 +1,20 @@
-import { ref, shallowRef } from "vue";
+import { shallowRef } from "vue";
 import * as THREE from "three";
-import { measureDirectedAngle, toDegrees, type MeasurePoint } from "dxf-render";
+import {
+  measureDirectedAngle,
+  toDegrees,
+  ANGLE_ARC_RADIUS_FRACTION,
+  ANGLE_ARC_MIN_PX,
+  ANGLE_ARC_MAX_PX,
+  ANGLE_ARC_SEGMENTS_PER_TURN,
+  type MeasurePoint,
+} from "dxf-render";
 import type { AngleUnits } from "../types";
-
-/**
- * Minimal shape of the MapControls/OrbitControls instance we need: we steal
- * the LEFT mouse button binding while measuring so left-clicks don't start
- * a pan drag. Middle/right buttons and wheel-zoom stay untouched.
- */
-interface ControlsLike {
-  mouseButtons: { LEFT: unknown; MIDDLE: unknown; RIGHT: unknown };
-}
+import {
+  usePointerTool,
+  ensurePositionCapacity,
+  isTypingTarget,
+} from "./usePointerTool";
 
 /**
  * Result of a completed (3-point) angle measurement. Emitted via `onResult`
@@ -57,16 +61,6 @@ export interface AngleMeasureCallbacks {
   snap?: (rawWorld: MeasurePoint, clientX: number, clientY: number) => MeasurePoint;
 }
 
-/** Pixel distance threshold above which a mousedown→mouseup is treated as pan, not click. */
-const CLICK_DISTANCE_THRESHOLD = 4;
-/** Arc radius as a fraction of the shorter ray length. */
-const ARC_RADIUS_FRACTION = 0.4;
-/** Lower / upper clamp for the arc radius, in screen pixels. */
-const ARC_MIN_PX = 24;
-const ARC_MAX_PX = 80;
-/** Segments used to approximate a full turn of the arc polyline. */
-const ARC_SEGMENTS_PER_TURN = 64;
-
 const emptyState = (): AngleMeasureState => ({
   points: [],
   hoverWorld: null,
@@ -74,22 +68,8 @@ const emptyState = (): AngleMeasureState => ({
 });
 
 /**
- * Tells whether an event target is a text-entry control, so global key
- * handlers (Backspace) don't hijack typing in the host page.
- */
-const isTypingTarget = (target: EventTarget | null): boolean => {
-  if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName;
-  return (
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    tag === "SELECT" ||
-    target.isContentEditable
-  );
-};
-
-/**
- * 3-point angle-measurement tool (AutoCAD-style).
+ * 3-point angle-measurement tool (AutoCAD-style), built on the shared
+ * {@link usePointerTool} pipeline.
  *
  * Flow (states keyed by committed-point count):
  *   - `empty` → click places the vertex (apex).
@@ -102,108 +82,21 @@ const isTypingTarget = (target: EventTarget | null): boolean => {
  *
  * Esc aborts; Backspace removes the last placed point.
  *
- * Owns a Three.js overlay group (renderOrder=999, depthTest=false) with two
- * ray segments (`THREE.Line` polyline `[p1, vertex, p2]`), a directed-arc
- * `THREE.Line`, and vertex `Points` markers. Independent of picking — needs
- * only a camera, the scene root, and a `getOriginOffset()` callback.
+ * Owns a Three.js overlay group with two ray segments (`THREE.Line` polyline
+ * `[p1, vertex, p2]`), a directed-arc `THREE.Line`, and vertex `Points` markers.
  */
 export function useAngleMeasurement() {
   const state = shallowRef<AngleMeasureState>(emptyState());
-  const isActive = ref(false);
+  const tool = usePointerTool<AngleMeasureCallbacks>();
 
-  let canvas: HTMLCanvasElement | null = null;
-  let scene: THREE.Scene | null = null;
-  let camera: THREE.Camera | null = null;
-  let controls: ControlsLike | null = null;
-  let getOriginOffsetFn: () => { x: number; y: number; z: number } = () => ({ x: 0, y: 0, z: 0 });
-  let requestRender: (() => void) | null = null;
-  let callbacks: AngleMeasureCallbacks = {};
   let units: AngleUnits = "deg";
-  let savedLeftButton: unknown = undefined;
 
-  // Three.js overlay
-  let overlayGroup: THREE.Group | null = null;
+  // Three.js overlay children (owned here; lifecycle driven by the base).
   let lineMaterial: THREE.LineBasicMaterial | null = null;
   let markerMaterial: THREE.PointsMaterial | null = null;
   let rayLine: THREE.Line | null = null;
   let arcLine: THREE.Line | null = null;
   let markerPoints: THREE.Points | null = null;
-  let color = "#ff6b1a";
-
-  // Pointer tracking — distinguish click from pan.
-  let mouseDownX = 0;
-  let mouseDownY = 0;
-  let mouseDownButton = -1;
-
-  const ensureOverlay = (): void => {
-    if (!scene || overlayGroup) return;
-
-    overlayGroup = new THREE.Group();
-    overlayGroup.name = "dxf-angle-measurement-overlay";
-    overlayGroup.renderOrder = 999;
-    scene.add(overlayGroup);
-
-    const c = new THREE.Color(color);
-    lineMaterial = new THREE.LineBasicMaterial({
-      color: c.clone(),
-      depthTest: false,
-      depthWrite: false,
-      transparent: true,
-      opacity: 0.95,
-    });
-    markerMaterial = new THREE.PointsMaterial({
-      color: c.clone(),
-      size: 8,
-      sizeAttenuation: false,
-      depthTest: false,
-      depthWrite: false,
-      transparent: true,
-      opacity: 1,
-    });
-
-    // Two ray segments share a single 3-vertex polyline [p1, vertex, p2].
-    const rayGeom = new THREE.BufferGeometry();
-    rayGeom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(9), 3));
-    rayGeom.setDrawRange(0, 0);
-    rayLine = new THREE.Line(rayGeom, lineMaterial);
-    rayLine.visible = false;
-    overlayGroup.add(rayLine);
-
-    const arcGeom = new THREE.BufferGeometry();
-    arcGeom.setAttribute(
-      "position",
-      new THREE.BufferAttribute(new Float32Array((ARC_SEGMENTS_PER_TURN + 1) * 3), 3),
-    );
-    arcGeom.setDrawRange(0, 0);
-    arcLine = new THREE.Line(arcGeom, lineMaterial);
-    arcLine.visible = false;
-    overlayGroup.add(arcLine);
-
-    const markerGeom = new THREE.BufferGeometry();
-    markerGeom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(9), 3));
-    markerGeom.setDrawRange(0, 0);
-    markerPoints = new THREE.Points(markerGeom, markerMaterial);
-    markerPoints.visible = false;
-    overlayGroup.add(markerPoints);
-  };
-
-  /**
-   * Grow a geometry's `position` attribute to hold at least `vertexCount`
-   * vertices, reusing the existing buffer when it is already large enough.
-   * Returns the (possibly new) Float32Array backing the attribute.
-   */
-  const ensurePositionCapacity = (
-    geom: THREE.BufferGeometry,
-    vertexCount: number,
-  ): Float32Array => {
-    let attr = geom.getAttribute("position") as THREE.BufferAttribute | undefined;
-    if (!attr || attr.array.length < vertexCount * 3) {
-      const arr = new Float32Array(Math.max(vertexCount, 4) * 3);
-      attr = new THREE.BufferAttribute(arr, 3);
-      geom.setAttribute("position", attr);
-    }
-    return attr.array as Float32Array;
-  };
 
   /**
    * Resolve the vertex and the two ray endpoints currently shown: committed
@@ -228,25 +121,11 @@ export function useAngleMeasurement() {
     return { vertex: null, r1: null, r2: null };
   };
 
-  /** World units spanned by one screen pixel (used to clamp the arc radius). */
-  const worldPerPixel = (): number => {
-    if (!canvas || !camera) return 1;
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0) return 1;
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const a = screenToWorld(cx, cy);
-    const b = screenToWorld(cx + 1, cy);
-    if (!a || !b) return 1;
-    const d = Math.hypot(b.x - a.x, b.y - a.y);
-    return d > 0 ? d : 1;
-  };
-
   const refreshOverlay = (): void => {
-    ensureOverlay();
+    tool.ensureOverlay();
     if (!rayLine || !arcLine || !markerPoints) return;
 
-    const offset = getOriginOffsetFn();
+    const offset = tool.getOffset();
     const committed = state.value.points;
     const { vertex, r1, r2 } = displayRays();
 
@@ -280,13 +159,13 @@ export function useAngleMeasurement() {
       const minRay = Math.min(len1, len2);
       const directed = measureDirectedAngle(vertex, r1, r2);
       if (minRay > 0 && directed > 0) {
-        const wpp = worldPerPixel();
-        let radius = ARC_RADIUS_FRACTION * minRay;
-        radius = Math.max(ARC_MIN_PX * wpp, Math.min(radius, ARC_MAX_PX * wpp));
+        const wpp = tool.worldPerPixel();
+        let radius = ANGLE_ARC_RADIUS_FRACTION * minRay;
+        radius = Math.max(ANGLE_ARC_MIN_PX * wpp, Math.min(radius, ANGLE_ARC_MAX_PX * wpp));
         // Never let the arc overshoot the shorter ray.
         radius = Math.min(radius, minRay * 0.9);
         const a1 = Math.atan2(r1.y - vertex.y, r1.x - vertex.x);
-        const segs = Math.max(2, Math.ceil((directed / (Math.PI * 2)) * ARC_SEGMENTS_PER_TURN));
+        const segs = Math.max(2, Math.ceil((directed / (Math.PI * 2)) * ANGLE_ARC_SEGMENTS_PER_TURN));
         const arr = ensurePositionCapacity(arcLine.geometry, segs + 1);
         for (let i = 0; i <= segs; i++) {
           const ang = a1 + directed * (i / segs);
@@ -323,48 +202,17 @@ export function useAngleMeasurement() {
     }
   };
 
-  const disposeOverlay = (): void => {
-    if (!scene || !overlayGroup) return;
-    scene.remove(overlayGroup);
-    rayLine?.geometry.dispose();
-    arcLine?.geometry.dispose();
-    markerPoints?.geometry.dispose();
-    lineMaterial?.dispose();
-    markerMaterial?.dispose();
-    overlayGroup = null;
-    rayLine = null;
-    arcLine = null;
-    markerPoints = null;
-    lineMaterial = null;
-    markerMaterial = null;
-  };
-
-  const setCursor = (on: boolean): void => {
-    if (!canvas) return;
-    canvas.style.cursor = on ? "crosshair" : "";
-  };
-
-  const screenToWorld = (clientX: number, clientY: number): MeasurePoint | null => {
-    if (!canvas || !camera) return null;
-    const rect = canvas.getBoundingClientRect();
-    const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
-    const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
-    const v = new THREE.Vector3(ndcX, ndcY, 0).unproject(camera);
-    const offset = getOriginOffsetFn();
-    return { x: v.x + offset.x, y: v.y + offset.y, z: 0 };
-  };
-
   const emitChange = (): void => {
-    callbacks.onChange?.(state.value);
+    tool.getCallbacks().onChange?.(state.value);
     refreshOverlay();
-    requestRender?.();
+    tool.render();
   };
 
   const resetState = (notify: boolean): void => {
     const hadDraft = state.value.points.length > 0 && !state.value.closed;
     state.value = emptyState();
     emitChange();
-    if (notify && hadDraft) callbacks.onCancel?.();
+    if (notify && hadDraft) tool.getCallbacks().onCancel?.();
   };
 
   const closeAngle = (): void => {
@@ -375,7 +223,7 @@ export function useAngleMeasurement() {
     const [v, p1, p2] = pts;
     const radians = measureDirectedAngle(v, p1, p2);
     const degrees = toDegrees(radians);
-    callbacks.onResult?.({
+    tool.getCallbacks().onResult?.({
       vertex: { x: v.x, y: v.y, z: v.z ?? 0 },
       p1: { x: p1.x, y: p1.y, z: p1.z ?? 0 },
       p2: { x: p2.x, y: p2.y, z: p2.z ?? 0 },
@@ -402,157 +250,109 @@ export function useAngleMeasurement() {
     emitChange();
   };
 
-  // Pointer handlers — capture phase, so we run before picking / rect selection.
-  const handlePointerDown = (e: PointerEvent): void => {
-    if (!isActive.value) return;
-    if (e.button !== 0) {
-      // Reserve middle/right for pan; suppress default (Firefox autoscroll).
-      e.preventDefault();
-      return;
-    }
-    mouseDownX = e.clientX;
-    mouseDownY = e.clientY;
-    mouseDownButton = e.button;
-  };
+  tool.configure({
+    overlayName: "dxf-angle-measurement-overlay",
+    buildOverlay: (group, color) => {
+      const c = new THREE.Color(color);
+      lineMaterial = new THREE.LineBasicMaterial({
+        color: c.clone(),
+        depthTest: false,
+        depthWrite: false,
+        transparent: true,
+        opacity: 0.95,
+      });
+      markerMaterial = new THREE.PointsMaterial({
+        color: c.clone(),
+        size: 8,
+        sizeAttenuation: false,
+        depthTest: false,
+        depthWrite: false,
+        transparent: true,
+        opacity: 1,
+      });
 
-  const handlePointerUp = (e: PointerEvent): void => {
-    if (!isActive.value) return;
-    if (mouseDownButton !== 0) return;
-    mouseDownButton = -1;
-    const dx = e.clientX - mouseDownX;
-    const dy = e.clientY - mouseDownY;
-    if (Math.hypot(dx, dy) >= CLICK_DISTANCE_THRESHOLD) return; // pan, not a click
-    const raw = screenToWorld(e.clientX, e.clientY);
-    if (!raw) return;
-    e.stopPropagation();
-    const world = callbacks.snap ? callbacks.snap(raw, e.clientX, e.clientY) : raw;
+      // Two ray segments share a single 3-vertex polyline [p1, vertex, p2].
+      const rayGeom = new THREE.BufferGeometry();
+      rayGeom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(9), 3));
+      rayGeom.setDrawRange(0, 0);
+      rayLine = new THREE.Line(rayGeom, lineMaterial);
+      rayLine.visible = false;
+      group.add(rayLine);
 
-    if (state.value.closed) {
-      // A completed angle is still visible — start fresh with this as the apex.
-      state.value = { points: [world], hoverWorld: world, closed: false };
+      const arcGeom = new THREE.BufferGeometry();
+      arcGeom.setAttribute(
+        "position",
+        new THREE.BufferAttribute(new Float32Array((ANGLE_ARC_SEGMENTS_PER_TURN + 1) * 3), 3),
+      );
+      arcGeom.setDrawRange(0, 0);
+      arcLine = new THREE.Line(arcGeom, lineMaterial);
+      arcLine.visible = false;
+      group.add(arcLine);
+
+      const markerGeom = new THREE.BufferGeometry();
+      markerGeom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(9), 3));
+      markerGeom.setDrawRange(0, 0);
+      markerPoints = new THREE.Points(markerGeom, markerMaterial);
+      markerPoints.visible = false;
+      group.add(markerPoints);
+    },
+    disposeOverlay: () => {
+      rayLine?.geometry.dispose();
+      arcLine?.geometry.dispose();
+      markerPoints?.geometry.dispose();
+      lineMaterial?.dispose();
+      markerMaterial?.dispose();
+      rayLine = null;
+      arcLine = null;
+      markerPoints = null;
+      lineMaterial = null;
+      markerMaterial = null;
+    },
+    applyColor: (color) => {
+      const c = new THREE.Color(color);
+      lineMaterial?.color.set(c);
+      markerMaterial?.color.set(c);
+    },
+    onCommit: (raw, e) => {
+      const world = tool.applySnap(raw, e.clientX, e.clientY);
+      if (state.value.closed) {
+        // A completed angle is still visible — start fresh with this as the apex.
+        state.value = { points: [world], hoverWorld: world, closed: false };
+        emitChange();
+        return;
+      }
+      addPoint(world);
+      // The third point completes the angle.
+      if (state.value.points.length >= 3) closeAngle();
+    },
+    onMove: (world) => {
+      if (state.value.closed) return;
+      if (state.value.points.length < 1) return;
+      state.value = { points: state.value.points, hoverWorld: world, closed: false };
       emitChange();
-      return;
-    }
-
-    addPoint(world);
-    // The third point completes the angle.
-    if (state.value.points.length >= 3) closeAngle();
-  };
-
-  const handlePointerMove = (e: PointerEvent): void => {
-    if (!isActive.value) return;
-    const raw = screenToWorld(e.clientX, e.clientY);
-    if (!raw) return;
-    // Run snap on every move so the marker tracks geometry in all states.
-    const world = callbacks.snap ? callbacks.snap(raw, e.clientX, e.clientY) : raw;
-    if (state.value.closed) return;
-    if (state.value.points.length < 1) return;
-    state.value = { points: state.value.points, hoverWorld: world, closed: false };
-    emitChange();
-  };
-
-  const handleKeyDown = (e: KeyboardEvent): void => {
-    if (!isActive.value) return;
-    if (e.key === "Escape") {
-      if (state.value.points.length > 0 || state.value.closed) {
-        e.preventDefault();
-        e.stopPropagation();
+    },
+    onKeyDown: (e) => {
+      if (e.key === "Escape") {
+        if (state.value.points.length > 0 || state.value.closed) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        resetState(true);
+        return;
       }
-      resetState(true);
-      return;
-    }
-    if (e.key === "Backspace") {
-      if (isTypingTarget(e.target)) return;
-      if (!state.value.closed && state.value.points.length >= 1) {
-        e.preventDefault();
-        popPoint();
+      if (e.key === "Backspace") {
+        if (isTypingTarget(e.target)) return;
+        if (!state.value.closed && state.value.points.length >= 1) {
+          e.preventDefault();
+          popPoint();
+        }
       }
-    }
-  };
-
-  /**
-   * Wire up DOM listeners and grab references to the scene/camera. Pairs with
-   * `detach()`. `getOriginOffset` is read on every projection so it tracks the
-   * loaded DXF; `requestRender` is called after each state change.
-   */
-  const attach = (
-    canvasEl: HTMLCanvasElement,
-    sceneRef: THREE.Scene,
-    cameraRef: THREE.Camera,
-    controlsRef: ControlsLike | null,
-    getOriginOffset: () => { x: number; y: number; z: number },
-    requestRenderFn: () => void,
-    cbs?: AngleMeasureCallbacks,
-  ): void => {
-    detach();
-    canvas = canvasEl;
-    scene = sceneRef;
-    camera = cameraRef;
-    controls = controlsRef;
-    getOriginOffsetFn = getOriginOffset;
-    requestRender = requestRenderFn;
-    callbacks = cbs ?? {};
-
-    canvas.addEventListener("pointerdown", handlePointerDown, { capture: true });
-    canvas.addEventListener("pointerup", handlePointerUp, { capture: true });
-    canvas.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("keydown", handleKeyDown);
-  };
-
-  const detach = (): void => {
-    if (canvas) {
-      canvas.removeEventListener("pointerdown", handlePointerDown, { capture: true } as EventListenerOptions);
-      canvas.removeEventListener("pointerup", handlePointerUp, { capture: true } as EventListenerOptions);
-      canvas.removeEventListener("pointermove", handlePointerMove);
-      setCursor(false);
-    }
-    window.removeEventListener("keydown", handleKeyDown);
-    releaseLeftButton();
-    canvas = null;
-    camera = null;
-    scene = null;
-    controls = null;
-    callbacks = {};
-    requestRender = null;
-    isActive.value = false;
-  };
-
-  /** Steal the LEFT mouse button so left-click+drag doesn't pan while measuring. */
-  const acquireLeftButton = (): void => {
-    if (!controls || savedLeftButton !== undefined) return;
-    savedLeftButton = controls.mouseButtons.LEFT;
-    controls.mouseButtons.LEFT = null;
-  };
-
-  const releaseLeftButton = (): void => {
-    if (!controls || savedLeftButton === undefined) return;
-    controls.mouseButtons.LEFT = savedLeftButton;
-    savedLeftButton = undefined;
-  };
-
-  const setEnabled = (on: boolean): void => {
-    if (isActive.value === on) return;
-    isActive.value = on;
-    setCursor(on);
-    if (on) {
-      ensureOverlay();
-      acquireLeftButton();
-    } else {
-      releaseLeftButton();
-      resetState(true);
-    }
-  };
+    },
+    reset: resetState,
+  });
 
   const setUnits = (next: AngleUnits): void => {
     units = next;
-  };
-
-  const setColor = (newColor: string): void => {
-    color = newColor;
-    const c = new THREE.Color(newColor);
-    lineMaterial?.color.set(c);
-    markerMaterial?.color.set(c);
-    requestRender?.();
   };
 
   /** Manually clear any in-flight or completed measurement without firing `onCancel`. */
@@ -561,21 +361,16 @@ export function useAngleMeasurement() {
     emitChange();
   };
 
-  const dispose = (): void => {
-    detach();
-    disposeOverlay();
-  };
-
   return {
     state,
-    isActive,
-    attach,
-    detach,
-    setEnabled,
+    isActive: tool.isActive,
+    attach: tool.attach,
+    detach: tool.detach,
+    setEnabled: tool.setEnabled,
     setUnits,
-    setColor,
+    setColor: tool.setColor,
     clear,
-    dispose,
+    dispose: tool.dispose,
   };
 }
 
