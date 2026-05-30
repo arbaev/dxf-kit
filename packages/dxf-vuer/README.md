@@ -101,6 +101,7 @@ async function loadFile(file) {
 | `measureAreaUnits`           | `AreaUnits`                        | `"auto"`          | Square units for the area label. `"auto"` mirrors `rulerUnits` (`mm`→`mm²`, `inch`→`in²`, `dxf-units`→no suffix); `"m²"` / `"ft²"` etc. force an explicit unit. The perimeter uses the matching linear unit |
 | `measureAngleUnits`          | `AngleUnits`                       | `"deg"`           | Display format for the angle label: `"deg"` (123.4°), `"rad"` (2.150 rad), or `"dms"` (123°30'15"). Angles are dimensionless — never converted via `$INSUNITS`        |
 | `measureColor`               | `string`                           | `"#ff6b1a"`       | Color of the measurement segments, fill, rays, arc, marker points, and value labels (all three tools). Cascades into the `--dxfk-measure-color` CSS custom property      |
+| `snapToGeometry`             | `boolean`                          | `true`            | Snap measurement clicks to nearby geometry (endpoint / midpoint / center / quadrant / point-node) and show an AutoCAD-style marker under the cursor. Active only while a measurement mode is on; set to `false` to place points exactly under the cursor. Works with or without `pickingEnabled`. See [Measurement tools](#measurement-tools) |
 
 `OverlayPosition` = `"top-left"` | `"top-center"` | `"top-right"` | `"bottom-left"` | `"bottom-center"` | `"bottom-right"`
 
@@ -676,6 +677,20 @@ The angle tool takes exactly three clicks:
 The reported angle is **directed** (CCW from the first ray to the second), so it covers the full `[0°, 360°)` range — `reflex: true` marks results over 180°. `measureAngleUnits` controls the label format (`"deg"` / `"rad"` / `"dms"`); angles never go through `$INSUNITS`.
 
 `measureColor` controls the color of all three tools (segments, polygon fill, rays, arc, markers, labels).
+
+### Snap to geometry
+
+While a measurement tool is active and `snapToGeometry` is `true` (the default), clicks snap to the nearest characteristic point of surrounding geometry, and a marker glyph tracks the cursor:
+
+| Snap | Marker | Where |
+| ---- | ------ | ----- |
+| endpoint | □ square | ends of lines, arcs, polyline/MLINE/leader segments, SOLID/3DFACE corners, spline ends |
+| midpoint | △ triangle | midpoint of straight segments and arcs |
+| center | ○ circle | center of circles, arcs, ellipses |
+| quadrant | ◇ diamond | the 0/90/180/270° points of circles, arcs, ellipses |
+| node | ✕ cross | `POINT` entities |
+
+Snapping engages only during measurement, so it never interferes with picking or panning. It reuses the picking index when `pickingEnabled` is on, otherwise it builds a lightweight index lazily the first time you enter a measurement mode — so it works even without picking. Set `:snap-to-geometry="false"` to place points exactly under the cursor. The marker is tinted with `measureColor`. (Entity-intersection snaps and polyline bulge-arc midpoints are not yet supported.)
 
 ### Interaction with pan / zoom
 

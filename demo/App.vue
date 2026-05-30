@@ -210,6 +210,7 @@
           :show-measure-button="true"
           :show-measure-area-button="true"
           :show-measure-angle-button="true"
+          :snap-to-geometry="snapToGeometry"
           v-model:measure-mode="measureMode"
           v-model:hidden-layers="hiddenLayers"
           @dxf-data="handleDXFData"
@@ -468,6 +469,10 @@
               />
               <span>Angle tool (3-point)</span>
             </label>
+            <label class="picking-label">
+              <input type="checkbox" v-model="snapToGeometry" />
+              <span>Snap to geometry (endpoint / midpoint / center / quadrant)</span>
+            </label>
             <p class="settings-cell-hint">
               Toggle the toolbar icons (top-right) or the checkboxes above; the tools
               are mutually exclusive. Distance: click two points. Area: click vertices,
@@ -723,6 +728,7 @@ const highlightAssociated = ref(true);
 const rectangleSelection = ref(true);
 const selectedEntities = ref<PickingEvent[]>([]);
 const measureMode = ref<MeasureMode>("none");
+const snapToGeometry = ref(true);
 const lastMeasureResult = ref<MeasureResult | null>(null);
 const lastAreaResult = ref<AreaMeasureResult | null>(null);
 const lastAngleResult = ref<AngleMeasureResult | null>(null);

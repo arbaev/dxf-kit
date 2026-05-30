@@ -404,6 +404,64 @@ Coverage: LINE, CIRCLE, ARC, ELLIPSE, POLYLINE / LWPOLYLINE (with bulge tessella
 
 INSERT aggregates return `fallbackToBBox: true` here — to highlight the contents of an INSERT instance, walk the aggregate's `PickingEntry.childIds` and call `buildHighlightGeometry` for each child entry. `dxf-vuer`'s `useHighlight` composable does exactly that.
 
+### Snap to geometry
+
+Two pure helpers implement CAD-style **object snap** — finding the characteristic points of nearby geometry (endpoint, midpoint, center, quadrant, point-node) so a measurement / drawing tool can make clicks "stick" to real geometry. No Three.js / DOM dependencies; they back the measurement snap in `dxf-vuer` and are reused 1:1 by future React/Lit wrappers.
+
+```ts
+import {
+  getEntitySnapPoints,
+  findSnapPoint,
+  type SnapPoint,
+  type SnapResult,
+  type SnapType,
+} from "dxf-render";
+
+// Low level: snap points of a single entity, in world coordinates.
+// Pass the PickingEntry.worldMatrix so block-instance transforms are applied.
+const points: SnapPoint[] = getEntitySnapPoints(entity, entry.worldMatrix ?? null);
+// → [{ type: "endpoint", point: { x, y, z } }, { type: "midpoint", ... }, ...]
+
+// High level: the best snap near a world position, across the whole drawing.
+const snap: SnapResult | null = findSnapPoint(
+  pickingIndex,
+  entityIndex,        // from buildEntityIndex(dxf)
+  { x: 104.1, y: 0 }, // cursor in DXF world coords (add originOffset back first)
+  0.5,                // tolerance in world units (convert from a pixel aperture)
+);
+
+if (snap) {
+  console.log(snap.type, snap.point, snap.handle, snap.distance);
+  // e.g. "endpoint" { x: 104, y: 0, z: 0 } "A" 0.1
+}
+```
+
+`findSnapPoint` bbox-culls `pickingIndex.entries` (2D, expanded by `tolerance`), resolves each surviving entity through `entityIndex`, computes its snap points with the entry's `worldMatrix`, and returns the best candidate within tolerance. INSERT aggregate entries are skipped (their children are separate entries), so block instances snap through their own transform.
+
+When several candidates fall inside the aperture, priority decides (matching AutoCAD running-osnap), and the nearest breaks ties:
+
+```
+endpoint  <  midpoint  <  center = node  <  quadrant
+```
+
+Per-entity coverage of `getEntitySnapPoints`:
+
+| Snap | Entities |
+| ---- | -------- |
+| `endpoint` | LINE, POLYLINE/LWPOLYLINE & MLINE & LEADER & MULTILEADER vertices, ARC/ELLIPSE arc ends, SOLID/3DFACE corners, SPLINE first/last fit (or control) point |
+| `midpoint` | LINE, straight POLYLINE/MLINE/LEADER/MULTILEADER segments, ARC arc-midpoint |
+| `center` | CIRCLE, ARC, ELLIPSE |
+| `quadrant` | CIRCLE (0/90/180/270°), ARC (only cardinals within the sweep), ELLIPSE (axis tips within the sweep) |
+| `node` | POINT |
+
+Notes:
+
+- Returns `[]` for TEXT/MTEXT/DIMENSION/ATTRIB/ATTDEF/HATCH/REGION/INSERT/XLINE/RAY — no precise vertex geometry to snap to.
+- Proximity is measured in the **XY plane** (the cursor's unprojected world point carries no meaningful z), so entities drawn at a non-zero z still snap; the returned `point` keeps the geometry's true z.
+- `tolerance` is in world units. Consumers driven by a screen cursor should convert a pixel aperture to world units (constant for an orthographic camera) — `dxf-vuer`'s `useSnap` does this and also draws the marker glyph.
+- `findSnapPoint` returns `null` for a non-positive / non-finite `tolerance`.
+- **Not yet handled:** polyline bulge-segment midpoints and entity-intersection snaps (crossings between two entities).
+
 ### Rectangle selection
 
 `findEntriesInRect(pickingIndex, rect, options?)` returns every `PickingEntry` whose bounding box satisfies a window- or crossing-style rectangle test. Pure data — no DOM events, no Three.js raycasting. The same helper powers the `entities-select` event in `dxf-vuer` and is intended for future React/Lit wrappers to reuse 1:1.

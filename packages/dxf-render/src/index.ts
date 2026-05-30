@@ -21,6 +21,14 @@ export {
   buildHighlightGeometry,
   type HighlightGeometry,
 } from "./render/highlightGeometry";
+export {
+  getEntitySnapPoints,
+  findSnapPoint,
+  type SnapType,
+  type SnapPoint,
+  type SnapResult,
+  type FindSnapOptions,
+} from "./render/snapPoints";
 export { getZoomBox, type GetZoomBoxOptions } from "./utils/getZoomBox";
 export {
   getZoomBoxForLayer,

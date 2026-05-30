@@ -15,6 +15,7 @@ export { useThreeScene } from "./composables/useThreeScene";
 export { useLayers } from "./composables/useLayers";
 export { usePicking, type PickingEvent } from "./composables/usePicking";
 export { useHighlight } from "./composables/useHighlight";
+export { useSnap } from "./composables/useSnap";
 export {
   useRectangleSelection,
   resolveSelectionMode,

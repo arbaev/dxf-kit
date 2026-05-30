@@ -70,6 +70,13 @@ export interface AreaMeasureCallbacks {
   onChange?: (state: AreaMeasureState) => void;
   /** Fired when Esc aborts an in-flight measurement OR `setEnabled(false)` aborts a draft. */
   onCancel?: () => void;
+  /**
+   * Optional geometry-snap resolver. Maps a raw world point + screen coords to
+   * a possibly-snapped world point and drives the snap marker. Called on every
+   * pointer move and on click. The close-to-first-vertex behavior takes
+   * precedence over geometry snap on click.
+   */
+  snap?: (rawWorld: MeasurePoint, clientX: number, clientY: number) => MeasurePoint;
 }
 
 /** Pixel distance threshold above which a mousedown→mouseup is treated as pan, not click. */
@@ -469,8 +476,8 @@ export function useAreaMeasurement() {
     const dx = e.clientX - mouseDownX;
     const dy = e.clientY - mouseDownY;
     if (Math.hypot(dx, dy) >= CLICK_DISTANCE_THRESHOLD) return; // pan, not a click
-    const world = screenToWorld(e.clientX, e.clientY);
-    if (!world) return;
+    const raw = screenToWorld(e.clientX, e.clientY);
+    if (!raw) return;
     e.stopPropagation();
 
     const now = performance.now();
@@ -492,6 +499,7 @@ export function useAreaMeasurement() {
       }
     }
 
+    const world = callbacks.snap ? callbacks.snap(raw, e.clientX, e.clientY) : raw;
     addPoint(world);
     lastCommitTime = now;
     lastCommitX = e.clientX;
@@ -500,11 +508,13 @@ export function useAreaMeasurement() {
 
   const handlePointerMove = (e: PointerEvent): void => {
     if (!isActive.value) return;
+    const raw = screenToWorld(e.clientX, e.clientY);
+    if (!raw) return;
+    // Run snap on every move so the marker tracks geometry in all states.
+    const world = callbacks.snap ? callbacks.snap(raw, e.clientX, e.clientY) : raw;
     if (state.value.closed) return;
     const committed = state.value.points;
     if (committed.length < 1) return;
-    const world = screenToWorld(e.clientX, e.clientY);
-    if (!world) return;
 
     // Detect proximity to the first vertex (≥3 committed → closable).
     let originSnap = false;

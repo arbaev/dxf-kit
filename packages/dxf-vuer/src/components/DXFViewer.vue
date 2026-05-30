@@ -402,7 +402,10 @@ import {
   measurePerimeter,
   measureDirectedAngle,
   toDegrees,
+  buildPickingIndex,
+  buildEntityIndex,
 } from "dxf-render";
+import { useSnap } from "../composables/useSnap";
 import type {
   OverlayPosition,
   ViewerClasses,
@@ -470,6 +473,12 @@ interface Props {
   measureAreaUnits?: AreaUnits;
   measureAngleUnits?: AngleUnits;
   measureColor?: string;
+  /**
+   * Snap measurement clicks to nearby geometry (endpoints, midpoints, centers,
+   * quadrants, point nodes). Active only while a measurement mode is on; shows
+   * an AutoCAD-style marker under the cursor. Default `true`.
+   */
+  snapToGeometry?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -518,6 +527,7 @@ const props = withDefaults(defineProps<Props>(), {
   measureAreaUnits: "auto",
   measureAngleUnits: "deg",
   measureColor: "#ff6b1a",
+  snapToGeometry: true,
 });
 
 interface Emits {
@@ -597,6 +607,7 @@ const areaMeasurement = useAreaMeasurement();
 const areaState = areaMeasurement.state;
 const angleMeasurement = useAngleMeasurement();
 const angleState = angleMeasurement.state;
+const snap = useSnap();
 let lastDxfForPicking: DxfData | null = null;
 
 // Currently selected entity surfaced to the built-in PropertiesPanel.
@@ -630,6 +641,32 @@ const teardownPicking = (): void => {
   rectSelection.removeRectData();
   lastDxfForPicking = null;
   selectedEntity.value = null;
+};
+
+/**
+ * Feed the snap controller the indexes it needs. Reuses the picking index /
+ * entity index when picking is on (free); otherwise builds them directly (snap
+ * does not need the heavy raycast group) — but only once a measurement mode is
+ * active, so loading a file the user never measures costs nothing extra.
+ * Clears the data when snapping is off or there is no DXF.
+ */
+const ensureSnapData = (dxf?: DxfData | null): void => {
+  const data = dxf ?? activeDxf.value;
+  if (!props.snapToGeometry || !data) {
+    snap.setData(null, null);
+    return;
+  }
+  const pi = picking.getPickingIndex();
+  const ei = picking.getEntityIndex();
+  if (pi && ei) {
+    snap.setData(pi, ei);
+    return;
+  }
+  if (props.measureMode === "none") {
+    snap.setData(null, null);
+    return;
+  }
+  snap.setData(buildPickingIndex(data), buildEntityIndex(data));
 };
 
 const handleEntityHover = (event: PickingEvent | null): void => {
@@ -739,9 +776,18 @@ const attachMeasurementIfReady = (): void => {
   const controls = getControls() as unknown as Parameters<typeof measurement.attach>[3];
   const render = () => renderScene();
 
+  // Shared geometry-snap controller + resolver injected into every tool.
+  snap.attach(renderer.domElement, scene, camera, getOriginOffset, render);
+  snap.setColor(props.measureColor);
+  snap.setEnabled(props.snapToGeometry);
+  ensureSnapData();
+  const snapResolver = (raw: MeasurePoint, x: number, y: number): MeasurePoint =>
+    snap.resolve(raw, x, y);
+
   measurement.attach(renderer.domElement, scene, camera, controls, getOriginOffset, render, {
     onResult: handleMeasureResult,
     onCancel: handleMeasureCancel,
+    snap: snapResolver,
   });
   measurement.setColor(props.measureColor);
   measurement.setUnitsScale(measureUnitsScale.value, currentMeasureUnits.value);
@@ -749,6 +795,7 @@ const attachMeasurementIfReady = (): void => {
   areaMeasurement.attach(renderer.domElement, scene, camera, controls, getOriginOffset, render, {
     onResult: handleMeasureAreaResult,
     onCancel: handleMeasureCancel,
+    snap: snapResolver,
   });
   areaMeasurement.setColor(props.measureColor);
   areaMeasurement.setUnits(areaUnitScales.value);
@@ -756,6 +803,7 @@ const attachMeasurementIfReady = (): void => {
   angleMeasurement.attach(renderer.domElement, scene, camera, controls, getOriginOffset, render, {
     onResult: handleMeasureAngleResult,
     onCancel: handleMeasureCancel,
+    snap: snapResolver,
   });
   angleMeasurement.setColor(props.measureColor);
   angleMeasurement.setUnits(props.measureAngleUnits);
@@ -1237,6 +1285,7 @@ const loadDXFFromText = async (dxfText: string) => {
     initLayersFromDXF(dxf, props.darkTheme);
     applyLayerVisibility(visibleLayerNames.value);
     setupPickingForDxf(dxf);
+    ensureSnapData(dxf);
     refreshRulerOriginOffset();
     emit("dxf-loaded", true);
     emit("dxf-data", dxf);
@@ -1263,6 +1312,7 @@ const loadDXFFromData = async (dxfData: DxfData) => {
     initLayersFromDXF(dxfData, props.darkTheme);
     applyLayerVisibility(visibleLayerNames.value);
     setupPickingForDxf(dxfData);
+    ensureSnapData(dxfData);
     refreshRulerOriginOffset();
     emit("dxf-loaded", true);
     emit("dxf-data", dxfData);
@@ -1374,6 +1424,8 @@ watch(
       attachPickingIfReady();
       attachRectSelectionIfReady();
     }
+    // Snap reuses the picking index when available; rebuild its data either way.
+    ensureSnapData();
   },
 );
 
@@ -1406,6 +1458,15 @@ watch(
     measurement.setColor(color);
     areaMeasurement.setColor(color);
     angleMeasurement.setColor(color);
+    snap.setColor(color);
+  },
+);
+
+watch(
+  () => props.snapToGeometry,
+  (on) => {
+    snap.setEnabled(on);
+    ensureSnapData();
   },
 );
 
@@ -1436,6 +1497,10 @@ watch(
     // so those are suspended while a tool is active and restored on `none`.
     if (mode === "none") restoreCompetingTools();
     else suspendCompetingTools();
+    // Drop any stale snap marker; the active tool repaints it on the next move.
+    snap.clear();
+    // Lazily build snap data on first entry into a measurement mode.
+    if (mode !== "none") ensureSnapData();
   },
 );
 
@@ -1545,6 +1610,7 @@ onBeforeUnmount(() => {
   measurement.dispose();
   areaMeasurement.dispose();
   angleMeasurement.dispose();
+  snap.dispose();
   keyboardNav.detach();
   teardownPicking();
   cleanup();

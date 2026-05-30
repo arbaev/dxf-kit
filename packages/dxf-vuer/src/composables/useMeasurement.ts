@@ -50,6 +50,13 @@ export interface MeasureCallbacks {
   onChange?: (state: MeasureState) => void;
   /** Fired when Esc is pressed mid-measurement OR when `setEnabled(false)` aborts a draft. */
   onCancel?: () => void;
+  /**
+   * Optional geometry-snap resolver. Maps a raw world point + screen coords to
+   * a possibly-snapped world point and drives the snap marker. Called on every
+   * pointer move (so the marker tracks geometry) and on click (so the placed
+   * point snaps). When omitted, points land exactly under the cursor.
+   */
+  snap?: (rawWorld: MeasurePoint, clientX: number, clientY: number) => MeasurePoint;
 }
 
 /** Pixel distance threshold above which a mousedown→mouseup is treated as pan, not click. */
@@ -311,21 +318,25 @@ export function useMeasurement() {
     const dx = e.clientX - mouseDownX;
     const dy = e.clientY - mouseDownY;
     if (Math.hypot(dx, dy) >= CLICK_DISTANCE_THRESHOLD) return; // pan
-    const world = screenToWorld(e.clientX, e.clientY);
-    if (!world) return;
+    const raw = screenToWorld(e.clientX, e.clientY);
+    if (!raw) return;
     // We acted on this click; suppress downstream handlers (picking, etc.)
     e.stopPropagation();
+    const world = callbacks.snap ? callbacks.snap(raw, e.clientX, e.clientY) : raw;
     addPoint(world);
   };
 
   const handlePointerMove = (e: PointerEvent): void => {
     if (!isActive.value) return;
+    const raw = screenToWorld(e.clientX, e.clientY);
+    if (!raw) return;
+    // Run snap on every move so the marker tracks geometry even when there is
+    // no live preview line yet (zero/two placed points).
+    const world = callbacks.snap ? callbacks.snap(raw, e.clientX, e.clientY) : raw;
     // Only the "one placed point, awaiting the second" state needs a live
     // preview. With zero points there's nothing to preview yet; with two
     // points the measurement is settled and waits for the next click.
     if (state.value.points.length !== 1) return;
-    const world = screenToWorld(e.clientX, e.clientY);
-    if (!world) return;
     state.value = { points: state.value.points, hoverWorld: world };
     emitChange();
   };
