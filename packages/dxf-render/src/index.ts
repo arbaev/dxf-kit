@@ -90,6 +90,8 @@ export {
   measureDistance,
   measureArea,
   measureSignedArea,
+  measurePerimeter,
+  polygonSelfIntersects,
   measureAngle,
   toDegrees,
   toRadians,

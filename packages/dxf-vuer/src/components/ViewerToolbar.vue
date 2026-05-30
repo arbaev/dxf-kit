@@ -54,6 +54,33 @@
       </svg>
     </button>
     <button
+      v-if="showMeasureAreaButton"
+      class="dxfk-toolbar-button"
+      :class="{ 'dxfk-toolbar-button--active': measureAreaActive }"
+      @click="$emit('toggle-measure-area')"
+      :title="measureAreaActive ? 'Disable area tool' : 'Measure area'"
+      :aria-label="measureAreaActive ? 'Disable area-measurement tool' : 'Enable area-measurement tool'"
+      :aria-pressed="measureAreaActive"
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polygon points="12 3 21 9.5 17.5 20.5 6.5 20.5 3 9.5" />
+        <circle cx="12" cy="3" r="1.4" fill="currentColor" stroke="none" />
+        <circle cx="21" cy="9.5" r="1.4" fill="currentColor" stroke="none" />
+        <circle cx="17.5" cy="20.5" r="1.4" fill="currentColor" stroke="none" />
+        <circle cx="6.5" cy="20.5" r="1.4" fill="currentColor" stroke="none" />
+        <circle cx="3" cy="9.5" r="1.4" fill="currentColor" stroke="none" />
+      </svg>
+    </button>
+    <button
       v-if="showResetButton"
       class="dxfk-toolbar-button"
       @click="$emit('reset-view')"
@@ -129,6 +156,8 @@ interface Props {
   showFullscreenButton?: boolean;
   showMeasureButton?: boolean;
   measureActive?: boolean;
+  showMeasureAreaButton?: boolean;
+  measureAreaActive?: boolean;
   isFullscreen?: boolean;
   darkTheme?: boolean;
 }
@@ -139,6 +168,8 @@ withDefaults(defineProps<Props>(), {
   showFullscreenButton: true,
   showMeasureButton: false,
   measureActive: false,
+  showMeasureAreaButton: false,
+  measureAreaActive: false,
   isFullscreen: false,
   darkTheme: false,
 });
@@ -148,6 +179,7 @@ defineEmits<{
   (e: "reset-view"): void;
   (e: "toggle-fullscreen"): void;
   (e: "toggle-measure"): void;
+  (e: "toggle-measure-area"): void;
 }>();
 </script>
 

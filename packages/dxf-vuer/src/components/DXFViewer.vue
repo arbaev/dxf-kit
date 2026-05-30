@@ -89,8 +89,11 @@
             exportToPNG,
             toggleFullscreen,
             isFullscreen,
+            measureMode,
             toggleMeasureDistance,
-            measureActive: measureDistance,
+            toggleMeasureArea,
+            measureDistanceActive: measureMode === 'distance',
+            measureAreaActive: measureMode === 'area',
           }"
         >
           <ViewerToolbar
@@ -99,13 +102,16 @@
             :show-reset-button="showResetButton"
             :show-fullscreen-button="showFullscreenButton"
             :show-measure-button="showMeasureButton"
-            :measure-active="measureDistance"
+            :measure-active="measureMode === 'distance'"
+            :show-measure-area-button="showMeasureAreaButton"
+            :measure-area-active="measureMode === 'area'"
             :is-fullscreen="isFullscreen"
             :dark-theme="darkTheme"
             @export="exportToPNG"
             @reset-view="handleResetView"
             @toggle-fullscreen="toggleFullscreen"
             @toggle-measure="toggleMeasureDistance"
+            @toggle-measure-area="toggleMeasureArea"
           >
             <template v-if="$slots['toolbar-extra']" #extra>
               <slot name="toolbar-extra" />
@@ -273,6 +279,23 @@
     </div>
 
     <div
+      v-if="areaLabel"
+      class="dxfk-measure-area-label"
+      :class="[{ 'dxfk-dark': darkTheme }, classes?.measureAreaLabel]"
+      :style="{
+        left: areaLabel.left + 'px',
+        top: areaLabel.top + 'px',
+        '--dxfk-measure-color': measureColor,
+      }"
+      aria-live="polite"
+    >
+      <div class="dxfk-measure-area-row">Area: {{ areaLabel.areaText }}</div>
+      <div class="dxfk-measure-area-row dxfk-measure-area-row--secondary">
+        Perimeter: {{ areaLabel.perimeterText }}
+      </div>
+    </div>
+
+    <div
       v-if="rectSelScreenRect"
       class="dxfk-selection-rect"
       :class="[
@@ -333,14 +356,33 @@ import {
   type MeasureResult,
   type MeasureUnits,
 } from "../composables/useMeasurement";
+import {
+  useAreaMeasurement,
+  formatAreaValue,
+  type AreaMeasureResult,
+  type AreaUnitScales,
+} from "../composables/useAreaMeasurement";
 import type {
   DxfData,
   DxfLayer,
   PickingEntry,
   EntityAssociation,
 } from "dxf-render";
-import { getZoomBox, getZoomBoxForLayer, getUnitsToMmFactor, findEntitiesByLayer } from "dxf-render";
-import type { OverlayPosition, ViewerClasses, RulerUnits } from "../types";
+import {
+  getZoomBox,
+  getZoomBoxForLayer,
+  getUnitsToMmFactor,
+  findEntitiesByLayer,
+  measureArea,
+  measurePerimeter,
+} from "dxf-render";
+import type {
+  OverlayPosition,
+  ViewerClasses,
+  RulerUnits,
+  MeasureMode,
+  AreaUnits,
+} from "../types";
 import type { AntialiasingMode, GroupLayersByPrefixOptions } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
 import PropertiesPanel from "./PropertiesPanel.vue";
@@ -392,9 +434,11 @@ interface Props {
   rectangleSelection?: boolean;
   rectangleSelectionModifier?: RectSelectionModifier;
   rectangleSelectionMode?: RectSelectionMode;
-  measureDistance?: boolean;
+  measureMode?: MeasureMode;
   showMeasureButton?: boolean;
+  showMeasureAreaButton?: boolean;
   measureUnits?: RulerUnits;
+  measureAreaUnits?: AreaUnits;
   measureColor?: string;
 }
 
@@ -437,8 +481,10 @@ const props = withDefaults(defineProps<Props>(), {
   rectangleSelection: false,
   rectangleSelectionModifier: "shift",
   rectangleSelectionMode: "auto",
-  measureDistance: false,
+  measureMode: "none",
   showMeasureButton: false,
+  showMeasureAreaButton: false,
+  measureAreaUnits: "auto",
   measureColor: "#ff6b1a",
 });
 
@@ -456,8 +502,9 @@ interface Emits {
   (e: "selection-start", mode: RectSelectionResolvedMode): void;
   (e: "selection-end"): void;
   (e: "update:hiddenLayers", hidden: string[]): void;
-  (e: "update:measureDistance", on: boolean): void;
+  (e: "update:measureMode", mode: MeasureMode): void;
   (e: "measure", result: MeasureResult): void;
+  (e: "measure-area", result: AreaMeasureResult): void;
   (e: "measure-cancel"): void;
 }
 
@@ -513,6 +560,8 @@ const rectSelection = useRectangleSelection();
 const rectSelScreenRect = rectSelection.screenRect;
 const measurement = useMeasurement();
 const measureState = measurement.state;
+const areaMeasurement = useAreaMeasurement();
+const areaState = areaMeasurement.state;
 let lastDxfForPicking: DxfData | null = null;
 
 // Currently selected entity surfaced to the built-in PropertiesPanel.
@@ -622,8 +671,25 @@ const handleMeasureResult = (result: MeasureResult): void => {
   emit("measure", result);
 };
 
+const handleMeasureAreaResult = (result: AreaMeasureResult): void => {
+  emit("measure-area", result);
+};
+
 const handleMeasureCancel = (): void => {
   emit("measure-cancel");
+};
+
+// Suspend competing pointer tools so they don't double-fire on the same click.
+const suspendCompetingTools = (): void => {
+  picking.setEnabled(false);
+  rectSelection.setEnabled(false);
+};
+
+// Restore prop-driven state for picking / rectangle-selection after leaving a
+// measurement mode.
+const restoreCompetingTools = (): void => {
+  picking.setEnabled(props.pickingEnabled);
+  rectSelection.setEnabled(props.rectangleSelection && props.pickingEnabled);
 };
 
 const attachMeasurementIfReady = (): void => {
@@ -631,25 +697,30 @@ const attachMeasurementIfReady = (): void => {
   const camera = getCamera();
   const scene = getScene();
   if (!renderer || !camera || !scene) return;
-  measurement.attach(
-    renderer.domElement,
-    scene,
-    camera,
-    getControls() as unknown as Parameters<typeof measurement.attach>[3],
-    getOriginOffset,
-    () => renderScene(),
-    {
-      onResult: handleMeasureResult,
-      onCancel: handleMeasureCancel,
-    },
-  );
+  const controls = getControls() as unknown as Parameters<typeof measurement.attach>[3];
+  const render = () => renderScene();
+
+  measurement.attach(renderer.domElement, scene, camera, controls, getOriginOffset, render, {
+    onResult: handleMeasureResult,
+    onCancel: handleMeasureCancel,
+  });
   measurement.setColor(props.measureColor);
   measurement.setUnitsScale(measureUnitsScale.value, currentMeasureUnits.value);
-  if (props.measureDistance) {
+
+  areaMeasurement.attach(renderer.domElement, scene, camera, controls, getOriginOffset, render, {
+    onResult: handleMeasureAreaResult,
+    onCancel: handleMeasureCancel,
+  });
+  areaMeasurement.setColor(props.measureColor);
+  areaMeasurement.setUnits(areaUnitScales.value);
+
+  // Enable whichever tool the initial measureMode selects.
+  if (props.measureMode === "distance") {
     measurement.setEnabled(true);
-    // Suspend competing pointer tools so they don't double-fire on the same click.
-    picking.setEnabled(false);
-    rectSelection.setEnabled(false);
+    suspendCompetingTools();
+  } else if (props.measureMode === "area") {
+    areaMeasurement.setEnabled(true);
+    suspendCompetingTools();
   }
 };
 
@@ -909,6 +980,79 @@ const measureLabel = computed<{ left: number; top: number; text: string } | null
   };
 });
 
+// Resolve the area-measurement units into scale factors + suffix labels.
+// `'auto'` mirrors `rulerUnits`; explicit square units (`m²`, `ft²`, …) convert
+// through `$INSUNITS`. Area scales with the square of the linear factor, the
+// perimeter with the linear factor itself.
+const areaUnitScales = computed<AreaUnitScales>(() => {
+  const insUnits = activeDxf.value?.header?.$INSUNITS ?? 0;
+  const toMm = insUnits === 0 ? 1 : getUnitsToMmFactor(insUnits) || 1;
+  let target: AreaUnits | "dxf" = props.measureAreaUnits ?? "auto";
+  if (target === "auto") {
+    target =
+      props.rulerUnits === "mm" ? "mm²" : props.rulerUnits === "inch" ? "in²" : "dxf";
+  }
+  let lin: number;
+  let areaLabel: string;
+  let lengthLabel: string;
+  switch (target) {
+    case "mm²": lin = toMm; areaLabel = "mm²"; lengthLabel = "mm"; break;
+    case "m²": lin = toMm / 1000; areaLabel = "m²"; lengthLabel = "m"; break;
+    case "in²": lin = toMm / 25.4; areaLabel = "in²"; lengthLabel = "in"; break;
+    case "ft²": lin = toMm / 304.8; areaLabel = "ft²"; lengthLabel = "ft"; break;
+    default: lin = 1; areaLabel = ""; lengthLabel = ""; break; // dxf-units
+  }
+  return { areaScale: lin * lin, perimeterScale: lin, areaLabel, lengthLabel };
+});
+
+// HTML-overlay label for the area tool, placed at the polygon centroid. Shows
+// the perimeter from the "two" state onward and the area once ≥3 vertices are
+// placed (a 2-point shape isn't a polygon yet → area held at "—").
+const areaLabel = computed<{
+  left: number;
+  top: number;
+  areaText: string;
+  perimeterText: string;
+} | null>(() => {
+  void cameraTick.value;
+  const st = areaState.value;
+  const committed = st.points;
+  if (committed.length < 2 && !st.closed) return null;
+  const poly = st.closed
+    ? committed
+    : st.hoverWorld
+      ? [...committed, st.hoverWorld]
+      : committed;
+  if (poly.length < 2) return null;
+  const cam = getCamera();
+  const container = dxfContainer.value;
+  if (!cam || !container) return null;
+  const offset = getOriginOffset();
+  let cx = 0;
+  let cy = 0;
+  for (const p of poly) {
+    cx += p.x;
+    cy += p.y;
+  }
+  cx /= poly.length;
+  cy /= poly.length;
+  const center = new THREE.Vector3(cx - offset.x, cy - offset.y, 0);
+  center.project(cam);
+  const rect = container.getBoundingClientRect();
+  const left = (center.x + 1) * 0.5 * rect.width;
+  const top = (-center.y + 1) * 0.5 * rect.height;
+  const scales = areaUnitScales.value;
+  const showArea = committed.length >= 3;
+  const areaRaw = measureArea(poly);
+  const perimeterRaw = measurePerimeter(poly);
+  return {
+    left,
+    top,
+    areaText: showArea ? formatAreaValue(areaRaw * scales.areaScale, scales.areaLabel) : "—",
+    perimeterText: formatAreaValue(perimeterRaw * scales.perimeterScale, scales.lengthLabel),
+  };
+});
+
 // Reactive snapshot of the scene's originOffset. `getOriginOffset()` returns a
 // non-reactive object that changes only when a new DXF is rendered, so we mirror
 // it into a ref and refresh after every successful displayDXF() call.
@@ -1165,7 +1309,10 @@ watch(
 
 watch(
   () => props.measureColor,
-  (color) => measurement.setColor(color),
+  (color) => {
+    measurement.setColor(color);
+    areaMeasurement.setColor(color);
+  },
 );
 
 watch(
@@ -1173,21 +1320,21 @@ watch(
   ([scale, units]) => measurement.setUnitsScale(scale, units),
 );
 
+watch(areaUnitScales, (scales) => areaMeasurement.setUnits(scales));
+
 watch(
-  () => props.measureDistance,
-  (on) => {
-    measurement.setEnabled(on);
-    if (on) {
-      // Measurement intercepts clicks before picking and rectangle-selection.
-      // Suspend those tools so they don't fight for the same click stream.
-      picking.setEnabled(false);
-      rectSelection.setEnabled(false);
-    } else {
-      // Restore prop-driven state. Picking re-enables if its prop is true;
-      // rectangle selection re-attaches if its prop is true.
-      picking.setEnabled(props.pickingEnabled);
-      rectSelection.setEnabled(props.rectangleSelection && props.pickingEnabled);
-    }
+  () => props.measureMode,
+  (mode) => {
+    // Disable the non-target tools first — that restores the LEFT mouse button
+    // each composable steals — before the target tool steals it again.
+    if (mode !== "distance") measurement.setEnabled(false);
+    if (mode !== "area") areaMeasurement.setEnabled(false);
+    if (mode === "distance") measurement.setEnabled(true);
+    if (mode === "area") areaMeasurement.setEnabled(true);
+    // Measurement tools intercept clicks before picking / rectangle-selection,
+    // so those are suspended while a tool is active and restored on `none`.
+    if (mode === "none") restoreCompetingTools();
+    else suspendCompetingTools();
   },
 );
 
@@ -1295,14 +1442,24 @@ onBeforeUnmount(() => {
   picking.detach();
   rectSelection.detach();
   measurement.dispose();
+  areaMeasurement.dispose();
   keyboardNav.detach();
   teardownPicking();
   cleanup();
 });
 
+// Toggle a tool from a toolbar button: a second press on the active tool turns
+// it off; pressing the other tool switches to it (modes are mutually exclusive).
 const toggleMeasureDistance = (): void => {
-  const next = !props.measureDistance;
-  emit("update:measureDistance", next);
+  emit("update:measureMode", props.measureMode === "distance" ? "none" : "distance");
+};
+
+const toggleMeasureArea = (): void => {
+  emit("update:measureMode", props.measureMode === "area" ? "none" : "area");
+};
+
+const setMeasureMode = (mode: MeasureMode): void => {
+  emit("update:measureMode", mode);
 };
 
 defineExpose({
@@ -1323,8 +1480,11 @@ defineExpose({
   zoomToEntity,
   zoomToLayer,
   getPickingIndex: picking.getPickingIndex,
-  clearMeasure: () => measurement.clear(),
-  toggleMeasureDistance,
+  clearMeasure: () => {
+    measurement.clear();
+    areaMeasurement.clear();
+  },
+  setMeasureMode,
 });
 </script>
 
@@ -1525,6 +1685,29 @@ defineExpose({
   white-space: nowrap;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   user-select: none;
+}
+
+.dxfk-measure-area-label {
+  position: absolute;
+  z-index: 14;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  padding: 3px 8px;
+  background-color: var(--dxfk-measure-color, #ff6b1a);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.35;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  user-select: none;
+}
+
+.dxfk-measure-area-row--secondary {
+  opacity: 0.85;
+  font-size: 11px;
 }
 
 .dxfk-selection-rect {

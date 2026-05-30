@@ -33,4 +33,5 @@ dist-ssr
 
 # AI related directories and files
 /todo
+/claude-docs
 CLAUDE.md

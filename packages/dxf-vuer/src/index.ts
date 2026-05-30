@@ -36,9 +36,23 @@ export {
   type MeasureResult,
   type MeasureCallbacks,
 } from "./composables/useMeasurement";
+export {
+  useAreaMeasurement,
+  formatAreaValue,
+  type AreaMeasureResult,
+  type AreaMeasureState,
+  type AreaMeasureCallbacks,
+  type AreaUnitScales,
+} from "./composables/useAreaMeasurement";
 
 // Types
-export type { OverlayPosition, ViewerClasses, RulerUnits } from "./types";
+export type {
+  OverlayPosition,
+  ViewerClasses,
+  RulerUnits,
+  MeasureMode,
+  AreaUnits,
+} from "./types";
 export {
   getEntityProperties,
   type PropertyRow,

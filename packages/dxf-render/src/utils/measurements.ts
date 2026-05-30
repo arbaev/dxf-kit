@@ -70,6 +70,94 @@ export function measureArea(points: readonly MeasurePoint[]): number {
 }
 
 /**
+ * Closed-polygon perimeter: the sum of edge lengths around the polygon,
+ * including the closing edge from the last vertex back to the first.
+ *
+ * Distances are 2D/3D (via {@link measureDistance}). Points may be passed
+ * open (last vertex != first) — the closing edge is always added.
+ *
+ * Returns `0` for fewer than 2 points or any non-finite coordinate. For
+ * exactly 2 points the result is twice the segment length (the degenerate
+ * "there and back" loop).
+ */
+export function measurePerimeter(points: readonly MeasurePoint[]): number {
+  const n = points.length;
+  if (n < 2) return 0;
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    if (!Number.isFinite(a.x) || !Number.isFinite(a.y)) return 0;
+    sum += measureDistance(a, b);
+  }
+  return sum;
+}
+
+/** 2D cross product of vectors (b - a) and (c - a). Sign gives orientation. */
+function cross2(
+  a: MeasurePoint,
+  b: MeasurePoint,
+  c: MeasurePoint,
+): number {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+/**
+ * Does the closed polygon's boundary cross itself? Treated purely in 2D
+ * (`z` ignored). Tests every pair of non-adjacent edges for a proper
+ * crossing using the orientation (signed-area) sign test.
+ *
+ * Only *proper* crossings count — edges that merely share a polygon vertex
+ * (adjacent edges, and the wrap-around first/last pair) are excluded, and
+ * collinear/touching overlaps are conservatively reported as non-crossing.
+ * This keeps the result free of false positives at the shared vertices a
+ * normal polygon has.
+ *
+ * Returns `false` for fewer than 4 vertices (a triangle cannot self-cross)
+ * and for any non-finite coordinate. Complexity is O(n²) — fine for the
+ * small, hand-placed polygons the area-measurement tool produces.
+ */
+export function polygonSelfIntersects(points: readonly MeasurePoint[]): boolean {
+  const n = points.length;
+  if (n < 4) return false;
+  for (let i = 0; i < n; i++) {
+    if (!Number.isFinite(points[i].x) || !Number.isFinite(points[i].y)) {
+      return false;
+    }
+  }
+
+  const segmentsCross = (
+    p1: MeasurePoint,
+    p2: MeasurePoint,
+    p3: MeasurePoint,
+    p4: MeasurePoint,
+  ): boolean => {
+    const d1 = cross2(p3, p4, p1);
+    const d2 = cross2(p3, p4, p2);
+    const d3 = cross2(p1, p2, p3);
+    const d4 = cross2(p1, p2, p4);
+    return (
+      ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+      ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
+    );
+  };
+
+  for (let i = 0; i < n; i++) {
+    const a1 = points[i];
+    const a2 = points[(i + 1) % n];
+    // Start j at i+2 so adjacent edges (sharing vertex i+1) are skipped.
+    for (let j = i + 2; j < n; j++) {
+      // Skip the wrap-around pair that shares vertex 0 with edge i=0.
+      if (i === 0 && j === n - 1) continue;
+      const b1 = points[j];
+      const b2 = points[(j + 1) % n];
+      if (segmentsCross(a1, a2, b1, b2)) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Unsigned angle at `vertex` between the rays `vertex → p1` and
  * `vertex → p2`, in radians, in the range `[0, π]`.
  *

@@ -17,6 +17,26 @@ export type OverlayPosition =
 export type RulerUnits = "dxf-units" | "mm" | "inch";
 
 /**
+ * Active measurement tool. The tools are mutually exclusive — switching modes
+ * resets the previously active tool's in-flight draft.
+ *
+ * - `"none"` — no measurement tool active (default).
+ * - `"distance"` — two-point linear ruler.
+ * - `"area"` — N-point polygon area + perimeter.
+ */
+export type MeasureMode = "none" | "distance" | "area";
+
+/**
+ * Square units for the area-measurement label.
+ *
+ * - `"auto"` — inherit from `rulerUnits` (`mm` → `mm²`, `inch` → `in²`,
+ *   `dxf-units` → no suffix).
+ * - `"mm²"` / `"m²"` / `"in²"` / `"ft²"` — explicit square units; converted via
+ *   `$INSUNITS` (millimetre-equivalent for unitless files), then squared.
+ */
+export type AreaUnits = "auto" | "mm²" | "m²" | "in²" | "ft²";
+
+/**
  * Headless UI-style class map for DXFViewer's named UI parts.
  *
  * Each entry is concatenated onto the corresponding built-in `.dxfk-*` class on
@@ -60,4 +80,6 @@ export interface ViewerClasses {
   selectionRect?: string;
   /** Measurement HTML label (linear distance) — applied to `.dxfk-measure-label`. */
   measureLabel?: string;
+  /** Area-measurement HTML label (area + perimeter) — applied to `.dxfk-measure-area-label`. */
+  measureAreaLabel?: string;
 }

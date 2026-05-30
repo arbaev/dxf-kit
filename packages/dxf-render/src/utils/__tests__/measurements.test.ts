@@ -3,6 +3,8 @@ import {
   measureDistance,
   measureArea,
   measureSignedArea,
+  measurePerimeter,
+  polygonSelfIntersects,
   measureAngle,
   toDegrees,
   toRadians,
@@ -171,6 +173,126 @@ describe("measureArea", () => {
       { x: 0, y: 3 },
     ];
     expect(measureArea(lshape)).toBe(8);
+  });
+});
+
+describe("measurePerimeter", () => {
+  it("returns 0 for fewer than 2 points", () => {
+    expect(measurePerimeter([])).toBe(0);
+    expect(measurePerimeter([{ x: 0, y: 0 }])).toBe(0);
+  });
+
+  it("computes the closed perimeter of a 3-4-5 right triangle", () => {
+    const tri: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 3, y: 0 },
+      { x: 3, y: 4 },
+    ];
+    // edges: 3 + 4 + 5 (hypotenuse) = 12
+    expect(measurePerimeter(tri)).toBe(12);
+  });
+
+  it("computes the perimeter of a 10x10 square", () => {
+    const sq: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+    ];
+    expect(measurePerimeter(sq)).toBe(40);
+  });
+
+  it("includes the closing edge (open input)", () => {
+    const tri: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 3, y: 0 },
+      { x: 3, y: 4 },
+    ];
+    // Passing the polygon explicitly closed adds a zero-length edge only.
+    const closed: MeasurePoint[] = [...tri, { x: 0, y: 0 }];
+    expect(measurePerimeter(closed)).toBe(measurePerimeter(tri));
+  });
+
+  it("returns twice the segment length for 2 points", () => {
+    expect(measurePerimeter([{ x: 0, y: 0 }, { x: 3, y: 4 }])).toBe(10);
+  });
+
+  it("returns 0 for non-finite coordinates", () => {
+    const bad: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: NaN, y: 0 },
+      { x: 0, y: 3 },
+    ];
+    expect(measurePerimeter(bad)).toBe(0);
+  });
+});
+
+describe("polygonSelfIntersects", () => {
+  it("returns false for fewer than 4 vertices", () => {
+    expect(polygonSelfIntersects([])).toBe(false);
+    expect(polygonSelfIntersects([{ x: 0, y: 0 }, { x: 1, y: 0 }])).toBe(false);
+    expect(
+      polygonSelfIntersects([
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+        { x: 0, y: 3 },
+      ]),
+    ).toBe(false);
+  });
+
+  it("returns false for a convex quadrilateral (square)", () => {
+    const sq: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+      { x: 2, y: 2 },
+      { x: 0, y: 2 },
+    ];
+    expect(polygonSelfIntersects(sq)).toBe(false);
+  });
+
+  it("returns false for a concave (non-convex) polygon", () => {
+    const lshape: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 3, y: 0 },
+      { x: 3, y: 2 },
+      { x: 2, y: 2 },
+      { x: 2, y: 3 },
+      { x: 0, y: 3 },
+    ];
+    expect(polygonSelfIntersects(lshape)).toBe(false);
+  });
+
+  it("detects the classic bow-tie / hourglass crossing", () => {
+    // Vertices ordered so edges (0→1) and (2→3) cross in the middle.
+    const bowtie: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 2, y: 2 },
+      { x: 2, y: 0 },
+      { x: 0, y: 2 },
+    ];
+    expect(polygonSelfIntersects(bowtie)).toBe(true);
+  });
+
+  it("does not flag a polygon that merely touches at a shared vertex", () => {
+    // A normal polygon — adjacent edges share endpoints but never cross.
+    const pentagon: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 4, y: 0 },
+      { x: 5, y: 3 },
+      { x: 2, y: 5 },
+      { x: -1, y: 3 },
+    ];
+    expect(polygonSelfIntersects(pentagon)).toBe(false);
+  });
+
+  it("returns false for non-finite coordinates", () => {
+    const bad: MeasurePoint[] = [
+      { x: 0, y: 0 },
+      { x: 2, y: 2 },
+      { x: NaN, y: 0 },
+      { x: 0, y: 2 },
+    ];
+    expect(polygonSelfIntersects(bad)).toBe(false);
   });
 });
 

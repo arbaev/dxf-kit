@@ -86,7 +86,7 @@ async function loadFile(file) {
 - **Vector text** — crisp at any zoom; Liberation Sans/Serif fonts; bold, italic, underline, overline, strikethrough; MTEXT inline scoped formatting (color/font/size/decoration inside `{…}` groups)
 - **Picking & associations** — bbox-based raycast, hover/click events, semantic links derived from DXF (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION, ACAD_GROUP)
 - **Search APIs** — `findEntitiesByText` / `findEntitiesByLayer` / `findEntitiesByType`, paired with `viewer.zoomToEntity` / `zoomToLayer` for find-and-focus UX
-- **Measurement utilities** — pure `measureDistance` / `measureArea` / `measureAngle` (2D/3D, Shoelace polygon area, `acos`-based angle) for linear ruler, area, and angle tools
+- **Measurement tools** — interactive on-canvas distance (two-point ruler) and area (N-point polygon with live area + perimeter), selected via `v-model:measure-mode`; backed by pure `measureDistance` / `measureArea` / `measurePerimeter` / `polygonSelfIntersects` / `measureAngle` utilities (2D/3D, Shoelace polygon area, self-intersection test, `acos`-based angle)
 - **Dark theme** — instant switching
 - **Layer panel** — toggle visibility with color indicators; optional `localStorage` persistence per file
 - **Keyboard navigation** — arrow keys pan, `+`/`-` zoom, `0` reset

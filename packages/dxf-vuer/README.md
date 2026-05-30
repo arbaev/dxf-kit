@@ -93,14 +93,20 @@ async function loadFile(file) {
 | `rectangleSelection`         | `boolean`                          | `false`           | Enable modifier-drag rectangle selection. Requires `pickingEnabled` to function (the picking index is the source of bboxes)                                              |
 | `rectangleSelectionModifier` | `"shift" \| "ctrl" \| "alt"`       | `"shift"`         | Modifier key that arms the rectangle drag. While held, OrbitControls panning is suspended and the cursor turns into a crosshair                                          |
 | `rectangleSelectionMode`     | `"auto" \| "window" \| "crossing"` | `"auto"`          | `auto` — drag direction decides (AutoCAD): L→R = window (fully inside), R→L = crossing (any overlap). The other values lock the semantic regardless of drag direction    |
-| `measureDistance`            | `boolean`                          | `false`           | Named v-model (`v-model:measure-distance`). Enables the linear distance tool — click two points on the canvas to measure their Euclidean distance. See [Measurement tool](#measurement-tool) |
-| `showMeasureButton`          | `boolean`                          | `false`           | Render a ruler-icon toggle in `<ViewerToolbar>` that drives `measureDistance`. Active state is shown via `.dxfk-toolbar-button--active` + `aria-pressed`                |
-| `measureUnits`               | `RulerUnits`                       | —                 | Override label units independently from `rulerUnits`. When omitted (default), measurement labels follow `rulerUnits` so a single switch governs both rulers and labels  |
-| `measureColor`               | `string`                           | `"#ff6b1a"`       | Color of the measurement segment, marker points, and the value label. Cascades into the `--dxfk-measure-color` CSS custom property                                       |
+| `measureMode`                | `MeasureMode`                      | `"none"`          | Named v-model (`v-model:measure-mode`). Selects the active measurement tool. `"distance"` — two-point linear ruler; `"area"` — N-point polygon. The tools are mutually exclusive. See [Measurement tool](#measurement-tool) |
+| `showMeasureButton`          | `boolean`                          | `false`           | Render a ruler-icon toggle in `<ViewerToolbar>` for the distance tool. Active state via `.dxfk-toolbar-button--active` + `aria-pressed`                                  |
+| `showMeasureAreaButton`      | `boolean`                          | `false`           | Render a polygon-icon toggle in `<ViewerToolbar>` for the area tool                                                                                                     |
+| `measureUnits`               | `RulerUnits`                       | —                 | Override distance-label units independently from `rulerUnits`. When omitted (default), distance labels follow `rulerUnits`                                              |
+| `measureAreaUnits`           | `AreaUnits`                        | `"auto"`          | Square units for the area label. `"auto"` mirrors `rulerUnits` (`mm`→`mm²`, `inch`→`in²`, `dxf-units`→no suffix); `"m²"` / `"ft²"` etc. force an explicit unit. The perimeter uses the matching linear unit |
+| `measureColor`               | `string`                           | `"#ff6b1a"`       | Color of the measurement segments, fill, marker points, and value labels (both tools). Cascades into the `--dxfk-measure-color` CSS custom property                      |
 
 `OverlayPosition` = `"top-left"` | `"top-center"` | `"top-right"` | `"bottom-left"` | `"bottom-center"` | `"bottom-right"`
 
 `RulerUnits` = `"dxf-units"` | `"mm"` | `"inch"`
+
+`MeasureMode` = `"none"` | `"distance"` | `"area"`
+
+`AreaUnits` = `"auto"` | `"mm²"` | `"m²"` | `"in²"` | `"ft²"`
 
 `AntialiasingMode` = `"msaa"` | `"smaa"` | `"fxaa"` | `"taa"` | `"ssaa"` | `"none"`
 
@@ -123,7 +129,7 @@ async function loadFile(file) {
 
 | Slot             | Scoped data                                                  | Description                                            |
 | ---------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
-| `#toolbar`       | `{ resetView, exportToPNG, toggleFullscreen, isFullscreen, toggleMeasureDistance, measureActive }` | Replace entire toolbar                 |
+| `#toolbar`       | `{ resetView, exportToPNG, toggleFullscreen, isFullscreen, measureMode, toggleMeasureDistance, toggleMeasureArea, measureDistanceActive, measureAreaActive }` | Replace entire toolbar |
 | `#toolbar-extra` | —                                                            | Add buttons to the existing toolbar                    |
 | `#loading`       | `{ phase, progress }`                                        | Replace loading screen                                 |
 | `#error`         | `{ message, retry }`                                         | Replace error screen                                   |
@@ -164,9 +170,10 @@ async function loadFile(file) {
 | `selection-end`        | —                      | Fired after `entities-select` or when the drag is cancelled (Esc) |
 | `layer-hover`          | `string \| null`       | Fires the layer name on `<LayerPanel>` row `mouseenter` and `null` on `mouseleave` (frozen rows do not fire). When `highlightOnHover` + `pickingEnabled` are on, the viewer also highlights all entities on the hovered layer via `findEntitiesByLayer` + the precise-geometry overlay. The event itself fires regardless of those gates |
 | `update:hiddenLayers`  | `string[]`             | Sent on every internal layer toggle / show-all / hide-all (only when `hiddenLayers` is provided). Powers `v-model:hidden-layers` |
-| `update:measureDistance` | `boolean`            | Sent when the toolbar's ruler button toggles or `toggleMeasureDistance()` is called. Powers `v-model:measure-distance`           |
+| `update:measureMode`   | `MeasureMode`          | Sent when a toolbar measurement button toggles or `setMeasureMode()` is called. Powers `v-model:measure-mode`                    |
 | `measure`              | `MeasureResult`        | Fires after the second click of a distance measurement. Payload: `{ kind: "distance", p1, p2, valueRaw, value, units }` (`value` is scaled to displayed units, `valueRaw` is in raw DXF units) |
-| `measure-cancel`       | —                      | Fires on <kbd>Esc</kbd> / toggling off the tool while a measurement draft was in flight                                          |
+| `measure-area`         | `AreaMeasureResult`    | Fires when an area polygon is closed (≥3 vertices). Payload: `{ points, areaRaw, area, perimeterRaw, perimeter, areaUnits, lengthUnits, selfIntersecting }` (`*Raw` are in raw DXF units, scaled values use `measureAreaUnits`) |
+| `measure-cancel`       | —                      | Fires on <kbd>Esc</kbd> / toggling off either tool while a measurement draft was in flight                                       |
 
 ## DXFViewer Methods (via `ref`)
 
@@ -188,8 +195,8 @@ async function loadFile(file) {
 | `zoomToEntity(handles: string[])`          | Fit the camera to the union of the entities' bboxes, with 20% padding. Requires `pickingEnabled` |
 | `zoomToLayer(layerName: string)`           | Fit the camera to all entities on the given layer. Requires `pickingEnabled`. Layer names are case-sensitive (DXF spec) |
 | `getPickingIndex()`                        | Returns the underlying `PickingIndex \| null`. Useful for filtering external search results (e.g. from `findEntitiesByText`) to entities that are actually rendered in the scene |
-| `clearMeasure()`                           | Clear any in-flight or completed measurement overlay from the canvas without firing `measure-cancel` |
-| `toggleMeasureDistance()`                  | Emit `update:measureDistance` with the inverted current state — same code path the toolbar button uses, useful for binding keyboard shortcuts |
+| `clearMeasure()`                           | Clear any in-flight or completed measurement overlay (distance + area) from the canvas without firing `measure-cancel` |
+| `setMeasureMode(mode: MeasureMode)`        | Emit `update:measureMode` with the given mode — same code path the toolbar buttons use, useful for binding keyboard shortcuts |
 
 ```vue
 <script setup>
@@ -575,85 +582,104 @@ For per-instance class injection, use the `rulerHorizontal` / `rulerVertical` / 
 
 When `showRulers` is on, the overlay grid receives `padding-top: 24px; padding-left: 24px` so existing overlays (file name, coordinates, debug, toolbar) don't sit underneath the rulers. The canvas itself stays full-size — picking, coordinates, and all NDC math are unchanged. The rulers are just overlays painted on top.
 
-## Measurement tool
+## Measurement tools
 
-A two-click linear measurement tool — click point A, click point B, see the Euclidean distance. The segment + endpoint markers live in the Three.js scene (so they follow pan / zoom natively); the value (`12.34 mm`) is rendered as a positioned HTML label above the midpoint. Completed measurements stay visible until the next interaction.
+Two mutually-exclusive on-canvas tools, selected via `v-model:measure-mode`:
+
+- **`"distance"`** — click point A, click point B, see the Euclidean distance.
+- **`"area"`** — click N vertices to draw a polygon, close it, and read its area + perimeter.
+
+In both tools the geometry (segments, polygon fill, markers) lives in the Three.js scene so it follows pan / zoom natively; the numbers are rendered as positioned HTML labels. Completed measurements stay visible until the next interaction.
 
 ```vue
 <script setup>
 import { ref } from "vue";
 import { DXFViewer } from "dxf-vuer";
-import type { MeasureResult } from "dxf-vuer";
+import type { MeasureMode, MeasureResult, AreaMeasureResult } from "dxf-vuer";
 
-const measureDistance = ref(false);
-const lastMeasurement = ref<MeasureResult | null>(null);
+const measureMode = ref<MeasureMode>("none");
+const lastDistance = ref<MeasureResult | null>(null);
+const lastArea = ref<AreaMeasureResult | null>(null);
 </script>
 
 <template>
   <DXFViewer
     :dxf-data="dxfData"
-    v-model:measure-distance="measureDistance"
+    v-model:measure-mode="measureMode"
     :show-measure-button="true"
+    :show-measure-area-button="true"
     :show-rulers="true"
     ruler-units="mm"
-    @measure="lastMeasurement = $event"
+    measure-area-units="m²"
+    @measure="lastDistance = $event"
+    @measure-area="lastArea = $event"
   />
-  <p v-if="lastMeasurement">
-    Distance: {{ lastMeasurement.value.toFixed(2) }} {{ lastMeasurement.units }}
+  <p v-if="lastDistance">
+    Distance: {{ lastDistance.value.toFixed(2) }} {{ lastDistance.units }}
+  </p>
+  <p v-if="lastArea">
+    Area: {{ lastArea.area.toFixed(2) }} {{ lastArea.areaUnits }} ·
+    Perimeter: {{ lastArea.perimeter.toFixed(2) }} {{ lastArea.lengthUnits }}
   </p>
 </template>
 ```
 
-### State machine
-
-The tool has three resting states:
+### Distance state machine
 
 | State | Visual                              | What the user can do                                                                |
 | ----- | ----------------------------------- | ----------------------------------------------------------------------------------- |
 | empty | (nothing on canvas)                 | Click anywhere → places point A → transition to **one**                             |
-| one   | Marker A + live segment A → cursor | Move cursor → segment + label follow. Click → places point B → fires `measure`, transition to **two**. <kbd>Esc</kbd> cancels → `measure-cancel`, transition to **empty** |
-| two   | Marker A + marker B + final segment | Click → starts a new measurement (previous A/B cleared, click becomes new A → transition to **one**). <kbd>Esc</kbd> clears → transition to **empty** |
+| one   | Marker A + live segment A → cursor | Move cursor → segment + label follow. Click → places point B → fires `measure`, transition to **two**. <kbd>Esc</kbd> cancels → `measure-cancel` |
+| two   | Marker A + marker B + final segment | Click → starts a new measurement (click becomes the new A). <kbd>Esc</kbd> clears   |
 
-`measureColor` controls the segment, marker, and label color. `measureUnits` overrides the label unit (otherwise it follows `rulerUnits` so rulers and measurements always agree).
+### Area state machine
+
+| State    | Visual                                                | What the user can do                                                                 |
+| -------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| empty    | (nothing on canvas)                                   | Click → places the first vertex → **one**                                            |
+| one      | 1 marker + live segment to cursor                     | Click → second vertex → **two**                                                      |
+| two      | preview triangle, `Area: —`, live perimeter           | Click → third vertex → **three+**                                                    |
+| three+   | growing polygon + fill, live area + perimeter         | Click → add vertex. **Close** the polygon → **closed**. <kbd>Backspace</kbd> removes the last vertex |
+| closed   | filled polygon + final label                          | Click → starts a fresh polygon. <kbd>Esc</kbd> clears                                |
+
+**Closing** the polygon (requires ≥3 vertices): **double-click**, **click on the first vertex** (it highlights when the cursor is in snap range), or press <kbd>Enter</kbd>. Closing fires `measure-area`.
+
+The area is the absolute Shoelace value; self-intersecting polygons are reported as-is with `selfIntersecting: true` in the result so you can warn the user if you want. `measureAreaUnits` controls the square units (`"auto"` mirrors `rulerUnits`); the perimeter uses the matching linear unit.
+
+`measureColor` controls the color of both tools (segments, polygon fill, markers, labels).
 
 ### Interaction with pan / zoom
 
-While the tool is active, the viewer rebinds the mouse so left-click places points instead of panning:
+While either tool is active, the viewer rebinds the mouse so left-click places points instead of panning:
 
 - **Left-click** → place point (composable temporarily nulls `controls.mouseButtons.LEFT`, restores on exit)
-- **Middle-button drag** → pan (unchanged)
-- **Right-button drag** → pan (unchanged)
+- **Middle / right-button drag** → pan (unchanged)
 - **Wheel** → zoom (unchanged)
 - **<kbd>Esc</kbd>** → cancel / clear
 
-Picking (`pickingEnabled`) and rectangle selection (`rectangleSelection`) are automatically suspended while the measurement tool is active and restored on toggle-off — they share the same left-click stream, so only one can be active at a time.
+Picking (`pickingEnabled`) and rectangle selection (`rectangleSelection`) are automatically suspended while a measurement tool is active and restored when `measureMode` returns to `"none"` — they share the same left-click stream.
 
 ### Imperative control
 
-When you don't want to surface the toolbar button, drive the tool from your own UI via the v-model + ref methods:
+Drive the tools from your own UI via the v-model + ref methods:
 
 ```vue
 <script setup>
 import { ref } from "vue";
-const measureDistance = ref(false);
+const measureMode = ref("none");
 const viewer = ref();
 </script>
 
 <template>
-  <button @click="measureDistance = !measureDistance">
-    {{ measureDistance ? 'Stop measuring' : 'Measure' }}
-  </button>
+  <button @click="measureMode = measureMode === 'distance' ? 'none' : 'distance'">Distance</button>
+  <button @click="measureMode = measureMode === 'area' ? 'none' : 'area'">Area</button>
   <button @click="viewer.clearMeasure()">Clear</button>
 
-  <DXFViewer
-    ref="viewer"
-    :dxf-data="dxfData"
-    v-model:measure-distance="measureDistance"
-  />
+  <DXFViewer ref="viewer" :dxf-data="dxfData" v-model:measure-mode="measureMode" />
 </template>
 ```
 
-### `MeasureResult` shape
+### Result shapes
 
 ```ts
 interface MeasureResult {
@@ -664,18 +690,30 @@ interface MeasureResult {
   value: number;          // distance scaled to `units`
   units: "dxf-units" | "mm" | "inch";
 }
+
+interface AreaMeasureResult {
+  points: { x: number; y: number; z: number }[];  // polygon vertices (world coords)
+  areaRaw: number;        // area in raw DXF units²
+  area: number;           // area scaled to `areaUnits`
+  perimeterRaw: number;   // perimeter in raw DXF units
+  perimeter: number;      // perimeter scaled to `lengthUnits`
+  areaUnits: string;      // "m²" | "mm²" | "in²" | "ft²" | "" (dxf-units)
+  lengthUnits: string;    // "m"  | "mm"  | "in"  | "ft"  | ""
+  selfIntersecting: boolean;
+}
 ```
 
-`valueRaw` is what you store; `value` + `units` is what you display.
+`*Raw` is what you store; the scaled values + unit labels are what you display.
 
 ### Styling
 
-| Hook                       | Element / variable                                                |
-| -------------------------- | ----------------------------------------------------------------- |
-| `.dxfk-measure-label`      | HTML label positioned over the segment midpoint                   |
-| `--dxfk-measure-color`     | Color of the label background, segment line, and marker dots (cascades from the `measureColor` prop) |
+| Hook                        | Element / variable                                                |
+| --------------------------- | ----------------------------------------------------------------- |
+| `.dxfk-measure-label`       | HTML label positioned over the distance-segment midpoint          |
+| `.dxfk-measure-area-label`  | HTML label (area + perimeter) positioned at the polygon centroid  |
+| `--dxfk-measure-color`      | Color of the label backgrounds, segments, polygon fill, and marker dots (cascades from the `measureColor` prop) |
 
-For per-instance class injection, use the `measureLabel` key in [`classes`](#3-classes-prop-headless-ui-style).
+For per-instance class injection, use the `measureLabel` / `measureAreaLabel` keys in [`classes`](#3-classes-prop-headless-ui-style).
 
 ## Customizing styles
 

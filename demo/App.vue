@@ -208,7 +208,8 @@
           :show-rulers="showRulers"
           :ruler-units="rulerUnits"
           :show-measure-button="true"
-          v-model:measure-distance="measureDistance"
+          :show-measure-area-button="true"
+          v-model:measure-mode="measureMode"
           v-model:hidden-layers="hiddenLayers"
           @dxf-data="handleDXFData"
           @unsupported-entities="handleUnsupportedEntities"
@@ -220,6 +221,7 @@
           @entity-click="handleEntityClick"
           @entities-select="handleEntitiesSelect"
           @measure="handleMeasureResult"
+          @measure-area="handleMeasureAreaResult"
           @measure-cancel="handleMeasureCancel"
         >
           <template #overlay>
@@ -429,10 +431,10 @@
             <header class="settings-cell-header">
               <span class="settings-cell-title">
                 Measurement
-                <span v-if="measureDistance" class="settings-badge">on</span>
+                <span v-if="measureMode !== 'none'" class="settings-badge">{{ measureMode }}</span>
               </span>
               <button
-                v-if="lastMeasureResult"
+                v-if="lastMeasureResult || lastAreaResult"
                 class="settings-cell-action"
                 type="button"
                 @click="clearMeasureResult"
@@ -441,22 +443,45 @@
               </button>
             </header>
             <label class="picking-label">
-              <input type="checkbox" v-model="measureDistance" />
+              <input
+                type="checkbox"
+                :checked="measureMode === 'distance'"
+                @change="setMeasureMode('distance')"
+              />
               <span>Distance tool (linear ruler)</span>
             </label>
+            <label class="picking-label">
+              <input
+                type="checkbox"
+                :checked="measureMode === 'area'"
+                @change="setMeasureMode('area')"
+              />
+              <span>Area tool (polygon)</span>
+            </label>
             <p class="settings-cell-hint">
-              Toggle the ruler icon in the toolbar (top-right) or the checkbox above.
-              Click two points on the drawing to measure. <kbd>Esc</kbd> cancels an
-              in-flight measurement. Units follow the rulers (<code>{{ rulerUnits }}</code>).
+              Toggle the toolbar icons (top-right) or the checkboxes above; the tools
+              are mutually exclusive. Distance: click two points. Area: click vertices,
+              then close via double-click, a click on the first vertex, or
+              <kbd>Enter</kbd>. <kbd>Backspace</kbd> undoes the last vertex,
+              <kbd>Esc</kbd> cancels. Units follow the rulers (<code>{{ rulerUnits }}</code>).
             </p>
             <div v-if="lastMeasureResult" class="measure-result">
-              <span class="measure-result-label">Last reading:</span>
+              <span class="measure-result-label">Distance:</span>
               <code class="measure-result-value">{{ formattedMeasureValue }}</code>
               <span class="measure-result-meta">
                 A&nbsp;({{ lastMeasureResult.p1.x.toFixed(2) }},
                 {{ lastMeasureResult.p1.y.toFixed(2) }}) &rarr;
                 B&nbsp;({{ lastMeasureResult.p2.x.toFixed(2) }},
                 {{ lastMeasureResult.p2.y.toFixed(2) }})
+              </span>
+            </div>
+            <div v-if="lastAreaResult" class="measure-result">
+              <span class="measure-result-label">Area:</span>
+              <code class="measure-result-value">{{ formattedAreaValue }}</code>
+              <span class="measure-result-meta">
+                Perimeter {{ formattedPerimeterValue }} ·
+                {{ lastAreaResult.points.length }} pts<template v-if="lastAreaResult.selfIntersecting">
+                  · ⚠ self-intersecting</template>
               </span>
             </div>
           </div>
@@ -618,7 +643,10 @@ import type {
   OverlayPosition,
   PickingEvent,
   MeasureResult,
+  MeasureMode,
+  AreaMeasureResult,
 } from "dxf-vuer";
+import { formatAreaValue } from "dxf-vuer";
 import "dxf-vuer/style.css";
 import type { DxfData, EntityAssociation } from "dxf-render";
 import { findEntitiesByText } from "dxf-render";
@@ -672,8 +700,9 @@ const highlightOnHover = ref(true);
 const highlightAssociated = ref(true);
 const rectangleSelection = ref(true);
 const selectedEntities = ref<PickingEvent[]>([]);
-const measureDistance = ref(false);
+const measureMode = ref<MeasureMode>("none");
 const lastMeasureResult = ref<MeasureResult | null>(null);
+const lastAreaResult = ref<AreaMeasureResult | null>(null);
 const hiddenLayers = ref<string[]>([]);
 const hoveredEntity = ref<PickingEvent | null>(null);
 const clickedEntity = ref<PickingEvent | null>(null);
@@ -757,12 +786,22 @@ const handleMeasureResult = (result: MeasureResult) => {
   lastMeasureResult.value = result;
 };
 
+const handleMeasureAreaResult = (result: AreaMeasureResult) => {
+  lastAreaResult.value = result;
+};
+
 const handleMeasureCancel = () => {
-  // Don't clear lastMeasureResult — keep the previous reading visible.
+  // Don't clear the last readings — keep the previous values visible.
+};
+
+// Toggle a measurement mode (mutually exclusive); a second click turns it off.
+const setMeasureMode = (mode: MeasureMode) => {
+  measureMode.value = measureMode.value === mode ? "none" : mode;
 };
 
 const clearMeasureResult = () => {
   lastMeasureResult.value = null;
+  lastAreaResult.value = null;
   dxfViewerRef.value?.clearMeasure();
 };
 
@@ -774,6 +813,16 @@ const formattedMeasureValue = computed<string>(() => {
   if (r.units === "mm") return `${fixed} mm`;
   if (r.units === "inch") return `${fixed} in`;
   return fixed;
+});
+
+const formattedAreaValue = computed<string>(() => {
+  const r = lastAreaResult.value;
+  return r ? formatAreaValue(r.area, r.areaUnits) : "";
+});
+
+const formattedPerimeterValue = computed<string>(() => {
+  const r = lastAreaResult.value;
+  return r ? formatAreaValue(r.perimeter, r.lengthUnits) : "";
 });
 
 const zoomToSelectedEntity = (event: PickingEvent) => {
@@ -814,8 +863,9 @@ const resetSettings = () => {
   highlightOnHover.value = true;
   highlightAssociated.value = true;
   rectangleSelection.value = true;
-  measureDistance.value = false;
+  measureMode.value = "none";
   lastMeasureResult.value = null;
+  lastAreaResult.value = null;
   showFileName.value = true;
   showCoordinates.value = true;
   showZoomLevel.value = true;

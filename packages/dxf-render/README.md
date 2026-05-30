@@ -537,6 +537,8 @@ import {
   measureDistance,
   measureArea,
   measureSignedArea,
+  measurePerimeter,
+  polygonSelfIntersects,
   measureAngle,
   toDegrees,
   toRadians,
@@ -554,6 +556,14 @@ const square: MeasurePoint[] = [
 ];
 measureArea(square);        // → 100
 measureSignedArea(square);  // → +100 (CCW); negative for CW winding
+measurePerimeter(square);   // → 40 (closed loop, includes the last → first edge)
+
+// Self-intersection test (proper crossings only)
+polygonSelfIntersects(square); // → false
+polygonSelfIntersects([
+  { x: 0, y: 0 }, { x: 2, y: 2 },
+  { x: 2, y: 0 }, { x: 0, y: 2 }, // bow-tie
+]); // → true
 
 // Angle at the vertex between two rays, in radians [0, π]
 const a = measureAngle(
@@ -570,6 +580,8 @@ Degenerate inputs are handled safely:
 
 - `measureDistance` returns `0` for identical points and for any non-finite coordinate.
 - `measureArea` / `measureSignedArea` return `0` for fewer than 3 points, for collinear polygons, and for non-finite coordinates. Open polygons (last vertex ≠ first) and closed polygons (last vertex == first) yield the same value.
+- `measurePerimeter` returns `0` for fewer than 2 points or non-finite coordinates; it always adds the closing edge, so open and closed inputs yield the same value.
+- `polygonSelfIntersects` returns `false` for fewer than 4 vertices and for non-finite coordinates. Only *proper* edge crossings count — edges that merely share a polygon vertex (or touch collinearly) are not flagged.
 - `measureAngle` clamps the cosine into `[-1, 1]` to absorb floating-point noise that would otherwise push `Math.acos` out of its domain, and returns `0` when `vertex` coincides with `p1` or `p2`.
 
 ### Fonts
@@ -584,7 +596,7 @@ Degenerate inputs are handled safely:
 - `resolveEntityLinetype()` — resolve entity linetype
 - `collectDXFStatistics()` — collect file statistics
 - `getInsUnitsScale()` — unit conversion factor
-- `measureDistance()` / `measureArea()` / `measureAngle()` — see [Measurements](#measurements)
+- `measureDistance()` / `measureArea()` / `measureSignedArea()` / `measurePerimeter()` / `polygonSelfIntersects()` / `measureAngle()` — see [Measurements](#measurements)
 
 ### Types
 
