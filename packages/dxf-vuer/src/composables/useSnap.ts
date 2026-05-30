@@ -54,6 +54,8 @@ export function useSnap() {
   let enabled = false;
   let tolerancePx = DEFAULT_TOLERANCE_PX;
   let color = "#ff6b1a";
+  // Set of visible layer names; `null` = no filtering (snap on any layer).
+  let visibleLayers: Set<string> | null = null;
 
   // Overlay: one parent group, one child glyph per snap type (only one visible).
   let overlayGroup: THREE.Group | null = null;
@@ -159,6 +161,7 @@ export function useSnap() {
     const tol = wpp * tolerancePx;
     const snap = findSnapPoint(pickingIndex, entityIndex, rawWorld, tol, {
       types: ALL_TYPES,
+      visibleLayers,
     });
     lastSnap = snap;
     if (snap) {
@@ -210,6 +213,16 @@ export function useSnap() {
     if (Number.isFinite(px) && px > 0) tolerancePx = px;
   };
 
+  /**
+   * Restrict snapping to entities on visible layers. Pass the set of currently
+   * visible layer names, or `null` to snap on every layer. Invalidates the memo
+   * so the next `resolve` recomputes against the new set.
+   */
+  const setVisibleLayers = (layers: Set<string> | null): void => {
+    visibleLayers = layers;
+    invalidate();
+  };
+
   /** Drop the memo so the next `resolve` recomputes. */
   const invalidate = (): void => {
     lastQueryX = Number.NaN;
@@ -249,6 +262,7 @@ export function useSnap() {
     setEnabled,
     setColor,
     setTolerance,
+    setVisibleLayers,
     resolve,
     clear,
     dispose,

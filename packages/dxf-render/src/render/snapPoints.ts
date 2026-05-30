@@ -56,6 +56,12 @@ export interface SnapResult {
 export interface FindSnapOptions {
   /** Restrict which snap kinds are considered. Defaults to all kinds. */
   types?: readonly SnapType[];
+  /**
+   * When provided, entities whose layer is not in this set are skipped, so
+   * snapping respects layer visibility. Omit (or pass `null`) to snap to
+   * entities on every layer.
+   */
+  visibleLayers?: Set<string> | null;
 }
 
 /**
@@ -119,6 +125,7 @@ export function findSnapPoint(
 ): SnapResult | null {
   if (!Number.isFinite(tolerance) || tolerance <= 0) return null;
   const types = options?.types;
+  const visibleLayers = options?.visibleLayers;
   const tol2 = tolerance * tolerance;
 
   let bestPriority = Infinity;
@@ -129,6 +136,9 @@ export function findSnapPoint(
     // INSERT aggregate entries reuse their children's handles, which are
     // emitted as their own entries — skip to avoid double work.
     if (entry.type === "INSERT") continue;
+
+    // Honor layer visibility: entries on hidden/frozen layers don't snap.
+    if (visibleLayers && !visibleLayers.has(entry.layer)) continue;
 
     const b = entry.bbox;
     if (worldPos.x < b.min.x - tolerance || worldPos.x > b.max.x + tolerance) continue;

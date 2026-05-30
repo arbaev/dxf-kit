@@ -321,4 +321,57 @@ describe("findSnapPoint", () => {
     expect(findSnapPoint(pickingIndex, entityIndex, { x: 0, y: 0 }, 0)).toBeNull();
     expect(findSnapPoint(pickingIndex, entityIndex, { x: 0, y: 0 }, -1)).toBeNull();
   });
+
+  describe("visibleLayers filter", () => {
+    // Two lines on distinct layers, both with an endpoint inside the aperture
+    // around (0.2, 0). B's endpoint (0.3,0) is nearer than A's (0,0), so B wins
+    // when both are visible — hiding B must flip the winner to A.
+    const onA: DxfLineEntity = {
+      type: "LINE",
+      handle: "A1",
+      layer: "A",
+      vertices: [{ x: 0, y: 0 }, { x: 10, y: 0 }],
+    };
+    const onB: DxfLineEntity = {
+      type: "LINE",
+      handle: "B1",
+      layer: "B",
+      vertices: [{ x: 0.3, y: 0 }, { x: 10, y: 0.3 }],
+    };
+    const d: DxfData = { entities: [onA, onB] };
+    const pi = buildPickingIndex(d);
+    const ei = buildEntityIndex(d);
+
+    it("skips entities whose layer is not in the visible set", () => {
+      // Only layer "A" visible → B's nearer endpoint is ignored, A wins.
+      const r = findSnapPoint(pi, ei, { x: 0.2, y: 0 }, 1, {
+        visibleLayers: new Set(["A"]),
+      });
+      expect(r).not.toBeNull();
+      expect(r!.handle).toBe("A1");
+    });
+
+    it("snaps to a hidden-layer entity once its layer becomes visible", () => {
+      // Both visible → B's nearer endpoint wins.
+      const r = findSnapPoint(pi, ei, { x: 0.2, y: 0 }, 1, {
+        visibleLayers: new Set(["A", "B"]),
+      });
+      expect(r).not.toBeNull();
+      expect(r!.handle).toBe("B1");
+    });
+
+    it("an empty visible set snaps to nothing", () => {
+      const r = findSnapPoint(pi, ei, { x: 0.2, y: 0 }, 1, {
+        visibleLayers: new Set(),
+      });
+      expect(r).toBeNull();
+    });
+
+    it("omitting / null visibleLayers snaps on every layer", () => {
+      expect(findSnapPoint(pi, ei, { x: 0.2, y: 0 }, 1)!.handle).toBe("B1");
+      expect(
+        findSnapPoint(pi, ei, { x: 0.2, y: 0 }, 1, { visibleLayers: null })!.handle,
+      ).toBe("B1");
+    });
+  });
 });

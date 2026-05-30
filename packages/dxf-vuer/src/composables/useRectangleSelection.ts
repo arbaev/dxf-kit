@@ -130,6 +130,8 @@ export function useRectangleSelection() {
 
   let pickingIndex: PickingIndex | null = null;
   let originOffset: { x: number; y: number; z?: number } = { x: 0, y: 0, z: 0 };
+  // Set of visible layer names; `null` = no filtering (select on any layer).
+  let visibleLayers: Set<string> | null = null;
 
   let modifier: RectSelectionModifier = "shift";
   let modeOption: RectSelectionMode = "auto";
@@ -277,9 +279,14 @@ export function useRectangleSelection() {
       startScreen,
       { x: e.clientX, y: e.clientY },
     );
-    const entries = pickingIndex
+    const found = pickingIndex
       ? findEntriesInRect(pickingIndex, buildWorldRect(startWorld, endWorld), { mode })
       : [];
+    // Exclude entries on hidden/frozen layers — they aren't visible to select.
+    const entries =
+      visibleLayers === null
+        ? found
+        : found.filter((e) => visibleLayers!.has(e.layer));
     callbacks.onSelect?.(entries, mode);
     callbacks.onEnd?.();
     finishDrag();
@@ -369,6 +376,14 @@ export function useRectangleSelection() {
     modeOption = mode;
   };
 
+  /**
+   * Restrict rectangle selection to entities on visible layers. Pass the set
+   * of currently visible layer names, or `null` to select on every layer.
+   */
+  const setVisibleLayers = (layers: Set<string> | null): void => {
+    visibleLayers = layers;
+  };
+
   return {
     /** True while the rectangle is actively being dragged (post-threshold) */
     isDragging,
@@ -381,5 +396,6 @@ export function useRectangleSelection() {
     setEnabled,
     setModifier,
     setMode,
+    setVisibleLayers,
   };
 }

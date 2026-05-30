@@ -50,6 +50,10 @@ export function usePicking() {
   let camera: THREE.Camera | null = null;
   let onHoverCb: ((e: PickingEvent | null) => void) | null = null;
   let onClickCb: ((e: PickingEvent) => void) | null = null;
+  // Set of layer names currently visible. `null` = no filtering (pick anything).
+  // The raycaster in three.js 0.182 ignores `mesh.visible`, so we must filter
+  // hits by layer here rather than toggling the picking meshes' visibility.
+  let visibleLayers: Set<string> | null = null;
 
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
@@ -148,18 +152,29 @@ export function usePicking() {
 
     if (hits.length === 0) return null;
 
+    // Drop hits on hidden/frozen layers — entities you can't see shouldn't be
+    // pickable. `visibleLayers === null` means no layer state yet (pick all).
+    const candidates =
+      visibleLayers === null
+        ? hits
+        : hits.filter((h) => {
+            const layerName = h.object.userData.layerName as string | undefined;
+            return layerName === undefined || visibleLayers!.has(layerName);
+          });
+    if (candidates.length === 0) return null;
+
     // Choose the most specific hit: lowest type-priority number wins (foreground
     // entities like text/dimension/leader beat background polylines and hatches),
     // and within the same priority the smallest bbox wins.
-    let best = hits[0];
+    let best = candidates[0];
     let bestPriority = typePriorityOf(best.object);
     let bestSize = bboxSizeOf(best.object);
-    for (let i = 1; i < hits.length; i++) {
-      const obj = hits[i].object;
+    for (let i = 1; i < candidates.length; i++) {
+      const obj = candidates[i].object;
       const pr = typePriorityOf(obj);
       const sz = bboxSizeOf(obj);
       if (pr < bestPriority || (pr === bestPriority && sz < bestSize)) {
-        best = hits[i];
+        best = candidates[i];
         bestPriority = pr;
         bestSize = sz;
       }
@@ -223,6 +238,14 @@ export function usePicking() {
   const setEnabled = (value: boolean) => { enabled = value; };
 
   /**
+   * Restrict click/hover picking to entities on visible layers. Pass the set
+   * of currently visible layer names, or `null` to pick on every layer.
+   */
+  const setVisibleLayers = (layers: Set<string> | null): void => {
+    visibleLayers = layers;
+  };
+
+  /**
    * Build a `PickingEvent` from a `PickingEntry`. Mirrors the payload produced
    * by raycast picking — populates `text` from the entity (or its
    * association) and resolves the first association for the entry's handle.
@@ -275,6 +298,7 @@ export function usePicking() {
     attach,
     detach,
     setEnabled,
+    setVisibleLayers,
     getPickingEntries,
     getPickingEntryById,
     getPickingIndex,

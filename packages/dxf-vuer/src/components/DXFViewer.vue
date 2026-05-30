@@ -1251,19 +1251,33 @@ const initLayersFromDXF = (dxf: DxfData, darkTheme?: boolean) => {
   initLayers(dxfLayers, entityLayerCounts, darkTheme);
 };
 
+/**
+ * Apply the current layer-visibility set everywhere it matters: the rendered
+ * scene plus the three interaction layers built on the picking index
+ * (click/hover picking, rectangle selection, object snap). Without syncing the
+ * latter three, hidden layers would still be clickable / selectable / snappable.
+ */
+const syncLayerVisibility = (): void => {
+  const visible = visibleLayerNames.value;
+  applyLayerVisibility(visible);
+  picking.setVisibleLayers(visible);
+  rectSelection.setVisibleLayers(visible);
+  snap.setVisibleLayers(visible);
+};
+
 const handleToggleLayer = (layerName: string) => {
   toggleLayerVisibility(layerName);
-  applyLayerVisibility(visibleLayerNames.value);
+  syncLayerVisibility();
 };
 
 const handleShowAllLayers = () => {
   showAllLayers();
-  applyLayerVisibility(visibleLayerNames.value);
+  syncLayerVisibility();
 };
 
 const handleHideAllLayers = () => {
   hideAllLayers();
-  applyLayerVisibility(visibleLayerNames.value);
+  syncLayerVisibility();
 };
 
 const handleLoadError = (error: unknown, fallbackMsg: string) => {
@@ -1288,7 +1302,7 @@ const loadDXFFromText = async (dxfText: string) => {
     loadingPhase.value = "rendering";
     const unsupportedEntities = await displayDXF(dxf, props.darkTheme, props.fontUrl);
     initLayersFromDXF(dxf, props.darkTheme);
-    applyLayerVisibility(visibleLayerNames.value);
+    syncLayerVisibility();
     setupPickingForDxf(dxf);
     ensureSnapData(dxf);
     refreshRulerOriginOffset();
@@ -1315,7 +1329,7 @@ const loadDXFFromData = async (dxfData: DxfData) => {
   try {
     const unsupportedEntities = await displayDXF(dxfData, props.darkTheme, props.fontUrl);
     initLayersFromDXF(dxfData, props.darkTheme);
-    applyLayerVisibility(visibleLayerNames.value);
+    syncLayerVisibility();
     setupPickingForDxf(dxfData);
     ensureSnapData(dxfData);
     refreshRulerOriginOffset();
@@ -1519,7 +1533,7 @@ watch(
     if (newHidden === undefined) return;
     if (hasSameHiddenSet(newHidden)) return;
     setHiddenLayers(newHidden);
-    applyLayerVisibility(visibleLayerNames.value);
+    syncLayerVisibility();
   },
   { deep: true },
 );
