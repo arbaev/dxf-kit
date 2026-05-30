@@ -530,7 +530,7 @@ findEntitiesByType(dxf, "DIMENSION");
 
 ### Measurements
 
-Framework-agnostic geometry math for CAD measurement tools (linear ruler, area, angle). No Three.js / DOM dependencies — intended to back upcoming linear-ruler / area / angle tools in `dxf-vuer` and future React/Lit wrappers.
+Framework-agnostic geometry math for CAD measurement tools (linear ruler, area, angle). No Three.js / DOM dependencies — these back the distance / area / angle measurement tools in `dxf-vuer` and are reused 1:1 by future React/Lit wrappers.
 
 ```ts
 import {
@@ -540,6 +540,7 @@ import {
   measurePerimeter,
   polygonSelfIntersects,
   measureAngle,
+  measureDirectedAngle,
   toDegrees,
   toRadians,
   type MeasurePoint,
@@ -565,13 +566,18 @@ polygonSelfIntersects([
   { x: 2, y: 0 }, { x: 0, y: 2 }, // bow-tie
 ]); // → true
 
-// Angle at the vertex between two rays, in radians [0, π]
+// Unsigned angle at the vertex between two rays, in radians [0, π]
 const a = measureAngle(
   { x: 0, y: 0 }, // vertex
   { x: 1, y: 0 }, // p1
   { x: 0, y: 1 }, // p2
 );
 toDegrees(a); // → 90
+
+// Directed angle: CCW sweep from the first ray to the second, in [0, 2π)
+const v = { x: 0, y: 0 };
+toDegrees(measureDirectedAngle(v, { x: 1, y: 0 }, { x: 0, y: 1 })); // → 90
+toDegrees(measureDirectedAngle(v, { x: 0, y: 1 }, { x: 1, y: 0 })); // → 270 (the reflex)
 ```
 
 `MeasurePoint` is `{ x: number; y: number; z?: number }` — compatible with `DxfVertex` and `THREE.Vector3`-like objects, so you can pass DXF coordinates or unprojected canvas points directly.
@@ -583,6 +589,7 @@ Degenerate inputs are handled safely:
 - `measurePerimeter` returns `0` for fewer than 2 points or non-finite coordinates; it always adds the closing edge, so open and closed inputs yield the same value.
 - `polygonSelfIntersects` returns `false` for fewer than 4 vertices and for non-finite coordinates. Only *proper* edge crossings count — edges that merely share a polygon vertex (or touch collinearly) are not flagged.
 - `measureAngle` clamps the cosine into `[-1, 1]` to absorb floating-point noise that would otherwise push `Math.acos` out of its domain, and returns `0` when `vertex` coincides with `p1` or `p2`.
+- `measureDirectedAngle` returns the directed counter-clockwise sweep in `[0, 2π)` (2D — `z` ignored). It preserves direction, so `measureDirectedAngle(v, b, a)` equals `2π − measureDirectedAngle(v, a, b)` (off the `0`/`2π` boundary) — use it when the sweep direction matters (e.g. an angle tool that distinguishes an angle from its reflex). Returns `0` for a coincident vertex or non-finite coordinates.
 
 ### Fonts
 

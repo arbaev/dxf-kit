@@ -93,6 +93,7 @@ export {
   measurePerimeter,
   polygonSelfIntersects,
   measureAngle,
+  measureDirectedAngle,
   toDegrees,
   toRadians,
   type MeasurePoint,

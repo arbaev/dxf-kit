@@ -23,8 +23,9 @@ export type RulerUnits = "dxf-units" | "mm" | "inch";
  * - `"none"` — no measurement tool active (default).
  * - `"distance"` — two-point linear ruler.
  * - `"area"` — N-point polygon area + perimeter.
+ * - `"angle"` — three-point angle (vertex + two rays).
  */
-export type MeasureMode = "none" | "distance" | "area";
+export type MeasureMode = "none" | "distance" | "area" | "angle";
 
 /**
  * Square units for the area-measurement label.
@@ -35,6 +36,16 @@ export type MeasureMode = "none" | "distance" | "area";
  *   `$INSUNITS` (millimetre-equivalent for unitless files), then squared.
  */
 export type AreaUnits = "auto" | "mm²" | "m²" | "in²" | "ft²";
+
+/**
+ * Display format for the angle-measurement label. Angles are dimensionless, so
+ * (unlike linear / area units) this never goes through `$INSUNITS`.
+ *
+ * - `"deg"` — decimal degrees, e.g. `123.4°` (default).
+ * - `"rad"` — radians, e.g. `2.150 rad`.
+ * - `"dms"` — degrees-minutes-seconds, e.g. `123°30'15"`.
+ */
+export type AngleUnits = "deg" | "rad" | "dms";
 
 /**
  * Headless UI-style class map for DXFViewer's named UI parts.
@@ -82,4 +93,6 @@ export interface ViewerClasses {
   measureLabel?: string;
   /** Area-measurement HTML label (area + perimeter) — applied to `.dxfk-measure-area-label`. */
   measureAreaLabel?: string;
+  /** Angle-measurement HTML label — applied to `.dxfk-measure-angle-label`. */
+  measureAngleLabel?: string;
 }

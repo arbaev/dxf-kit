@@ -192,6 +192,46 @@ export function measureAngle(
   return Number.isFinite(a) ? a : 0;
 }
 
+/**
+ * Directed angle from the ray `vertex → from` to the ray `vertex → to`,
+ * swept counter-clockwise, in radians, in the range `[0, 2π)`.
+ *
+ * Treated purely in 2D (`z` ignored). Unlike {@link measureAngle} (which
+ * returns the unsigned `[0, π]` angle), this preserves the sweep direction:
+ * swapping `from` and `to` yields `2π − result` (except at the `0` / `2π`
+ * boundary). This makes it the right primitive for an interactive 3-point
+ * angle tool where moving the cursor past the first ray flips between an
+ * acute angle and its reflex (`α` ↔ `360° − α`).
+ *
+ * Returns `0` for degenerate input: `vertex` coincides with `from` or `to`,
+ * or any coordinate is non-finite.
+ */
+export function measureDirectedAngle(
+  vertex: MeasurePoint,
+  from: MeasurePoint,
+  to: MeasurePoint,
+): number {
+  const v1x = from.x - vertex.x;
+  const v1y = from.y - vertex.y;
+  const v2x = to.x - vertex.x;
+  const v2y = to.y - vertex.y;
+  if (
+    !Number.isFinite(v1x) ||
+    !Number.isFinite(v1y) ||
+    !Number.isFinite(v2x) ||
+    !Number.isFinite(v2y)
+  ) {
+    return 0;
+  }
+  if ((v1x === 0 && v1y === 0) || (v2x === 0 && v2y === 0)) return 0;
+
+  const TAU = Math.PI * 2;
+  const delta = Math.atan2(v2y, v2x) - Math.atan2(v1y, v1x);
+  // Normalize into [0, 2π): the double modulo handles the negative branch.
+  const d = ((delta % TAU) + TAU) % TAU;
+  return Number.isFinite(d) ? d : 0;
+}
+
 /** Convert radians to degrees. */
 export function toDegrees(radians: number): number {
   return (radians * 180) / Math.PI;

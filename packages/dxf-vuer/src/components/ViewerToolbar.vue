@@ -81,6 +81,32 @@
       </svg>
     </button>
     <button
+      v-if="showMeasureAngleButton"
+      class="dxfk-toolbar-button"
+      :class="{ 'dxfk-toolbar-button--active': measureAngleActive }"
+      @click="$emit('toggle-measure-angle')"
+      :title="measureAngleActive ? 'Disable angle tool' : 'Measure angle'"
+      :aria-label="measureAngleActive ? 'Disable angle-measurement tool' : 'Enable angle-measurement tool'"
+      :aria-pressed="measureAngleActive"
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M3 19h18" />
+        <path d="M3 19a9 9 0 0 1 18 0" />
+        <path d="M12 19 19 13" />
+        <path d="M16.5 19a4.5 4.5 0 0 0-1.4-3.3" />
+        <circle cx="12" cy="19" r="1.3" fill="currentColor" stroke="none" />
+      </svg>
+    </button>
+    <button
       v-if="showResetButton"
       class="dxfk-toolbar-button"
       @click="$emit('reset-view')"
@@ -158,6 +184,8 @@ interface Props {
   measureActive?: boolean;
   showMeasureAreaButton?: boolean;
   measureAreaActive?: boolean;
+  showMeasureAngleButton?: boolean;
+  measureAngleActive?: boolean;
   isFullscreen?: boolean;
   darkTheme?: boolean;
 }
@@ -170,6 +198,8 @@ withDefaults(defineProps<Props>(), {
   measureActive: false,
   showMeasureAreaButton: false,
   measureAreaActive: false,
+  showMeasureAngleButton: false,
+  measureAngleActive: false,
   isFullscreen: false,
   darkTheme: false,
 });
@@ -180,6 +210,7 @@ defineEmits<{
   (e: "toggle-fullscreen"): void;
   (e: "toggle-measure"): void;
   (e: "toggle-measure-area"): void;
+  (e: "toggle-measure-angle"): void;
 }>();
 </script>
 

@@ -209,6 +209,7 @@
           :ruler-units="rulerUnits"
           :show-measure-button="true"
           :show-measure-area-button="true"
+          :show-measure-angle-button="true"
           v-model:measure-mode="measureMode"
           v-model:hidden-layers="hiddenLayers"
           @dxf-data="handleDXFData"
@@ -222,6 +223,7 @@
           @entities-select="handleEntitiesSelect"
           @measure="handleMeasureResult"
           @measure-area="handleMeasureAreaResult"
+          @measure-angle="handleMeasureAngleResult"
           @measure-cancel="handleMeasureCancel"
         >
           <template #overlay>
@@ -434,7 +436,7 @@
                 <span v-if="measureMode !== 'none'" class="settings-badge">{{ measureMode }}</span>
               </span>
               <button
-                v-if="lastMeasureResult || lastAreaResult"
+                v-if="lastMeasureResult || lastAreaResult || lastAngleResult"
                 class="settings-cell-action"
                 type="button"
                 @click="clearMeasureResult"
@@ -458,12 +460,22 @@
               />
               <span>Area tool (polygon)</span>
             </label>
+            <label class="picking-label">
+              <input
+                type="checkbox"
+                :checked="measureMode === 'angle'"
+                @change="setMeasureMode('angle')"
+              />
+              <span>Angle tool (3-point)</span>
+            </label>
             <p class="settings-cell-hint">
               Toggle the toolbar icons (top-right) or the checkboxes above; the tools
               are mutually exclusive. Distance: click two points. Area: click vertices,
               then close via double-click, a click on the first vertex, or
-              <kbd>Enter</kbd>. <kbd>Backspace</kbd> undoes the last vertex,
-              <kbd>Esc</kbd> cancels. Units follow the rulers (<code>{{ rulerUnits }}</code>).
+              <kbd>Enter</kbd>. Angle: click the vertex, then two rays — move the cursor
+              to pick the angle or its reflex. <kbd>Backspace</kbd> undoes the last point,
+              <kbd>Esc</kbd> cancels. Length/area units follow the rulers
+              (<code>{{ rulerUnits }}</code>); angles are shown in degrees.
             </p>
             <div v-if="lastMeasureResult" class="measure-result">
               <span class="measure-result-label">Distance:</span>
@@ -482,6 +494,15 @@
                 Perimeter {{ formattedPerimeterValue }} ·
                 {{ lastAreaResult.points.length }} pts<template v-if="lastAreaResult.selfIntersecting">
                   · ⚠ self-intersecting</template>
+              </span>
+            </div>
+            <div v-if="lastAngleResult" class="measure-result">
+              <span class="measure-result-label">Angle:</span>
+              <code class="measure-result-value">{{ formattedAngleValue }}</code>
+              <span class="measure-result-meta">
+                V&nbsp;({{ lastAngleResult.vertex.x.toFixed(2) }},
+                {{ lastAngleResult.vertex.y.toFixed(2) }})<template v-if="lastAngleResult.reflex">
+                  · reflex</template>
               </span>
             </div>
           </div>
@@ -645,8 +666,9 @@ import type {
   MeasureResult,
   MeasureMode,
   AreaMeasureResult,
+  AngleMeasureResult,
 } from "dxf-vuer";
-import { formatAreaValue } from "dxf-vuer";
+import { formatAreaValue, formatAngleValue } from "dxf-vuer";
 import "dxf-vuer/style.css";
 import type { DxfData, EntityAssociation } from "dxf-render";
 import { findEntitiesByText } from "dxf-render";
@@ -703,6 +725,7 @@ const selectedEntities = ref<PickingEvent[]>([]);
 const measureMode = ref<MeasureMode>("none");
 const lastMeasureResult = ref<MeasureResult | null>(null);
 const lastAreaResult = ref<AreaMeasureResult | null>(null);
+const lastAngleResult = ref<AngleMeasureResult | null>(null);
 const hiddenLayers = ref<string[]>([]);
 const hoveredEntity = ref<PickingEvent | null>(null);
 const clickedEntity = ref<PickingEvent | null>(null);
@@ -790,6 +813,10 @@ const handleMeasureAreaResult = (result: AreaMeasureResult) => {
   lastAreaResult.value = result;
 };
 
+const handleMeasureAngleResult = (result: AngleMeasureResult) => {
+  lastAngleResult.value = result;
+};
+
 const handleMeasureCancel = () => {
   // Don't clear the last readings — keep the previous values visible.
 };
@@ -802,6 +829,7 @@ const setMeasureMode = (mode: MeasureMode) => {
 const clearMeasureResult = () => {
   lastMeasureResult.value = null;
   lastAreaResult.value = null;
+  lastAngleResult.value = null;
   dxfViewerRef.value?.clearMeasure();
 };
 
@@ -823,6 +851,11 @@ const formattedAreaValue = computed<string>(() => {
 const formattedPerimeterValue = computed<string>(() => {
   const r = lastAreaResult.value;
   return r ? formatAreaValue(r.perimeter, r.lengthUnits) : "";
+});
+
+const formattedAngleValue = computed<string>(() => {
+  const r = lastAngleResult.value;
+  return r ? formatAngleValue(r.degrees, r.units) : "";
 });
 
 const zoomToSelectedEntity = (event: PickingEvent) => {
@@ -866,6 +899,7 @@ const resetSettings = () => {
   measureMode.value = "none";
   lastMeasureResult.value = null;
   lastAreaResult.value = null;
+  lastAngleResult.value = null;
   showFileName.value = true;
   showCoordinates.value = true;
   showZoomLevel.value = true;

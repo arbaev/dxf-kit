@@ -44,6 +44,13 @@ export {
   type AreaMeasureCallbacks,
   type AreaUnitScales,
 } from "./composables/useAreaMeasurement";
+export {
+  useAngleMeasurement,
+  formatAngleValue,
+  type AngleMeasureResult,
+  type AngleMeasureState,
+  type AngleMeasureCallbacks,
+} from "./composables/useAngleMeasurement";
 
 // Types
 export type {
@@ -52,6 +59,7 @@ export type {
   RulerUnits,
   MeasureMode,
   AreaUnits,
+  AngleUnits,
 } from "./types";
 export {
   getEntityProperties,

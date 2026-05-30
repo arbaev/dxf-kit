@@ -92,8 +92,10 @@
             measureMode,
             toggleMeasureDistance,
             toggleMeasureArea,
+            toggleMeasureAngle,
             measureDistanceActive: measureMode === 'distance',
             measureAreaActive: measureMode === 'area',
+            measureAngleActive: measureMode === 'angle',
           }"
         >
           <ViewerToolbar
@@ -105,6 +107,8 @@
             :measure-active="measureMode === 'distance'"
             :show-measure-area-button="showMeasureAreaButton"
             :measure-area-active="measureMode === 'area'"
+            :show-measure-angle-button="showMeasureAngleButton"
+            :measure-angle-active="measureMode === 'angle'"
             :is-fullscreen="isFullscreen"
             :dark-theme="darkTheme"
             @export="exportToPNG"
@@ -112,6 +116,7 @@
             @toggle-fullscreen="toggleFullscreen"
             @toggle-measure="toggleMeasureDistance"
             @toggle-measure-area="toggleMeasureArea"
+            @toggle-measure-angle="toggleMeasureAngle"
           >
             <template v-if="$slots['toolbar-extra']" #extra>
               <slot name="toolbar-extra" />
@@ -296,6 +301,20 @@
     </div>
 
     <div
+      v-if="angleLabel"
+      class="dxfk-measure-angle-label"
+      :class="[{ 'dxfk-dark': darkTheme }, classes?.measureAngleLabel]"
+      :style="{
+        left: angleLabel.left + 'px',
+        top: angleLabel.top + 'px',
+        '--dxfk-measure-color': measureColor,
+      }"
+      aria-live="polite"
+    >
+      {{ angleLabel.text }}
+    </div>
+
+    <div
       v-if="rectSelScreenRect"
       class="dxfk-selection-rect"
       :class="[
@@ -362,11 +381,17 @@ import {
   type AreaMeasureResult,
   type AreaUnitScales,
 } from "../composables/useAreaMeasurement";
+import {
+  useAngleMeasurement,
+  formatAngleValue,
+  type AngleMeasureResult,
+} from "../composables/useAngleMeasurement";
 import type {
   DxfData,
   DxfLayer,
   PickingEntry,
   EntityAssociation,
+  MeasurePoint,
 } from "dxf-render";
 import {
   getZoomBox,
@@ -375,6 +400,8 @@ import {
   findEntitiesByLayer,
   measureArea,
   measurePerimeter,
+  measureDirectedAngle,
+  toDegrees,
 } from "dxf-render";
 import type {
   OverlayPosition,
@@ -382,6 +409,7 @@ import type {
   RulerUnits,
   MeasureMode,
   AreaUnits,
+  AngleUnits,
 } from "../types";
 import type { AntialiasingMode, GroupLayersByPrefixOptions } from "dxf-render";
 import LayerPanel from "./LayerPanel.vue";
@@ -437,8 +465,10 @@ interface Props {
   measureMode?: MeasureMode;
   showMeasureButton?: boolean;
   showMeasureAreaButton?: boolean;
+  showMeasureAngleButton?: boolean;
   measureUnits?: RulerUnits;
   measureAreaUnits?: AreaUnits;
+  measureAngleUnits?: AngleUnits;
   measureColor?: string;
 }
 
@@ -484,7 +514,9 @@ const props = withDefaults(defineProps<Props>(), {
   measureMode: "none",
   showMeasureButton: false,
   showMeasureAreaButton: false,
+  showMeasureAngleButton: false,
   measureAreaUnits: "auto",
+  measureAngleUnits: "deg",
   measureColor: "#ff6b1a",
 });
 
@@ -505,6 +537,7 @@ interface Emits {
   (e: "update:measureMode", mode: MeasureMode): void;
   (e: "measure", result: MeasureResult): void;
   (e: "measure-area", result: AreaMeasureResult): void;
+  (e: "measure-angle", result: AngleMeasureResult): void;
   (e: "measure-cancel"): void;
 }
 
@@ -562,6 +595,8 @@ const measurement = useMeasurement();
 const measureState = measurement.state;
 const areaMeasurement = useAreaMeasurement();
 const areaState = areaMeasurement.state;
+const angleMeasurement = useAngleMeasurement();
+const angleState = angleMeasurement.state;
 let lastDxfForPicking: DxfData | null = null;
 
 // Currently selected entity surfaced to the built-in PropertiesPanel.
@@ -675,6 +710,10 @@ const handleMeasureAreaResult = (result: AreaMeasureResult): void => {
   emit("measure-area", result);
 };
 
+const handleMeasureAngleResult = (result: AngleMeasureResult): void => {
+  emit("measure-angle", result);
+};
+
 const handleMeasureCancel = (): void => {
   emit("measure-cancel");
 };
@@ -714,12 +753,22 @@ const attachMeasurementIfReady = (): void => {
   areaMeasurement.setColor(props.measureColor);
   areaMeasurement.setUnits(areaUnitScales.value);
 
+  angleMeasurement.attach(renderer.domElement, scene, camera, controls, getOriginOffset, render, {
+    onResult: handleMeasureAngleResult,
+    onCancel: handleMeasureCancel,
+  });
+  angleMeasurement.setColor(props.measureColor);
+  angleMeasurement.setUnits(props.measureAngleUnits);
+
   // Enable whichever tool the initial measureMode selects.
   if (props.measureMode === "distance") {
     measurement.setEnabled(true);
     suspendCompetingTools();
   } else if (props.measureMode === "area") {
     areaMeasurement.setEnabled(true);
+    suspendCompetingTools();
+  } else if (props.measureMode === "angle") {
+    angleMeasurement.setEnabled(true);
     suspendCompetingTools();
   }
 };
@@ -1053,6 +1102,50 @@ const areaLabel = computed<{
   };
 });
 
+// HTML-overlay label for the angle tool, placed just outside the vertex along
+// the angle bisector. Renders the live directed angle once both rays exist
+// (vertex + first ray committed, second ray = cursor while drafting, or the
+// committed third point once closed).
+const angleLabel = computed<{ left: number; top: number; text: string } | null>(() => {
+  void cameraTick.value;
+  const st = angleState.value;
+  const pts = st.points;
+  const vertex = pts[0];
+  if (!vertex) return null;
+  let p1: MeasurePoint | null = null;
+  let p2: MeasurePoint | null = null;
+  if (st.closed && pts.length >= 3) {
+    p1 = pts[1];
+    p2 = pts[2];
+  } else if (pts.length === 2) {
+    p1 = pts[1];
+    p2 = st.hoverWorld;
+  }
+  if (!p1 || !p2) return null;
+  const cam = getCamera();
+  const container = dxfContainer.value;
+  if (!cam || !container) return null;
+  const offset = getOriginOffset();
+  const directed = measureDirectedAngle(vertex, p1, p2);
+  const a1 = Math.atan2(p1.y - vertex.y, p1.x - vertex.x);
+  const bisector = a1 + directed / 2;
+  // Project the vertex to screen, then push the label out along the bisector.
+  const v = new THREE.Vector3(vertex.x - offset.x, vertex.y - offset.y, 0);
+  v.project(cam);
+  const rect = container.getBoundingClientRect();
+  const vLeft = (v.x + 1) * 0.5 * rect.width;
+  const vTop = (-v.y + 1) * 0.5 * rect.height;
+  const pxOut = 44;
+  // Screen Y grows downward, so the world-Y bisector component flips sign.
+  const left = vLeft + Math.cos(bisector) * pxOut;
+  const top = vTop - Math.sin(bisector) * pxOut;
+  return {
+    left,
+    top,
+    text: formatAngleValue(toDegrees(directed), props.measureAngleUnits),
+  };
+});
+
 // Reactive snapshot of the scene's originOffset. `getOriginOffset()` returns a
 // non-reactive object that changes only when a new DXF is rendered, so we mirror
 // it into a ref and refresh after every successful displayDXF() call.
@@ -1312,6 +1405,7 @@ watch(
   (color) => {
     measurement.setColor(color);
     areaMeasurement.setColor(color);
+    angleMeasurement.setColor(color);
   },
 );
 
@@ -1323,14 +1417,21 @@ watch(
 watch(areaUnitScales, (scales) => areaMeasurement.setUnits(scales));
 
 watch(
+  () => props.measureAngleUnits,
+  (units) => angleMeasurement.setUnits(units),
+);
+
+watch(
   () => props.measureMode,
   (mode) => {
     // Disable the non-target tools first — that restores the LEFT mouse button
     // each composable steals — before the target tool steals it again.
     if (mode !== "distance") measurement.setEnabled(false);
     if (mode !== "area") areaMeasurement.setEnabled(false);
+    if (mode !== "angle") angleMeasurement.setEnabled(false);
     if (mode === "distance") measurement.setEnabled(true);
     if (mode === "area") areaMeasurement.setEnabled(true);
+    if (mode === "angle") angleMeasurement.setEnabled(true);
     // Measurement tools intercept clicks before picking / rectangle-selection,
     // so those are suspended while a tool is active and restored on `none`.
     if (mode === "none") restoreCompetingTools();
@@ -1443,6 +1544,7 @@ onBeforeUnmount(() => {
   rectSelection.detach();
   measurement.dispose();
   areaMeasurement.dispose();
+  angleMeasurement.dispose();
   keyboardNav.detach();
   teardownPicking();
   cleanup();
@@ -1456,6 +1558,10 @@ const toggleMeasureDistance = (): void => {
 
 const toggleMeasureArea = (): void => {
   emit("update:measureMode", props.measureMode === "area" ? "none" : "area");
+};
+
+const toggleMeasureAngle = (): void => {
+  emit("update:measureMode", props.measureMode === "angle" ? "none" : "angle");
 };
 
 const setMeasureMode = (mode: MeasureMode): void => {
@@ -1483,6 +1589,7 @@ defineExpose({
   clearMeasure: () => {
     measurement.clear();
     areaMeasurement.clear();
+    angleMeasurement.clear();
   },
   setMeasureMode,
 });
@@ -1708,6 +1815,22 @@ defineExpose({
 .dxfk-measure-area-row--secondary {
   opacity: 0.85;
   font-size: 11px;
+}
+
+.dxfk-measure-angle-label {
+  position: absolute;
+  z-index: 14;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  padding: 2px 8px;
+  background-color: var(--dxfk-measure-color, #ff6b1a);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  user-select: none;
 }
 
 .dxfk-selection-rect {

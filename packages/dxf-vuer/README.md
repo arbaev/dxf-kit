@@ -93,20 +93,24 @@ async function loadFile(file) {
 | `rectangleSelection`         | `boolean`                          | `false`           | Enable modifier-drag rectangle selection. Requires `pickingEnabled` to function (the picking index is the source of bboxes)                                              |
 | `rectangleSelectionModifier` | `"shift" \| "ctrl" \| "alt"`       | `"shift"`         | Modifier key that arms the rectangle drag. While held, OrbitControls panning is suspended and the cursor turns into a crosshair                                          |
 | `rectangleSelectionMode`     | `"auto" \| "window" \| "crossing"` | `"auto"`          | `auto` — drag direction decides (AutoCAD): L→R = window (fully inside), R→L = crossing (any overlap). The other values lock the semantic regardless of drag direction    |
-| `measureMode`                | `MeasureMode`                      | `"none"`          | Named v-model (`v-model:measure-mode`). Selects the active measurement tool. `"distance"` — two-point linear ruler; `"area"` — N-point polygon. The tools are mutually exclusive. See [Measurement tool](#measurement-tool) |
+| `measureMode`                | `MeasureMode`                      | `"none"`          | Named v-model (`v-model:measure-mode`). Selects the active measurement tool. `"distance"` — two-point linear ruler; `"area"` — N-point polygon; `"angle"` — 3-point directed angle. The tools are mutually exclusive. See [Measurement tools](#measurement-tools) |
 | `showMeasureButton`          | `boolean`                          | `false`           | Render a ruler-icon toggle in `<ViewerToolbar>` for the distance tool. Active state via `.dxfk-toolbar-button--active` + `aria-pressed`                                  |
 | `showMeasureAreaButton`      | `boolean`                          | `false`           | Render a polygon-icon toggle in `<ViewerToolbar>` for the area tool                                                                                                     |
+| `showMeasureAngleButton`     | `boolean`                          | `false`           | Render a protractor-icon toggle in `<ViewerToolbar>` for the angle tool                                                                                                 |
 | `measureUnits`               | `RulerUnits`                       | —                 | Override distance-label units independently from `rulerUnits`. When omitted (default), distance labels follow `rulerUnits`                                              |
 | `measureAreaUnits`           | `AreaUnits`                        | `"auto"`          | Square units for the area label. `"auto"` mirrors `rulerUnits` (`mm`→`mm²`, `inch`→`in²`, `dxf-units`→no suffix); `"m²"` / `"ft²"` etc. force an explicit unit. The perimeter uses the matching linear unit |
-| `measureColor`               | `string`                           | `"#ff6b1a"`       | Color of the measurement segments, fill, marker points, and value labels (both tools). Cascades into the `--dxfk-measure-color` CSS custom property                      |
+| `measureAngleUnits`          | `AngleUnits`                       | `"deg"`           | Display format for the angle label: `"deg"` (123.4°), `"rad"` (2.150 rad), or `"dms"` (123°30'15"). Angles are dimensionless — never converted via `$INSUNITS`        |
+| `measureColor`               | `string`                           | `"#ff6b1a"`       | Color of the measurement segments, fill, rays, arc, marker points, and value labels (all three tools). Cascades into the `--dxfk-measure-color` CSS custom property      |
 
 `OverlayPosition` = `"top-left"` | `"top-center"` | `"top-right"` | `"bottom-left"` | `"bottom-center"` | `"bottom-right"`
 
 `RulerUnits` = `"dxf-units"` | `"mm"` | `"inch"`
 
-`MeasureMode` = `"none"` | `"distance"` | `"area"`
+`MeasureMode` = `"none"` | `"distance"` | `"area"` | `"angle"`
 
 `AreaUnits` = `"auto"` | `"mm²"` | `"m²"` | `"in²"` | `"ft²"`
+
+`AngleUnits` = `"deg"` | `"rad"` | `"dms"`
 
 `AntialiasingMode` = `"msaa"` | `"smaa"` | `"fxaa"` | `"taa"` | `"ssaa"` | `"none"`
 
@@ -129,7 +133,7 @@ async function loadFile(file) {
 
 | Slot             | Scoped data                                                  | Description                                            |
 | ---------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
-| `#toolbar`       | `{ resetView, exportToPNG, toggleFullscreen, isFullscreen, measureMode, toggleMeasureDistance, toggleMeasureArea, measureDistanceActive, measureAreaActive }` | Replace entire toolbar |
+| `#toolbar`       | `{ resetView, exportToPNG, toggleFullscreen, isFullscreen, measureMode, toggleMeasureDistance, toggleMeasureArea, toggleMeasureAngle, measureDistanceActive, measureAreaActive, measureAngleActive }` | Replace entire toolbar |
 | `#toolbar-extra` | —                                                            | Add buttons to the existing toolbar                    |
 | `#loading`       | `{ phase, progress }`                                        | Replace loading screen                                 |
 | `#error`         | `{ message, retry }`                                         | Replace error screen                                   |
@@ -173,7 +177,8 @@ async function loadFile(file) {
 | `update:measureMode`   | `MeasureMode`          | Sent when a toolbar measurement button toggles or `setMeasureMode()` is called. Powers `v-model:measure-mode`                    |
 | `measure`              | `MeasureResult`        | Fires after the second click of a distance measurement. Payload: `{ kind: "distance", p1, p2, valueRaw, value, units }` (`value` is scaled to displayed units, `valueRaw` is in raw DXF units) |
 | `measure-area`         | `AreaMeasureResult`    | Fires when an area polygon is closed (≥3 vertices). Payload: `{ points, areaRaw, area, perimeterRaw, perimeter, areaUnits, lengthUnits, selfIntersecting }` (`*Raw` are in raw DXF units, scaled values use `measureAreaUnits`) |
-| `measure-cancel`       | —                      | Fires on <kbd>Esc</kbd> / toggling off either tool while a measurement draft was in flight                                       |
+| `measure-angle`        | `AngleMeasureResult`   | Fires when the third point of an angle measurement is placed. Payload: `{ vertex, p1, p2, radians, degrees, reflex, units }` (`radians`/`degrees` are the directed CCW sweep in `[0, 360)`; `reflex` is true when `> 180°`) |
+| `measure-cancel`       | —                      | Fires on <kbd>Esc</kbd> / toggling off a tool while a measurement draft was in flight                                            |
 
 ## DXFViewer Methods (via `ref`)
 
@@ -195,7 +200,7 @@ async function loadFile(file) {
 | `zoomToEntity(handles: string[])`          | Fit the camera to the union of the entities' bboxes, with 20% padding. Requires `pickingEnabled` |
 | `zoomToLayer(layerName: string)`           | Fit the camera to all entities on the given layer. Requires `pickingEnabled`. Layer names are case-sensitive (DXF spec) |
 | `getPickingIndex()`                        | Returns the underlying `PickingIndex \| null`. Useful for filtering external search results (e.g. from `findEntitiesByText`) to entities that are actually rendered in the scene |
-| `clearMeasure()`                           | Clear any in-flight or completed measurement overlay (distance + area) from the canvas without firing `measure-cancel` |
+| `clearMeasure()`                           | Clear any in-flight or completed measurement overlay (distance, area, and angle) from the canvas without firing `measure-cancel` |
 | `setMeasureMode(mode: MeasureMode)`        | Emit `update:measureMode` with the given mode — same code path the toolbar buttons use, useful for binding keyboard shortcuts |
 
 ```vue
@@ -584,22 +589,29 @@ When `showRulers` is on, the overlay grid receives `padding-top: 24px; padding-l
 
 ## Measurement tools
 
-Two mutually-exclusive on-canvas tools, selected via `v-model:measure-mode`:
+Three mutually-exclusive on-canvas tools, selected via `v-model:measure-mode`:
 
 - **`"distance"`** — click point A, click point B, see the Euclidean distance.
 - **`"area"`** — click N vertices to draw a polygon, close it, and read its area + perimeter.
+- **`"angle"`** — click the vertex, then two points to define the rays; read the directed angle (CCW, `[0°, 360°)`) on the bisector. Move the cursor past the first ray to pick the angle or its reflex.
 
-In both tools the geometry (segments, polygon fill, markers) lives in the Three.js scene so it follows pan / zoom natively; the numbers are rendered as positioned HTML labels. Completed measurements stay visible until the next interaction.
+In all three tools the geometry (segments, polygon fill, rays, arc, markers) lives in the Three.js scene so it follows pan / zoom natively; the numbers are rendered as positioned HTML labels. Completed measurements stay visible until the next interaction.
 
 ```vue
 <script setup>
 import { ref } from "vue";
 import { DXFViewer } from "dxf-vuer";
-import type { MeasureMode, MeasureResult, AreaMeasureResult } from "dxf-vuer";
+import type {
+  MeasureMode,
+  MeasureResult,
+  AreaMeasureResult,
+  AngleMeasureResult,
+} from "dxf-vuer";
 
 const measureMode = ref<MeasureMode>("none");
 const lastDistance = ref<MeasureResult | null>(null);
 const lastArea = ref<AreaMeasureResult | null>(null);
+const lastAngle = ref<AngleMeasureResult | null>(null);
 </script>
 
 <template>
@@ -608,11 +620,14 @@ const lastArea = ref<AreaMeasureResult | null>(null);
     v-model:measure-mode="measureMode"
     :show-measure-button="true"
     :show-measure-area-button="true"
+    :show-measure-angle-button="true"
     :show-rulers="true"
     ruler-units="mm"
     measure-area-units="m²"
+    measure-angle-units="deg"
     @measure="lastDistance = $event"
     @measure-area="lastArea = $event"
+    @measure-angle="lastAngle = $event"
   />
   <p v-if="lastDistance">
     Distance: {{ lastDistance.value.toFixed(2) }} {{ lastDistance.units }}
@@ -620,6 +635,9 @@ const lastArea = ref<AreaMeasureResult | null>(null);
   <p v-if="lastArea">
     Area: {{ lastArea.area.toFixed(2) }} {{ lastArea.areaUnits }} ·
     Perimeter: {{ lastArea.perimeter.toFixed(2) }} {{ lastArea.lengthUnits }}
+  </p>
+  <p v-if="lastAngle">
+    Angle: {{ lastAngle.degrees.toFixed(1) }}°{{ lastAngle.reflex ? " (reflex)" : "" }}
   </p>
 </template>
 ```
@@ -646,11 +664,22 @@ const lastArea = ref<AreaMeasureResult | null>(null);
 
 The area is the absolute Shoelace value; self-intersecting polygons are reported as-is with `selfIntersecting: true` in the result so you can warn the user if you want. `measureAreaUnits` controls the square units (`"auto"` mirrors `rulerUnits`); the perimeter uses the matching linear unit.
 
-`measureColor` controls the color of both tools (segments, polygon fill, markers, labels).
+The angle tool takes exactly three clicks:
+
+| State  | Angle overlay                                  | Behavior                                                                     |
+| ------ | ---------------------------------------------- | --------------------------------------------------------------------------- |
+| empty  | nothing                                        | Click → vertex (apex) → **one**                                             |
+| one    | preview ray vertex → cursor                    | Click → first ray endpoint → **two**                                       |
+| two    | both rays + directed arc + live angle label    | Move cursor → angle / arc update (picks angle vs reflex). Click → **closed**, fires `measure-angle` |
+| closed | final rays + arc + label                       | Click → starts a new measurement. <kbd>Backspace</kbd> undoes a point, <kbd>Esc</kbd> clears |
+
+The reported angle is **directed** (CCW from the first ray to the second), so it covers the full `[0°, 360°)` range — `reflex: true` marks results over 180°. `measureAngleUnits` controls the label format (`"deg"` / `"rad"` / `"dms"`); angles never go through `$INSUNITS`.
+
+`measureColor` controls the color of all three tools (segments, polygon fill, rays, arc, markers, labels).
 
 ### Interaction with pan / zoom
 
-While either tool is active, the viewer rebinds the mouse so left-click places points instead of panning:
+While any measurement tool is active, the viewer rebinds the mouse so left-click places points instead of panning:
 
 - **Left-click** → place point (composable temporarily nulls `controls.mouseButtons.LEFT`, restores on exit)
 - **Middle / right-button drag** → pan (unchanged)
