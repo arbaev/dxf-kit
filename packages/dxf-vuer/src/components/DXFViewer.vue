@@ -1239,7 +1239,12 @@ const retry = () => {
 const initLayersFromDXF = (dxf: DxfData, darkTheme?: boolean) => {
   const dxfLayers = (dxf.tables?.layer?.layers || {}) as Record<string, DxfLayer>;
   const entityLayerCounts: Record<string, number> = {};
-  for (const entity of dxf.entities) {
+  // Count via the same flat index used by findEntitiesByLayer (hover highlight):
+  // top-level entities, INSERT ATTRIBs, and entities defined inside blocks.
+  // This keeps the panel count consistent with hover and correctly counts
+  // layers (e.g. Defpoints) whose entities live only inside block definitions.
+  const index = buildEntityIndex(dxf);
+  for (const entity of index.values()) {
     const layerName = entity.layer || "0";
     entityLayerCounts[layerName] = (entityLayerCounts[layerName] || 0) + 1;
   }
