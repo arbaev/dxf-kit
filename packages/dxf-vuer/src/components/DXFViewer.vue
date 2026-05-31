@@ -1056,9 +1056,17 @@ const handleLoadError = (error: unknown, fallbackMsg: string) => {
   emit("dxf-data", null);
 };
 
+/** Clear any in-flight or completed measurement overlays (distance / angle / area). */
+const clearMeasurements = () => {
+  measurement.clear();
+  areaMeasurement.clear();
+  angleMeasurement.clear();
+};
+
 const loadDXFFromText = async (dxfText: string) => {
   clearError();
   selectedEntity.value = null;
+  clearMeasurements();
   isLoading.value = true;
   try {
     loadingPhase.value = "parsing";
@@ -1091,6 +1099,7 @@ const loadDXFFromText = async (dxfText: string) => {
 const loadDXFFromData = async (dxfData: DxfData) => {
   clearError();
   selectedEntity.value = null;
+  clearMeasurements();
   isLoading.value = true;
   loadingPhase.value = "rendering";
   loadedDxfRef.value = dxfData;
@@ -1414,11 +1423,7 @@ defineExpose({
   zoomToEntity,
   zoomToLayer,
   getPickingIndex: picking.getPickingIndex,
-  clearMeasure: () => {
-    measurement.clear();
-    areaMeasurement.clear();
-    angleMeasurement.clear();
-  },
+  clearMeasure: clearMeasurements,
   setMeasureMode,
 });
 </script>
