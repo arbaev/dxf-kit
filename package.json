@@ -7,8 +7,7 @@
     "dev:react": "pnpm --filter dxf-react-playground dev",
     "build": "pnpm --filter dxf-render build && pnpm --filter dxf-vuer build && pnpm --filter dxf-react build",
     "build:demo": "pnpm --filter dxf-vuer-demo build",
-    "build:playground": "pnpm --filter dxf-react-playground build",
-    "build:site": "pnpm build:demo && pnpm build:playground",
+    "build:site": "pnpm build:demo",
     "preview": "pnpm --filter dxf-vuer-demo preview",
     "test": "pnpm -r --parallel run test",
     "test:watch": "pnpm -r --parallel run test -- --watch"

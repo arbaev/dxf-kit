@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 — Page Not Found | dxf-kit</title>
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Honour the site's manual dark-theme toggle (stored in localStorage by
+      // useDarkTheme.ts), falling back to the OS preference when nothing is
+      // stored — same rule as the rest of the site. Runs before paint to avoid
+      // a flash of the wrong theme.
+      (function () {
+        try {
+          var v = localStorage.getItem("dxf-vuer-demo:dark-theme");
+          var dark = v === "1" || (v === null && matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) {
+            document.documentElement.classList.add("dark");
+            // Also paint the root background immediately so navigating here from a
+            // dark page doesn't flash white before the body styles apply.
+            document.documentElement.style.backgroundColor = "#121212";
+          }
+        } catch (e) {
+          /* localStorage / matchMedia may be unavailable */
+        }
+      })();
+    </script>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
+          "Helvetica Neue", sans-serif;
+        background: #fafafa;
+        color: #212121;
+      }
+      .code {
+        font-size: 5rem;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -2px;
+        color: #1040b0;
+      }
+      h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 12px 0 8px;
+      }
+      p {
+        color: #757575;
+        margin-bottom: 24px;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+      }
+      a {
+        display: inline-block;
+        padding: 10px 20px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.95rem;
+      }
+      .primary {
+        background: #1040b0;
+        color: #fff;
+      }
+      .ghost {
+        border: 1px solid #e0e0e0;
+        color: #212121;
+      }
+      a:hover {
+        opacity: 0.9;
+      }
+      .dark body {
+        background: #121212;
+        color: #e0e0e0;
+      }
+      .dark .code {
+        color: #2563eb;
+      }
+      .dark p {
+        color: #999;
+      }
+      .dark .ghost {
+        border-color: #333;
+        color: #e0e0e0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="code">404</div>
+      <h1>Page not found</h1>
+      <p>That page doesn’t exist. Let’s get you back to rendering DXF drawings.</p>
+      <div class="actions">
+        <a class="primary" href="/">← Back to dxf-kit</a>
+        <a class="ghost" href="/vue">Vue</a>
+        <a class="ghost" href="/react">React</a>
+      </div>
+    </main>
+  </body>
+</html>

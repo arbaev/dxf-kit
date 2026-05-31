@@ -31,6 +31,23 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Dark theme tokens — applied on any page root that gets the `.dark` class
+   (neutral landing's .app and the per-framework landing's .fw-page). Kept global
+   so every demo page shares one palette. */
+.dark {
+  /* Saturated primary that still passes WCAG AA on dark surfaces.
+     #1040b0 on #121212 is ~3.4:1 (fails); #2563eb on #121212 is ~4.6:1. */
+  --primary-color: #2563eb;
+  --bg-color: #121212;
+  --text-color: #e0e0e0;
+  --text-secondary: #999;
+  --border-color: #333;
+  --accent-bg: #1a2744;
+  --input-bg: #1e1e1e;
+  --card-bg: #1e1e1e;
+  color: var(--text-color);
+}
+
 body {
   margin: 0;
   min-height: 100vh;

@@ -16,22 +16,13 @@
         vector-effect="non-scaling-stroke"
       />
     </svg>
-    <div class="hero-switch" role="group" aria-label="Choose framework wrapper">
-      <span class="hero-switch-item hero-switch-item--active" aria-current="page">Vue 3</span>
-      <a
-        class="hero-switch-item"
-        :href="reactHref"
-        @click="trackEvent('framework-demo', { framework: 'react' })"
-        >React&nbsp;→</a
-      >
-    </div>
     <h1>Render AutoCAD DXF Drawings in&nbsp;the&nbsp;Browser</h1>
     <p class="hero-subtitle">
-      TypeScript DXF parser and Three.js WebGL renderer. Use standalone with React, Svelte, or
-      vanilla JS — or as a drop-in Vue&nbsp;3 component.
+      A TypeScript DXF parser and Three.js WebGL renderer. Framework-agnostic core with drop-in
+      components for Vue, React, and Web&nbsp;Components.
     </p>
     <div class="hero-install-wrapper">
-      <code class="hero-install">npm install dxf-vuer dxf-render three</code>
+      <code class="hero-install">npm install dxf-render three</code>
       <button class="copy-btn" aria-label="Copy install command" @click="copyInstallCommand">
         <svg
           v-if="!copied"
@@ -62,6 +53,9 @@
         </svg>
       </button>
     </div>
+    <p class="hero-stack-link">
+      <a href="#stack">↓ Use it with your framework — Vue, React, or vanilla JS</a>
+    </p>
   </section>
 </template>
 
@@ -70,10 +64,6 @@ import { ref } from "vue";
 import { trackEvent } from "../analytics";
 
 const copied = ref(false);
-
-// In production both demos live in one deploy → relative /react/. In dev they are
-// separate Vite servers (Vue 5173, React 5174), so point at the React dev port.
-const reactHref = import.meta.env.DEV ? "http://localhost:5174/" : "/react/";
 
 const BG_W = 1200;
 const BG_H = 520;
@@ -132,12 +122,12 @@ const triangles = buildTriangles();
 
 async function copyInstallCommand() {
   try {
-    await navigator.clipboard.writeText("npm install dxf-vuer dxf-render three");
+    await navigator.clipboard.writeText("npm install dxf-render three");
     copied.value = true;
     setTimeout(() => (copied.value = false), 2000);
   } catch {
     const el = document.createElement("textarea");
-    el.value = "npm install dxf-vuer dxf-render three";
+    el.value = "npm install dxf-render three";
     document.body.appendChild(el);
     el.select();
     document.execCommand("copy");
@@ -180,42 +170,19 @@ async function copyInstallCommand() {
 
 /* Dark theme uses same opacity as light; --primary-color is already redefined for dark in App.vue */
 
-.hero-switch {
-  display: inline-flex;
-  align-items: stretch;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 999px;
-  background: var(--accent-bg, #f0f4ff);
-  margin-bottom: var(--spacing-md);
-  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+.hero-stack-link {
+  margin-top: var(--spacing-sm);
+  font-size: 0.9rem;
 }
 
-.hero-switch-item {
-  padding: 3px 14px;
-  border-radius: 999px;
+.hero-stack-link a {
   color: var(--primary-color);
   text-decoration: none;
-  transition:
-    background-color 0.15s,
-    color 0.15s;
+  font-weight: 600;
 }
 
-.hero-switch-item--active {
-  background: var(--primary-color);
-  color: #fff;
-}
-
-a.hero-switch-item:hover {
-  background: rgba(74, 144, 217, 0.12);
-}
-
-a.hero-switch-item:focus-visible {
-  outline: 2px solid var(--primary-color);
-  outline-offset: 2px;
+.hero-stack-link a:hover {
+  text-decoration: underline;
 }
 
 .hero h1 {

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Set the dark background before the app bundle loads so full-page
+      // navigations don't flash white in dark mode (mirrors useDarkTheme.ts).
+      (function () {
+        try {
+          var v = localStorage.getItem("dxf-vuer-demo:dark-theme");
+          if (v === "1" || (v === null && matchMedia("(prefers-color-scheme: dark)").matches)) {
+            document.documentElement.style.backgroundColor = "#121212";
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <title>Vue 3 DXF Viewer Component — dxf-vuer | dxf-kit</title>
+    <meta
+      name="description"
+      content="Render AutoCAD DXF drawings in Vue 3 with dxf-vuer — a drop-in <DXFViewer> component over a Three.js/WebGL engine. Layers, measure, export, dark theme."
+    />
+    <meta
+      name="keywords"
+      content="vue dxf viewer, vue dxf, dxf viewer component, vue 3 cad, dxf-vuer, autocad vue, view dxf vue"
+    />
+    <link rel="canonical" href="https://dxf-kit.netlify.app/vue" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Vue 3 DXF Viewer Component — dxf-vuer" />
+    <meta
+      property="og:description"
+      content="A drop-in Vue 3 <DXFViewer> component for AutoCAD DXF drawings, built on a Three.js/WebGL engine."
+    />
+    <meta property="og:url" content="https://dxf-kit.netlify.app/vue" />
+    <meta property="og:image" content="https://dxf-kit.netlify.app/og-image.png" />
+    <meta property="og:site_name" content="dxf-kit" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Vue 3 DXF Viewer Component — dxf-vuer" />
+    <meta
+      name="twitter:description"
+      content="A drop-in Vue 3 <DXFViewer> component for AutoCAD DXF drawings."
+    />
+    <meta name="twitter:image" content="https://dxf-kit.netlify.app/og-image.png" />
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "dxf-vuer",
+        "description": "Vue 3 DXF viewer component — render AutoCAD DXF drawings in the browser with Three.js. A thin wrapper over the framework-agnostic dxf-render engine.",
+        "url": "https://dxf-kit.netlify.app/vue",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Web Browser",
+        "softwareRequirements": "Vue 3",
+        "license": "https://opensource.org/licenses/MIT",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="dxf-kit" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Umami analytics (proxied through Netlify, see netlify.toml) -->
+    <script
+      defer
+      src="/script.js"
+      data-website-id="717922e7-0a26-45bf-9b01-2e78ef3e0db2"
+      data-host-url="https://dxf-kit.netlify.app"
+    ></script>
+  </head>
+  <body>
+    <div id="app" data-framework="vue"></div>
+    <script type="module" src="/framework-main.ts"></script>
+  </body>
+</html>

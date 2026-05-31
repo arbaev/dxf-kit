@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Set the dark background before the app bundle loads so full-page
+      // navigations don't flash white in dark mode (mirrors useDarkTheme.ts).
+      (function () {
+        try {
+          var v = localStorage.getItem("dxf-vuer-demo:dark-theme");
+          if (v === "1" || (v === null && matchMedia("(prefers-color-scheme: dark)").matches)) {
+            document.documentElement.style.backgroundColor = "#121212";
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <title>DXF Viewer Web Component (Lit) — dxf-lit | dxf-kit</title>
+    <meta
+      name="description"
+      content="A framework-agnostic <dxf-viewer> Web Component for AutoCAD DXF drawings, built on a Three.js/WebGL engine. Coming soon."
+    />
+    <meta
+      name="keywords"
+      content="dxf web component, dxf viewer web component, lit dxf, dxf-lit, framework agnostic dxf, custom element dxf"
+    />
+    <link rel="canonical" href="https://dxf-kit.netlify.app/lit" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="DXF Viewer Web Component (Lit) — dxf-lit" />
+    <meta
+      property="og:description"
+      content="A framework-agnostic <dxf-viewer> Web Component for AutoCAD DXF drawings. Coming soon."
+    />
+    <meta property="og:url" content="https://dxf-kit.netlify.app/lit" />
+    <meta property="og:image" content="https://dxf-kit.netlify.app/og-image.png" />
+    <meta property="og:site_name" content="dxf-kit" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="DXF Viewer Web Component (Lit) — dxf-lit" />
+    <meta
+      name="twitter:description"
+      content="A framework-agnostic <dxf-viewer> Web Component for AutoCAD DXF drawings. Coming soon."
+    />
+    <meta name="twitter:image" content="https://dxf-kit.netlify.app/og-image.png" />
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "dxf-lit",
+        "description": "A framework-agnostic DXF viewer Web Component — render AutoCAD DXF drawings in any stack with Three.js. Built on the dxf-render engine. Coming soon.",
+        "url": "https://dxf-kit.netlify.app/lit",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Web Browser",
+        "softwareRequirements": "Web Components",
+        "license": "https://opensource.org/licenses/MIT",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="dxf-kit" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Umami analytics (proxied through Netlify, see netlify.toml) -->
+    <script
+      defer
+      src="/script.js"
+      data-website-id="717922e7-0a26-45bf-9b01-2e78ef3e0db2"
+      data-host-url="https://dxf-kit.netlify.app"
+    ></script>
+  </head>
+  <body>
+    <div id="app" data-framework="lit"></div>
+    <script type="module" src="/framework-main.ts"></script>
+  </body>
+</html>

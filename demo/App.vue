@@ -627,6 +627,7 @@
       </section>
 
       <StatsSection />
+      <FrameworkTabs />
       <FeaturesSection />
       <WhatsNewSection />
       <ExamplesSection />
@@ -647,6 +648,14 @@
           rel="noopener noreferrer"
           @click="trackEvent('external-link', { target: 'npm-vuer' })"
           >dxf-vuer</a
+        >
+        &middot;
+        <a
+          href="https://www.npmjs.com/package/dxf-react"
+          target="_blank"
+          rel="noopener noreferrer"
+          @click="trackEvent('external-link', { target: 'npm-react' })"
+          >dxf-react</a
         >
         &middot;
         <a
@@ -682,6 +691,7 @@ import StatsSection from "./components/StatsSection.vue";
 import FeaturesSection from "./components/FeaturesSection.vue";
 import WhatsNewSection from "./components/WhatsNewSection.vue";
 import ExamplesSection from "./components/ExamplesSection.vue";
+import FrameworkTabs from "./components/FrameworkTabs.vue";
 import { trackEvent } from "./analytics";
 
 const THEME_STORAGE_KEY = "dxf-vuer-demo:dark-theme";
@@ -2224,21 +2234,9 @@ const resetView = () => {
   outline-offset: 2px;
 }
 
-/* Dark theme */
-.app.dark {
-  /* Saturated primary that still passes WCAG AA on dark surfaces.
-     #1040b0 on #121212 is ~3.4:1 (fails); #2563eb on #121212 is ~4.6:1. */
-  --primary-color: #2563eb;
-  --bg-color: #121212;
-  --text-color: #e0e0e0;
-  --text-secondary: #999;
-  --border-color: #333;
-  --accent-bg: #1a2744;
-  --input-bg: #1e1e1e;
-  --card-bg: #1e1e1e;
-  color: var(--text-color);
-}
-
+/* Dark theme tokens live in demo/style.css (.dark) so they apply to every demo
+   page (neutral landing + per-framework landings), not just this component.
+   Component-specific dark overrides stay below. */
 .app.dark .top-action-btn {
   background: #1e1e1e;
   border-color: #444;

@@ -41,8 +41,8 @@ const examples = [
   {
     framework: "react",
     title: "React",
-    description: "DXF viewer as a React component with useEffect, useRef, and Three.js rendering.",
-    url: `${STACKBLITZ_BASE}/react?file=src/DxfViewer.tsx&title=dxf-render+React`,
+    description: "Drop-in DXF viewer using the dxf-react component — dark theme, layers, and export.",
+    url: `${STACKBLITZ_BASE}/react?file=src/App.tsx&title=dxf-react+React`,
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="2"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/></svg>',
   },
   {

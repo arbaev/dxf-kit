@@ -20,11 +20,11 @@ export function trackEvent(
 ): void;
 export function trackEvent(
   name: "framework-demo",
-  props: { framework: "react" | "vue" },
+  props: { framework: "vanilla" | "vue" | "react" | "lit" },
 ): void;
 export function trackEvent(
   name: "external-link",
-  props: { target: "github" | "npm-render" | "npm-vuer" },
+  props: { target: "github" | "npm-render" | "npm-vuer" | "npm-react" },
 ): void;
 export function trackEvent(
   name: "dxf-error",

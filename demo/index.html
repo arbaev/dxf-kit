@@ -3,6 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Set the dark background before the app bundle loads so full-page
+      // navigations don't flash white in dark mode (mirrors useDarkTheme.ts).
+      (function () {
+        try {
+          var v = localStorage.getItem("dxf-vuer-demo:dark-theme");
+          if (v === "1" || (v === null && matchMedia("(prefers-color-scheme: dark)").matches)) {
+            document.documentElement.style.backgroundColor = "#121212";
+          }
+        } catch (e) {}
+      })();
+    </script>
     <title>dxf-kit — DXF Viewer for the Web | Live Demo</title>
     <meta name="description" content="View AutoCAD DXF files in the browser. Custom parser, Three.js/WebGL rendering, framework-agnostic core with Vue 3 wrapper." />
     <meta name="keywords" content="dxf viewer, dxf viewer online, vue dxf, autocad viewer, cad viewer online, view dxf, dxf browser" />
