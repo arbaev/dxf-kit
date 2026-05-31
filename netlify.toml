@@ -1,7 +1,10 @@
 # Netlify configuration for dxf-kit
 
 [build]
-  command = "pnpm install && pnpm build && pnpm build:demo"
+  # build → render+vuer+react dist; build:site → Vue demo into dist-demo/ then
+  # React playground into dist-demo/react/ (order matters: demo first, it wipes
+  # dist-demo; playground writes the /react/ subdir). Served at / and /react/.
+  command = "pnpm install && pnpm build && pnpm build:site"
 
   publish = "dist-demo"
 
@@ -21,6 +24,14 @@
   status = 200
   force = true
 
+# React playground SPA fallback — must precede the catch-all so /react/* falls
+# back to the React index, not the Vue one. Real files (/react/assets/*) are
+# served directly regardless.
+[[redirects]]
+  from = "/react/*"
+  to = "/react/index.html"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -37,5 +48,10 @@
 
 [[headers]]
   for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/react/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"

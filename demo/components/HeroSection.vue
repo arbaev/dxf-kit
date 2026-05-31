@@ -16,7 +16,15 @@
         vector-effect="non-scaling-stroke"
       />
     </svg>
-    <span class="hero-brand">dxf-render · dxf-vuer</span>
+    <div class="hero-switch" role="group" aria-label="Choose framework wrapper">
+      <span class="hero-switch-item hero-switch-item--active" aria-current="page">Vue 3</span>
+      <a
+        class="hero-switch-item"
+        :href="reactHref"
+        @click="trackEvent('framework-demo', { framework: 'react' })"
+        >React&nbsp;→</a
+      >
+    </div>
     <h1>Render AutoCAD DXF Drawings in&nbsp;the&nbsp;Browser</h1>
     <p class="hero-subtitle">
       TypeScript DXF parser and Three.js WebGL renderer. Use standalone with React, Svelte, or
@@ -62,6 +70,10 @@ import { ref } from "vue";
 import { trackEvent } from "../analytics";
 
 const copied = ref(false);
+
+// In production both demos live in one deploy → relative /react/. In dev they are
+// separate Vite servers (Vue 5173, React 5174), so point at the React dev port.
+const reactHref = import.meta.env.DEV ? "http://localhost:5174/" : "/react/";
 
 const BG_W = 1200;
 const BG_H = 520;
@@ -168,17 +180,42 @@ async function copyInstallCommand() {
 
 /* Dark theme uses same opacity as light; --primary-color is already redefined for dark in App.vue */
 
-.hero-brand {
-  display: inline-block;
+.hero-switch {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--accent-bg, #f0f4ff);
+  margin-bottom: var(--spacing-md);
   font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--primary-color);
-  background: var(--accent-bg, #f0f4ff);
-  padding: 4px 12px;
-  border-radius: 999px;
-  margin-bottom: var(--spacing-md);
   letter-spacing: 0.5px;
+}
+
+.hero-switch-item {
+  padding: 3px 14px;
+  border-radius: 999px;
+  color: var(--primary-color);
+  text-decoration: none;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.hero-switch-item--active {
+  background: var(--primary-color);
+  color: #fff;
+}
+
+a.hero-switch-item:hover {
+  background: rgba(74, 144, 217, 0.12);
+}
+
+a.hero-switch-item:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
 }
 
 .hero h1 {

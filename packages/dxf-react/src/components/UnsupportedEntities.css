@@ -1,0 +1,122 @@
+/* Intentional warning palette (amber). Override .dxfk-unsupported to recolor. */
+.dxfk-unsupported {
+  background-color: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: var(--dxfk-border-radius, 4px);
+  padding: var(--dxfk-spacing-md, 16px);
+  margin: var(--dxfk-spacing-md, 16px);
+}
+
+.dxfk-unsupported-header {
+  display: flex;
+  align-items: center;
+  gap: var(--dxfk-spacing-sm, 8px);
+  margin-bottom: var(--dxfk-spacing-sm, 8px);
+}
+
+.dxfk-unsupported-icon {
+  flex-shrink: 0;
+  color: #ff9800;
+}
+
+.dxfk-unsupported-title {
+  flex: 1;
+  font-weight: 600;
+  color: #856404;
+  font-size: 14px;
+}
+
+.dxfk-unsupported-toggle {
+  padding: 4px 12px;
+  font-size: 12px;
+  background-color: white;
+  border: 1px solid #ffc107;
+  border-radius: var(--dxfk-border-radius, 4px);
+  color: #856404;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.dxfk-unsupported-toggle:hover {
+  background-color: #ffc107;
+  color: white;
+}
+
+.dxfk-unsupported-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: var(--dxfk-spacing-sm, 8px);
+  padding: var(--dxfk-spacing-sm, 8px);
+  background-color: white;
+  border-radius: var(--dxfk-border-radius, 4px);
+  border: 1px solid #ffc107;
+}
+
+.dxfk-unsupported-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--dxfk-spacing-sm, 8px);
+  padding: 4px 0;
+  font-size: 13px;
+  color: #856404;
+}
+
+.dxfk-unsupported-bullet {
+  flex-shrink: 0;
+  font-weight: bold;
+}
+
+.dxfk-unsupported-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+.dxfk-unsupported-footer {
+  margin-top: var(--dxfk-spacing-sm, 8px);
+  padding-top: var(--dxfk-spacing-sm, 8px);
+  border-top: 1px solid #ffc107;
+}
+
+.dxfk-unsupported-note {
+  font-size: 12px;
+  color: #856404;
+  font-style: italic;
+}
+
+.dxfk-unsupported-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dxfk-unsupported-list::-webkit-scrollbar-track {
+  background: #fff3cd;
+  border-radius: 3px;
+}
+
+.dxfk-unsupported-list::-webkit-scrollbar-thumb {
+  background: #ffc107;
+  border-radius: 3px;
+}
+
+.dxfk-unsupported-list::-webkit-scrollbar-thumb:hover {
+  background: #ff9800;
+}
+
+@media (max-width: 768px) {
+  .dxfk-unsupported {
+    padding: var(--dxfk-spacing-sm, 8px);
+    margin: var(--dxfk-spacing-sm, 8px);
+  }
+
+  .dxfk-unsupported-title {
+    font-size: 13px;
+  }
+
+  .dxfk-unsupported-item {
+    font-size: 12px;
+  }
+
+  .dxfk-unsupported-list {
+    max-height: 150px;
+  }
+}

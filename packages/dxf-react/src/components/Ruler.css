@@ -1,0 +1,34 @@
+.dxfk-ruler {
+  position: absolute;
+  z-index: 11;
+  pointer-events: none;
+  background-color: var(--dxfk-ruler-bg, #fafafa);
+  overflow: hidden;
+}
+
+.dxfk-ruler-h {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--dxfk-ruler-size, 24px);
+}
+
+.dxfk-ruler-v {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--dxfk-ruler-size, 24px);
+}
+
+.dxfk-ruler canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dxfk-ruler.dxfk-dark {
+  --dxfk-ruler-bg: #1f1f1f;
+  --dxfk-ruler-text: #ddd;
+  --dxfk-ruler-tick: #888;
+  --dxfk-ruler-cursor: #ffaa00;
+}

@@ -19,6 +19,10 @@ export function trackEvent(
   props: { framework: "vanilla-ts" | "react" | "vue" | "leaflet-dxf" | "dxf-to-pdf" },
 ): void;
 export function trackEvent(
+  name: "framework-demo",
+  props: { framework: "react" | "vue" },
+): void;
+export function trackEvent(
   name: "external-link",
   props: { target: "github" | "npm-render" | "npm-vuer" },
 ): void;

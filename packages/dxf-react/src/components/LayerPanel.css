@@ -1,0 +1,405 @@
+.dxfk-layer-panel {
+  background-color: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--dxfk-border-color, #e0e0e0);
+  border-radius: var(--dxfk-border-radius, 4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  max-width: 260px;
+  pointer-events: auto;
+}
+
+.dxfk-layer-panel--collapsed {
+  max-height: none;
+}
+
+.dxfk-layer-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--dxfk-border-color, #e0e0e0);
+  flex-shrink: 0;
+}
+
+.dxfk-layer-panel--collapsed .dxfk-layer-panel-header {
+  border-bottom: none;
+}
+
+.dxfk-layer-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dxfk-text-color, #212121);
+}
+
+.dxfk-layer-panel-collapse {
+  background: none;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--dxfk-text-secondary, #757575);
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.dxfk-layer-panel-body {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dxfk-layer-panel-actions {
+  display: flex;
+  gap: 4px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--dxfk-border-color, #e0e0e0);
+  flex-shrink: 0;
+}
+
+.dxfk-layer-panel-action {
+  padding: 2px 8px;
+  font-size: 11px;
+  background: none;
+  border: 1px solid var(--dxfk-border-color, #e0e0e0);
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--dxfk-text-secondary, #757575);
+  transition: all 0.15s;
+}
+
+.dxfk-layer-panel-action:hover {
+  border-color: var(--dxfk-primary-color, #1040b0);
+  color: var(--dxfk-primary-color, #1040b0);
+}
+
+.dxfk-layer-filter-wrapper {
+  position: relative;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--dxfk-border-color, #e0e0e0);
+  flex-shrink: 0;
+}
+
+.dxfk-layer-filter {
+  width: 100%;
+  padding: 3px 22px 3px 6px;
+  font-size: 11px;
+  border: 1px solid var(--dxfk-border-color, #e0e0e0);
+  border-radius: 3px;
+  background: white;
+  color: var(--dxfk-text-color, #212121);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.dxfk-layer-filter:focus {
+  border-color: var(--dxfk-primary-color, #1040b0);
+}
+
+.dxfk-layer-filter::placeholder {
+  color: var(--dxfk-text-secondary, #757575);
+}
+
+.dxfk-layer-filter-clear {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--dxfk-text-secondary, #757575);
+}
+
+.dxfk-layer-filter-clear:hover {
+  color: var(--dxfk-text-color, #212121);
+}
+
+.dxfk-layer-empty {
+  padding: 8px 10px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--dxfk-text-secondary, #757575);
+  text-align: center;
+}
+
+.dxfk-layer-list {
+  overflow-y: auto;
+  max-height: 300px;
+  padding: 2px 0;
+}
+
+.dxfk-layer-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  font-size: 12px;
+}
+
+.dxfk-layer-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.dxfk-layer-item--hidden {
+  opacity: 0.5;
+}
+
+.dxfk-layer-item--frozen {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.dxfk-layer-item--in-group {
+  padding-left: 22px;
+}
+
+.dxfk-layer-group {
+  border-top: 1px solid var(--dxfk-border-color, #e0e0e0);
+}
+
+.dxfk-layer-group:first-child {
+  border-top: none;
+}
+
+.dxfk-layer-group-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 4px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dxfk-text-secondary, #757575);
+  background-color: rgba(0, 0, 0, 0.025);
+  transition: background-color 0.15s;
+}
+
+.dxfk-layer-group-header:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.dxfk-layer-group-collapse {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--dxfk-text-secondary, #757575);
+}
+
+.dxfk-layer-group-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dxfk-text-color, #212121);
+  letter-spacing: 0.02em;
+}
+
+.dxfk-layer-group-count {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--dxfk-text-secondary, #757575);
+  white-space: nowrap;
+}
+
+.dxfk-layer-group-toggle {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dxfk-text-color, #212121);
+  border-radius: 3px;
+  transition: background-color 0.15s;
+}
+
+.dxfk-layer-group-toggle:hover:not(:disabled) {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.dxfk-layer-group-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.dxfk-layer-group-toggle--all-hidden {
+  color: var(--dxfk-text-secondary, #757575);
+}
+
+.dxfk-layer-group-toggle--mixed {
+  color: var(--dxfk-text-color, #212121);
+  opacity: 0.7;
+}
+
+.dxfk-layer-group-body {
+  padding: 2px 0;
+}
+
+.dxfk-layer-icon-eye {
+  flex-shrink: 0;
+  color: var(--dxfk-text-color, #212121);
+}
+
+.dxfk-layer-icon-eye--off {
+  color: var(--dxfk-text-secondary, #757575);
+}
+
+.dxfk-layer-icon-frozen {
+  flex-shrink: 0;
+  color: #5ba3d9;
+}
+
+.dxfk-layer-icon-lock {
+  flex-shrink: 0;
+  color: var(--dxfk-text-secondary, #757575);
+}
+
+.dxfk-layer-swatch {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.dxfk-layer-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dxfk-text-color, #212121);
+}
+
+.dxfk-layer-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--dxfk-text-secondary, #757575);
+}
+
+/* Dark theme — applied when the panel root carries `.dxfk-dark`. */
+.dxfk-layer-panel.dxfk-dark {
+  background-color: rgba(30, 30, 30, 0.95);
+  border-color: #444;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-panel-header {
+  border-bottom-color: #444;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-panel-title {
+  color: #e0e0e0;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-panel-collapse {
+  color: #aaa;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-panel-actions {
+  border-bottom-color: #444;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-panel-action {
+  border-color: #555;
+  color: #aaa;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-panel-action:hover {
+  border-color: #6b8fd4;
+  color: #6b8fd4;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-item:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-icon-eye {
+  color: #e0e0e0;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-icon-eye--off {
+  color: #666;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-name {
+  color: #e0e0e0;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-count {
+  color: #888;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-swatch {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-group {
+  border-top-color: #444;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-group-header {
+  background-color: rgba(255, 255, 255, 0.04);
+  color: #aaa;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-group-header:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-group-name {
+  color: #e0e0e0;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-group-count,
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-group-collapse {
+  color: #888;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-group-toggle {
+  color: #e0e0e0;
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-group-toggle:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dxfk-layer-panel.dxfk-dark .dxfk-layer-group-toggle--all-hidden {
+  color: #666;
+}
+
+@media (max-width: 768px) {
+  .dxfk-layer-panel {
+    min-width: 150px;
+    max-width: 200px;
+    max-height: 40%;
+  }
+
+  .dxfk-layer-list {
+    max-height: 200px;
+  }
+}

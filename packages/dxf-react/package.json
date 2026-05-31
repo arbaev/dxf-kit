@@ -1,0 +1,84 @@
+{
+  "name": "dxf-react",
+  "version": "0.1.0",
+  "description": "React DXF file viewer — render AutoCAD DXF drawings in the browser with Three.js. Built-in parser, vector text rendering, TypeScript support.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Timur Arbaev",
+  "homepage": "https://dxf-kit.netlify.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arbaev/dxf-kit.git",
+    "directory": "packages/dxf-react"
+  },
+  "bugs": {
+    "url": "https://github.com/arbaev/dxf-kit/issues"
+  },
+  "keywords": [
+    "react",
+    "dxf",
+    "dxf-viewer",
+    "dxf-renderer",
+    "dxf-parser",
+    "dxf-three",
+    "render-dxf",
+    "viewer",
+    "parser",
+    "cad",
+    "cad-viewer",
+    "autocad",
+    "threejs",
+    "three.js",
+    "webgl",
+    "engineering",
+    "drawing",
+    "technical-drawing",
+    "blueprint",
+    "typescript"
+  ],
+  "main": "./dist/dxf-react-index.es.js",
+  "module": "./dist/dxf-react-index.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/dxf-react-index.es.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && vite build",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "dxf-render": "^1.6.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "three": ">=0.160.0"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.182.0",
+    "@vitejs/plugin-react": "^4.5.2",
+    "dxf-render": "workspace:*",
+    "jsdom": "^26.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.182.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.0.18"
+  }
+}

@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/dxf-render" },
     { "path": "./packages/dxf-vuer" },
+    { "path": "./packages/dxf-react" },
     { "path": "./demo" }
   ]
 }

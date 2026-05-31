@@ -4,8 +4,11 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "pnpm --filter dxf-vuer-demo dev",
-    "build": "pnpm --filter dxf-render build && pnpm --filter dxf-vuer build",
+    "dev:react": "pnpm --filter dxf-react-playground dev",
+    "build": "pnpm --filter dxf-render build && pnpm --filter dxf-vuer build && pnpm --filter dxf-react build",
     "build:demo": "pnpm --filter dxf-vuer-demo build",
+    "build:playground": "pnpm --filter dxf-react-playground build",
+    "build:site": "pnpm build:demo && pnpm build:playground",
     "preview": "pnpm --filter dxf-vuer-demo preview",
     "test": "pnpm -r --parallel run test",
     "test:watch": "pnpm -r --parallel run test -- --watch"

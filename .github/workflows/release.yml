@@ -5,6 +5,7 @@ on:
     tags:
       - "dxf-render@*"
       - "dxf-vuer@*"
+      - "dxf-react@*"
 
 permissions:
   contents: write

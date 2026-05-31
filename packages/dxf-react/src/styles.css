@@ -1,0 +1,35 @@
+/*
+ * dxf-kit CSS custom properties.
+ * Consumers can override via :root or a wrapper container.
+ * Example:
+ *   :root {
+ *     --dxfk-primary-color: #ff6600;
+ *     --dxfk-border-radius: 8px;
+ *   }
+ *
+ * The `--dxfk-*` prefix is intentionally framework-neutral so any wrapper
+ * shares the same variable surface.
+ *
+ * Component styles (`.dxfk-*` hook classes) are imported per-component from
+ * their co-located `.css` files (see each component in `./components/`).
+ */
+:root {
+  --dxfk-primary-color: #1040b0;
+  --dxfk-error-color: #f44336;
+  --dxfk-bg-color: #fafafa;
+  --dxfk-text-color: #212121;
+  --dxfk-text-secondary: #757575;
+  --dxfk-border-color: #e0e0e0;
+  --dxfk-border-radius: 4px;
+  --dxfk-spacing-xs: 4px;
+  --dxfk-spacing-sm: 8px;
+  --dxfk-spacing-md: 16px;
+  --dxfk-spacing-lg: 24px;
+
+  /* Ruler appearance. */
+  --dxfk-ruler-size: 24px;
+  --dxfk-ruler-bg: #fafafa;
+  --dxfk-ruler-text: #333;
+  --dxfk-ruler-tick: #999;
+  --dxfk-ruler-cursor: #1040b0;
+}

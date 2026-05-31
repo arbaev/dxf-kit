@@ -1,0 +1,48 @@
+.dxfk-file-uploader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dxfk-spacing-sm, 8px);
+  flex: 1;
+  max-width: 420px;
+}
+
+.dxfk-file-input {
+  display: none;
+}
+
+.dxfk-file-input-label {
+  cursor: pointer;
+}
+
+.dxfk-file-uploader-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dxfk-spacing-sm, 8px);
+  padding: var(--dxfk-spacing-sm, 8px) var(--dxfk-spacing-md, 16px);
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--dxfk-border-radius, 4px);
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s;
+  user-select: none;
+  backdrop-filter: blur(10px);
+}
+
+.dxfk-file-uploader-button:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.dxfk-file-uploader-button:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 768px) {
+  .dxfk-file-uploader-button {
+    padding: var(--dxfk-spacing-sm, 8px);
+    justify-content: center;
+  }
+}

@@ -10,6 +10,7 @@
   "include": [
     "packages/dxf-render/vite.config.ts",
     "packages/dxf-vuer/vite.config.ts",
+    "packages/dxf-react/vite.config.ts",
     "demo/vite.config.ts",
     "vitest.workspace.ts",
     "packages/dxf-render/vite-plugins/**/*.ts",

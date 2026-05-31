@@ -1,0 +1,61 @@
+.dxfk-toolbar {
+  display: flex;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.dxfk-toolbar-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--dxfk-spacing-sm, 8px);
+  color: var(--dxfk-text-color, #212121);
+  border: 1px solid var(--dxfk-border-color, #e0e0e0);
+  border-radius: var(--dxfk-border-radius, 4px);
+  transition: all 0.2s;
+  user-select: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+}
+
+.dxfk-toolbar-button:hover {
+  border-color: rgb(from var(--dxfk-primary-color, #1040b0) r g b / 0.5);
+}
+
+.dxfk-toolbar-button:active {
+  transform: scale(0.94);
+}
+
+.dxfk-toolbar-button--active {
+  background-color: var(--dxfk-primary-color, #1040b0);
+  border-color: var(--dxfk-primary-color, #1040b0);
+  color: #fff;
+}
+
+.dxfk-toolbar-button--active:hover {
+  border-color: var(--dxfk-primary-color, #1040b0);
+}
+
+.dxfk-toolbar.dxfk-dark .dxfk-toolbar-button {
+  background-color: rgba(30, 30, 30, 0.95);
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+.dxfk-toolbar.dxfk-dark .dxfk-toolbar-button--active {
+  background-color: var(--dxfk-primary-color, #2563eb);
+  border-color: var(--dxfk-primary-color, #2563eb);
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .dxfk-toolbar-button {
+    padding: 6px;
+  }
+
+  .dxfk-toolbar-button svg {
+    width: 18px;
+    height: 18px;
+  }
+}
