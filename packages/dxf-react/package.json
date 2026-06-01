@@ -16,8 +16,12 @@
   },
   "keywords": [
     "react",
+    "react-component",
+    "react-dxf",
+    "react-dxf-viewer",
     "dxf",
     "dxf-viewer",
+    "dxf-react",
     "dxf-renderer",
     "dxf-parser",
     "dxf-three",

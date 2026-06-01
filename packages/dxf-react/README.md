@@ -5,9 +5,18 @@
 [![license](https://img.shields.io/npm/l/dxf-react)](https://github.com/arbaev/dxf-kit/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
-React component for viewing DXF files in the browser. Thin wrapper around [dxf-render](https://www.npmjs.com/package/dxf-render) — the same engine that powers [dxf-vuer](https://www.npmjs.com/package/dxf-vuer).
+**React DXF viewer component** — render AutoCAD DXF drawings in the browser. A thin, fully typed wrapper around [dxf-render](https://www.npmjs.com/package/dxf-render), the framework-agnostic Three.js/WebGL engine that also powers [dxf-vuer](https://www.npmjs.com/package/dxf-vuer).
 
-[Live Demo](https://dxf-kit.netlify.app) | [GitHub](https://github.com/arbaev/dxf-kit)
+[Live Demo](https://dxf-kit.netlify.app/react) | [GitHub](https://github.com/arbaev/dxf-kit) | [Open in StackBlitz](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/react?file=src/App.tsx&title=dxf-react+React)
+
+## Why dxf-react?
+
+- **One tag** — drop in `<DXFViewer>` with typed props, refs, and callbacks
+- **Runs in the browser** — DXF is parsed client-side in a Web Worker; no backend, no AutoCAD, nothing uploaded
+- **21 entity types** — lines, arcs, splines, hatches, dimensions, leaders, multilines, and block inserts with attributes
+- **Crisp vector text** — triangulated opentype.js glyphs stay sharp at any zoom
+- **Interactive** — pan, zoom, layer toggles, measure tools, dark theme, and PNG export
+- **TypeScript-native** — fully typed props with `onEntityHover` / `onEntityClick` callbacks over the [dxf-render](https://www.npmjs.com/package/dxf-render) engine
 
 ## Installation
 

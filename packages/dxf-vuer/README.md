@@ -6,11 +6,20 @@
 [![license](https://img.shields.io/npm/l/dxf-vuer)](https://github.com/arbaev/dxf-kit/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
-Vue 3 component for viewing DXF files in the browser. Thin wrapper around [dxf-render](https://www.npmjs.com/package/dxf-render).
+**Vue 3 DXF viewer component** — render AutoCAD DXF drawings in the browser. A thin, fully typed wrapper around [dxf-render](https://www.npmjs.com/package/dxf-render), the framework-agnostic Three.js/WebGL engine.
 
-[Live Demo](https://dxf-kit.netlify.app) | [GitHub](https://github.com/arbaev/dxf-kit) | [Open in StackBlitz](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vue?file=src/App.vue&title=dxf-vuer+Vue+3)
+[Live Demo](https://dxf-kit.netlify.app/vue) | [GitHub](https://github.com/arbaev/dxf-kit) | [Open in StackBlitz](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vue?file=src/App.vue&title=dxf-vuer+Vue+3)
 
 ![screenshot](https://raw.githubusercontent.com/arbaev/dxf-kit/main/docs/dxf-kit-basic-patterns.jpg)
+
+## Why dxf-vuer?
+
+- **One tag** — drop in `<DXFViewer>` with reactive props, `v-model`, and slots
+- **Runs in the browser** — DXF is parsed client-side in a Web Worker; no backend, no AutoCAD, nothing uploaded
+- **21 entity types** — lines, arcs, splines, hatches, dimensions, leaders, multilines, and block inserts with attributes
+- **Crisp vector text** — triangulated opentype.js glyphs stay sharp at any zoom
+- **Interactive** — pan, zoom, layer toggles, measure tools, dark theme, and PNG export
+- **TypeScript-native** — fully typed props with `entity-hover` / `entity-click` events over the [dxf-render](https://www.npmjs.com/package/dxf-render) engine
 
 ## Installation
 

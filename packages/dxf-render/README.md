@@ -5,11 +5,11 @@
 [![license](https://img.shields.io/npm/l/dxf-render)](https://github.com/arbaev/dxf-kit/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
-Framework-agnostic DXF parser and Three.js renderer. Use with React, Svelte, vanilla JS, or any framework.
+Framework-agnostic **AutoCAD DXF parser and Three.js/WebGL renderer** for the browser, written in TypeScript. Use it standalone with React, Vue, Svelte, vanilla JS, or any framework — or parser-only in Node.js.
 
 [Live Demo](https://dxf-kit.netlify.app) — upload your DXF and see the rendering quality.
 
-Try it now on StackBlitz: [Vanilla TS](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vanilla-ts?file=src/main.ts&title=dxf-render+Vanilla+TS) | [React](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/react?file=src/DxfViewer.tsx&title=dxf-render+React) | [Vue](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vue?file=src/App.vue&title=dxf-vuer+Vue+3) | [Leaflet + DXF](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/leaflet-dxf?file=src/main.ts&title=dxf-render+Leaflet) | [DXF to PDF](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/dxf-to-pdf?file=src/main.ts&title=dxf-render+PDF+Export)
+Try it now on StackBlitz: [Vanilla TS](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vanilla-ts?file=src/main.ts&title=dxf-render+Vanilla+TS) | [React](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/react?file=src/App.tsx&title=dxf-render+React) | [Vue](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vue?file=src/App.vue&title=dxf-vuer+Vue+3) | [Leaflet + DXF](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/leaflet-dxf?file=src/main.ts&title=dxf-render+Leaflet) | [DXF to PDF](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/dxf-to-pdf?file=src/main.ts&title=dxf-render+PDF+Export)
 
 For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer) package.
 

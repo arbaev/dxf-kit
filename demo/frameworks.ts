@@ -6,6 +6,24 @@
 
 export type FrameworkId = "vanilla" | "vue" | "react" | "lit";
 
+/** A single capability bullet shown in the "What you get" grid. */
+export interface FeatureItem {
+  title: string;
+  body: string;
+}
+
+/** Compact "key props" hint shown under the snippet, in the framework's casing. */
+export interface PropsHint {
+  props: string[];
+  events: string;
+}
+
+/** One FAQ entry — also mirrored into FAQPage JSON-LD in the page head. */
+export interface FaqItem {
+  q: string;
+  a: string;
+}
+
 export interface FrameworkInfo {
   id: FrameworkId;
   /** Display name, e.g. "React". */
@@ -32,6 +50,44 @@ export interface FrameworkInfo {
   blurb: string;
   /** Per-page SEO metadata (also baked statically into the page's HTML head). */
   meta: { title: string; description: string };
+  /** "What you get" capability grid shown under the live viewer (optional). */
+  features?: FeatureItem[];
+  /** Compact key-props caption shown under the snippet (optional). */
+  propsHint?: PropsHint;
+  /** FAQ entries shown near the foot of the page; mirrored into FAQPage JSON-LD. */
+  faq?: FaqItem[];
+}
+
+// The capability bullets below the framework name describe the shared engine, so
+// they are identical across wrappers — only the leading "drop-in component" bullet
+// is framework-specific. Keep these in sync with the home page FeaturesSection and
+// the package READMEs.
+const ENGINE_FEATURES: FeatureItem[] = [
+  {
+    title: "Pan, zoom, layers & export",
+    body: "Toggle layer visibility, measure distances, areas and angles, pan and zoom, switch to a dark theme, and export the view to PNG.",
+  },
+  {
+    title: "21 DXF entity types",
+    body: "Lines, arcs, circles, splines, hatches, dimensions, leaders, multilines and block inserts with attributes — rendered accurately from the DXF.",
+  },
+  {
+    title: "Crisp vector text",
+    body: "Text stays sharp at any zoom via triangulated opentype.js glyphs, with MTEXT formatting, stacked fractions and custom fonts.",
+  },
+  {
+    title: "Runs in the browser",
+    body: "Files are parsed client-side in a Web Worker. No backend, no AutoCAD, nothing uploaded — your drawings never leave the device.",
+  },
+  {
+    title: "Powered by dxf-render",
+    body: "The same framework-agnostic TypeScript and Three.js/WebGL engine behind every wrapper, with full type definitions included.",
+  },
+];
+
+/** Prepend the framework-specific component bullet to the shared engine features. */
+function featuresWith(componentBullet: FeatureItem): FeatureItem[] {
+  return [componentBullet, ...ENGINE_FEATURES];
 }
 
 const STACKBLITZ_BASE = "https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples";
@@ -103,8 +159,34 @@ import "dxf-vuer/style.css";
     meta: {
       title: "Vue 3 DXF Viewer Component — dxf-vuer | dxf-kit",
       description:
-        "Render AutoCAD DXF drawings in Vue 3 with dxf-vuer — a drop-in <DXFViewer> component over a Three.js/WebGL engine. Layers, measure, export, dark theme.",
+        "Render AutoCAD DXF drawings in Vue 3 with dxf-vuer — a drop-in <DXFViewer> component on a Three.js/WebGL engine. Layers, measure, export, dark theme. No backend.",
     },
+    features: featuresWith({
+      title: "Drop-in Vue 3 component",
+      body: "One <DXFViewer> tag with reactive props, v-model and slots — the whole viewer, no wiring.",
+    }),
+    propsHint: {
+      props: ["url", "show-rulers", "show-layer-panel", "dark-theme"],
+      events: "@entity-hover / @entity-click",
+    },
+    faq: [
+      {
+        q: "How do I view a DXF file in Vue 3?",
+        a: "Install dxf-vuer, import the <DXFViewer> component and its stylesheet, then pass a url (or a parsed DXF). Pan, zoom, layers and measurement work out of the box — no extra setup.",
+      },
+      {
+        q: "Does dxf-vuer need a backend or AutoCAD?",
+        a: "No. The DXF is parsed and rendered entirely in the browser with WebGL — nothing is uploaded to a server, and AutoCAD is not required.",
+      },
+      {
+        q: "Which DXF entities are supported?",
+        a: "21 entity types, including lines, arcs, circles, splines, hatches, dimensions, leaders, multilines and block inserts with attributes — rendered by the shared dxf-render engine.",
+      },
+      {
+        q: "Is dxf-vuer written in TypeScript?",
+        a: "Yes. Props, events and the underlying dxf-render API are fully typed, and the package ships its own type definitions.",
+      },
+    ],
   },
   {
     id: "react",
@@ -128,8 +210,34 @@ export default function Viewer() {
     meta: {
       title: "React DXF Viewer Component — dxf-react | dxf-kit",
       description:
-        "Render AutoCAD DXF drawings in React with dxf-react — a <DXFViewer> component over a Three.js/WebGL engine. Layers, measure, export, dark theme.",
+        "Render AutoCAD DXF drawings in React with dxf-react — a <DXFViewer> component on a Three.js/WebGL engine. Layers, measure, export, dark theme. No backend.",
     },
+    features: featuresWith({
+      title: "Drop-in React component",
+      body: "One <DXFViewer> tag with typed props, refs and callbacks — the whole viewer, no wiring.",
+    }),
+    propsHint: {
+      props: ["url", "showRulers", "showLayerPanel", "darkTheme"],
+      events: "onEntityHover / onEntityClick",
+    },
+    faq: [
+      {
+        q: "How do I view a DXF file in React?",
+        a: "Install dxf-react, import the <DXFViewer> component and its stylesheet, then pass a url (or load text through a ref). Pan, zoom, layers and measurement work out of the box — no extra setup.",
+      },
+      {
+        q: "Does dxf-react need a backend or AutoCAD?",
+        a: "No. The DXF is parsed and rendered entirely in the browser with WebGL — nothing is uploaded to a server, and AutoCAD is not required.",
+      },
+      {
+        q: "Which DXF entities are supported?",
+        a: "21 entity types, including lines, arcs, circles, splines, hatches, dimensions, leaders, multilines and block inserts with attributes — rendered by the shared dxf-render engine.",
+      },
+      {
+        q: "Is dxf-react written in TypeScript?",
+        a: "Yes. Props, refs and callbacks are fully typed, and the package ships its own type definitions.",
+      },
+    ],
   },
   {
     id: "lit",
@@ -155,6 +263,10 @@ export default function Viewer() {
       description:
         "A framework-agnostic <dxf-viewer> Web Component for AutoCAD DXF drawings, built on a Three.js/WebGL engine. Coming soon.",
     },
+    features: featuresWith({
+      title: "Framework-agnostic Web Component",
+      body: "One <dxf-viewer> custom element for any stack — Lit, plain HTML, or no framework at all. (Coming soon.)",
+    }),
   },
 ];
 

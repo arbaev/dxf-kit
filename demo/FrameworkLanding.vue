@@ -68,6 +68,13 @@
       <!-- Integration snippet -->
       <CodeBlock :code="fw.snippet" :lang="fw.lang" class="fw-code" />
 
+      <!-- Key props caption -->
+      <p v-if="fw.propsHint" class="fw-props">
+        <span class="fw-props-label">Key props</span>
+        <code v-for="p in fw.propsHint.props" :key="p" class="fw-prop">{{ p }}</code>
+        <span class="fw-props-events">+ {{ fw.propsHint.events }}</span>
+      </p>
+
       <!-- Live viewer (same engine across all wrappers) -->
       <p class="fw-live-label">
         <template v-if="fw.status === 'coming-soon'"
@@ -77,6 +84,17 @@
         drag to pan, scroll to zoom.
       </p>
       <MiniViewer :url="DEMO_SAMPLE_URL" :dark="isDark" />
+
+      <!-- What you get -->
+      <section v-if="fw.features" class="fw-features" aria-labelledby="fw-features-h">
+        <h2 id="fw-features-h" class="fw-section-h">What you get</h2>
+        <div class="fw-feature-grid">
+          <div v-for="f in fw.features" :key="f.title" class="fw-feature">
+            <h3>{{ f.title }}</h3>
+            <p>{{ f.body }}</p>
+          </div>
+        </div>
+      </section>
 
       <!-- Links -->
       <div class="fw-links">
@@ -107,6 +125,15 @@
           >{{ fw.status === "coming-soon" ? "Watch the repo" : "GitHub" }}</a
         >
       </div>
+
+      <!-- FAQ (mirrored into FAQPage JSON-LD in the page head) -->
+      <section v-if="fw.faq" class="fw-faq" aria-labelledby="fw-faq-h">
+        <h2 id="fw-faq-h" class="fw-section-h">Frequently asked questions</h2>
+        <div v-for="item in fw.faq" :key="item.q" class="fw-faq-item">
+          <h3 class="fw-faq-q">{{ item.q }}</h3>
+          <p class="fw-faq-a">{{ item.a }}</p>
+        </div>
+      </section>
 
       <footer class="fw-footer">
         MIT License ·
@@ -372,6 +399,101 @@ a.fw-nav-item:hover {
   text-decoration: none;
 }
 
+/* Key props caption */
+.fw-props {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 auto var(--spacing-lg);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.fw-props-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.7rem;
+}
+
+.fw-prop {
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 0.78rem;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--accent-bg, #f0f4ff);
+  color: var(--primary-color);
+}
+
+.fw-props-events {
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 0.78rem;
+}
+
+/* Section heading shared by "What you get" and FAQ */
+.fw-section-h {
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: var(--spacing-md);
+}
+
+/* What you get */
+.fw-features {
+  margin-top: var(--spacing-xl);
+}
+
+.fw-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+}
+
+.fw-feature {
+  padding: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--card-bg, #fff);
+}
+
+.fw-feature h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--text-color);
+}
+
+.fw-feature p {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* FAQ */
+.fw-faq {
+  margin-top: var(--spacing-xl);
+}
+
+.fw-faq-item {
+  border-bottom: 1px solid var(--border-color);
+  padding: var(--spacing-md) 0;
+}
+
+.fw-faq-q {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-color);
+  margin-bottom: 6px;
+}
+
+.fw-faq-a {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
 @media (max-width: 768px) {
   .fw-main {
     padding: 2rem var(--spacing-md) 3rem;
@@ -379,6 +501,10 @@ a.fw-nav-item:hover {
 
   .fw-hero h1 {
     font-size: 1.5rem;
+  }
+
+  .fw-feature-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

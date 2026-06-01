@@ -18,11 +18,11 @@
     <title>React DXF Viewer Component — dxf-react | dxf-kit</title>
     <meta
       name="description"
-      content="Render AutoCAD DXF drawings in React with dxf-react — a <DXFViewer> component over a Three.js/WebGL engine. Layers, measure, export, dark theme."
+      content="Render AutoCAD DXF drawings in React with dxf-react — a <DXFViewer> component on a Three.js/WebGL engine. Layers, measure, export, dark theme. No backend."
     />
     <meta
       name="keywords"
-      content="react dxf viewer, react dxf, dxf viewer component, react cad, dxf-react, autocad react, view dxf react"
+      content="react dxf viewer, react dxf viewer component, dxf viewer react, view dxf in react, react autocad viewer, react cad viewer, dxf-react"
     />
     <link rel="canonical" href="https://dxf-kit.netlify.app/react" />
 
@@ -59,6 +59,48 @@
         "softwareRequirements": "React 18+",
         "license": "https://opensource.org/licenses/MIT",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+
+    <!-- FAQ (mirrors the visible FAQ on the page; keep in sync with frameworks.ts) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How do I view a DXF file in React?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Install dxf-react, import the <DXFViewer> component and its stylesheet, then pass a url (or load text through a ref). Pan, zoom, layers and measurement work out of the box — no extra setup."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does dxf-react need a backend or AutoCAD?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. The DXF is parsed and rendered entirely in the browser with WebGL — nothing is uploaded to a server, and AutoCAD is not required."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which DXF entities are supported?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "21 entity types, including lines, arcs, circles, splines, hatches, dimensions, leaders, multilines and block inserts with attributes — rendered by the shared dxf-render engine."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is dxf-react written in TypeScript?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Props, refs and callbacks are fully typed, and the package ships its own type definitions."
+            }
+          }
+        ]
       }
     </script>
 
