@@ -37,15 +37,9 @@ export type MeasureMode = "none" | "distance" | "area" | "angle";
  */
 export type AreaUnits = "auto" | "mm²" | "m²" | "in²" | "ft²";
 
-/**
- * Display format for the angle-measurement label. Angles are dimensionless, so
- * (unlike linear / area units) this never goes through `$INSUNITS`.
- *
- * - `"deg"` — decimal degrees, e.g. `123.4°` (default).
- * - `"rad"` — radians, e.g. `2.150 rad`.
- * - `"dms"` — degrees-minutes-seconds, e.g. `123°30'15"`.
- */
-export type AngleUnits = "deg" | "rad" | "dms";
+// `AngleUnits` is owned by dxf-interaction (the angle-measurement controller
+// depends on it); re-exported here so the public type name stays stable.
+export type { AngleUnits } from "dxf-interaction";
 
 /**
  * Headless UI-style class map for DXFViewer's named UI parts.

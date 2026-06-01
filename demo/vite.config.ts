@@ -88,6 +88,7 @@ export default defineConfig(({ command }) => {
         ? {
             "dxf-vuer/style.css": path.resolve(__dirname, "../packages/dxf-vuer/src/styles.css"),
             "dxf-vuer": path.resolve(__dirname, "../packages/dxf-vuer/src/index.ts"),
+            "dxf-interaction": path.resolve(__dirname, "../packages/dxf-interaction/src/index.ts"),
             "dxf-render": path.resolve(__dirname, "../packages/dxf-render/src/index.ts"),
             // dxf-render's source files use the "@/" alias to refer to their
             // own ./src — reproduce it here so Vite can follow those imports.

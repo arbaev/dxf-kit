@@ -6,7 +6,7 @@ import {
   worldPerPixel,
   ensurePositionCapacity,
   isPanGesture,
-} from "../usePointerTool";
+} from "../pointerTool";
 
 /** Symmetric orthographic frustum, matching `useCamera` defaults. */
 function makeCamera(): THREE.OrthographicCamera {

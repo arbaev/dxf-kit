@@ -64,6 +64,9 @@
     "build": "vue-tsc -p tsconfig.build.json && vite build",
     "test": "vitest run"
   },
+  "dependencies": {
+    "dxf-interaction": "workspace:*"
+  },
   "peerDependencies": {
     "dxf-render": "^1.5.0",
     "three": ">=0.160.0",

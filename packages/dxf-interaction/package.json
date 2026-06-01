@@ -1,0 +1,69 @@
+{
+  "name": "dxf-interaction",
+  "version": "0.1.0",
+  "description": "Framework-agnostic DXF viewer interaction controllers (measure / snap / picking / highlight / rectangle-select) built on dxf-render + Three.js. Shared by dxf-vuer and dxf-react.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Timur Arbaev",
+  "homepage": "https://dxf-kit.netlify.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arbaev/dxf-kit.git",
+    "directory": "packages/dxf-interaction"
+  },
+  "bugs": {
+    "url": "https://github.com/arbaev/dxf-kit/issues"
+  },
+  "keywords": [
+    "dxf",
+    "dxf-viewer",
+    "interaction",
+    "measure",
+    "measurement",
+    "snap",
+    "picking",
+    "highlight",
+    "selection",
+    "three",
+    "three.js",
+    "threejs",
+    "cad",
+    "typescript"
+  ],
+  "main": "./dist/dxf-interaction-index.es.js",
+  "module": "./dist/dxf-interaction-index.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/dxf-interaction-index.es.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && vite build",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "dxf-render": ">=1.6.0",
+    "three": ">=0.160.0"
+  },
+  "peerDependenciesMeta": {
+    "three": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/three": "^0.182.0",
+    "dxf-render": "workspace:*",
+    "three": "^0.182.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.0.18"
+  }
+}

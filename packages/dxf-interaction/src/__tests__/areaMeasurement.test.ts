@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatAreaValue } from "../useAreaMeasurement";
+import { formatAreaValue } from "../areaMeasurement";
 
 describe("formatAreaValue", () => {
   describe("with a unit suffix", () => {

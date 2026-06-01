@@ -62,6 +62,9 @@
     "build": "tsc -p tsconfig.build.json && vite build",
     "test": "vitest run"
   },
+  "dependencies": {
+    "dxf-interaction": "workspace:*"
+  },
   "peerDependencies": {
     "dxf-render": "^1.6.0",
     "react": ">=18.0.0",

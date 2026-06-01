@@ -13,6 +13,7 @@ export default defineConfig(({ command }) => {
     ? {
         "dxf-react/style.css": path.resolve(__dirname, "../../packages/dxf-react/src/styles.css"),
         "dxf-react": path.resolve(__dirname, "../../packages/dxf-react/src/index.ts"),
+        "dxf-interaction": path.resolve(__dirname, "../../packages/dxf-interaction/src/index.ts"),
         "dxf-render": path.resolve(__dirname, "../../packages/dxf-render/src/index.ts"),
         "@/": path.resolve(__dirname, "../../packages/dxf-render/src") + "/",
       }

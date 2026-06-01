@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatMeasureValue } from "../useMeasurement";
+import { formatMeasureValue } from "../measurement";
 
 describe("formatMeasureValue", () => {
   describe("mm units", () => {

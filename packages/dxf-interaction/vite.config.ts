@@ -1,11 +1,9 @@
-import { defineConfig } from "vite";
-import vue from "@vitejs/plugin-vue";
+import { defineConfig } from "vitest/config";
 import dts from "vite-plugin-dts";
 import path from "path";
 
 export default defineConfig({
   plugins: [
-    vue(),
     dts({
       tsconfigPath: "./tsconfig.build.json",
       outDir: "dist",
@@ -23,14 +21,12 @@ export default defineConfig({
         index: path.resolve(__dirname, "src/index.ts"),
       },
       formats: ["es"],
-      fileName: (format, entryName) => `dxf-vuer-${entryName}.${format}.js`,
-      cssFileName: "style",
+      fileName: (format, entryName) => `dxf-interaction-${entryName}.${format}.js`,
     },
     rollupOptions: {
-      external: ["vue", /^three/, /^dxf-render/, /^dxf-interaction/],
+      external: [/^three/, /^dxf-render/],
     },
     sourcemap: false,
-    cssCodeSplit: false,
   },
   test: {
     include: ["src/**/__tests__/**/*.test.ts"],

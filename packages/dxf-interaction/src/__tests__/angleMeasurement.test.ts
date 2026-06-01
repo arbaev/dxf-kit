@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatAngleValue } from "../useAngleMeasurement";
+import { formatAngleValue } from "../angleMeasurement";
 
 describe("formatAngleValue", () => {
   describe("degrees", () => {

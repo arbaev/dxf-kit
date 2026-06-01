@@ -27,7 +27,7 @@ export default defineConfig({
       cssFileName: "style",
     },
     rollupOptions: {
-      external: ["react", "react-dom", "react/jsx-runtime", /^three/, /^dxf-render/],
+      external: ["react", "react-dom", "react/jsx-runtime", /^three/, /^dxf-render/, /^dxf-interaction/],
     },
     sourcemap: false,
     cssCodeSplit: false,

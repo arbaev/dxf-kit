@@ -3,7 +3,7 @@ import {
   resolveSelectionMode,
   normaliseScreenRect,
   buildWorldRect,
-} from "../useRectangleSelection";
+} from "../rectangleSelection";
 
 describe("resolveSelectionMode", () => {
   it("returns 'window' when locked regardless of direction", () => {

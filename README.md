@@ -5,13 +5,13 @@
 
 Parse and render AutoCAD DXF files in the browser. Custom parser, Three.js rendering, 21 entity types, vector text, hatch patterns.
 
-#### [Core engine `dxf-render`](packages/dxf-render/) | [Vue 3 component `dxf-vuer`](packages/dxf-vuer/) | [Live Demo Viewer](https://dxf-kit.netlify.app)
+#### [Core engine `dxf-render`](packages/dxf-render/) | [Vue 3 `dxf-vuer`](packages/dxf-vuer/) | [React `dxf-react`](packages/dxf-react/) | [Live Demo Viewer](https://dxf-kit.netlify.app)
 
 ![screenshot](https://raw.githubusercontent.com/arbaev/dxf-kit/main/docs/dxf-kit-house-plan.jpg)
 
 ## Packages
 
-This monorepo contains two npm packages. Choose the one that fits your stack:
+This monorepo publishes three packages for consumers — choose the one that fits your stack. (A fourth, [`dxf-interaction`](packages/dxf-interaction/), is a shared internal layer the Vue/React wrappers pull in automatically; you won't install it directly.)
 
 ### [`dxf-render`](packages/dxf-render/) — framework-agnostic engine
 
@@ -75,6 +75,42 @@ async function loadFile(file) {
 ```
 
 [Full documentation →](packages/dxf-vuer/)
+
+---
+
+### [`dxf-react`](packages/dxf-react/) — React component
+
+[![npm](https://img.shields.io/npm/v/dxf-react)](https://www.npmjs.com/package/dxf-react)
+[![npm downloads](https://img.shields.io/npm/dm/dxf-react)](https://www.npmjs.com/package/dxf-react)
+
+React 18+ wrapper around `dxf-render` — a 1:1 port of `dxf-vuer` over the same engine. Drop-in `<DXFViewer>` with the same layer panel, dark theme, drag-and-drop, PNG export, picking, measurement tools, and rulers; Vue's `v-model` / scoped slots become controlled props + render-props.
+
+```bash
+npm install dxf-react dxf-render three
+```
+
+```tsx
+import { useState } from "react";
+import { DXFViewer, parseDxf, type DxfData } from "dxf-react";
+import "dxf-react/style.css";
+
+export default function App() {
+  const [dxfData, setDxfData] = useState<DxfData | null>(null);
+
+  async function loadFile(file: File) {
+    setDxfData(parseDxf(await file.text()));
+  }
+
+  return (
+    <>
+      <input type="file" accept=".dxf" onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
+      <DXFViewer dxfData={dxfData} showResetButton style={{ width: "100%", height: 600 }} />
+    </>
+  );
+}
+```
+
+[Full documentation →](packages/dxf-react/)
 
 ## Features
 
