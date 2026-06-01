@@ -25,6 +25,10 @@ defineProps<{ url: string; dark: boolean }>();
 
 <style scoped>
 .mini-viewer {
+  /* DXFViewer's root is `flex: 1` with no explicit height — it needs a flex
+     parent to fill (the main demo's .viewer-container does the same). Without
+     `display: flex` the viewer collapses to 0 height → only the frame shows. */
+  display: flex;
   height: 380px;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);

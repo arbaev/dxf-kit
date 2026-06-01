@@ -926,10 +926,6 @@ const hasSameHiddenSet = (a: readonly string[]): boolean => {
   return true;
 };
 
-const hasDXFData = computed(() => {
-  return props.dxfData && props.dxfData.entities && props.dxfData.entities.length > 0;
-});
-
 // Reference to data loaded via loadDXFFromText so watch does not reload them
 let lastLoadedDxf: DxfData | null = null;
 
@@ -938,6 +934,17 @@ let lastLoadedDxf: DxfData | null = null;
 const loadedDxfRef = ref<DxfData | null>(null);
 
 const activeDxf = computed<DxfData | null>(() => props.dxfData ?? loadedDxfRef.value);
+
+// True when a drawing is available — whether passed via the `dxfData` prop or
+// loaded internally (`url` / loadDXFFromText / drag-and-drop). Drives the
+// empty-state overlay, overlay grid and rulers. Basing this on `activeDxf` (not
+// just the prop) is what lets a standalone `:url` load clear the
+// "Select a DXF file to view" placeholder — otherwise that overlay stays on top
+// of the rendered scene and swallows pan/zoom pointer events.
+const hasDXFData = computed(() => {
+  const dxf = activeDxf.value;
+  return !!(dxf && dxf.entities && dxf.entities.length > 0);
+});
 
 // $INSUNITS-based scale factors + labels shared by the rulers and the three
 // measurement tools (distance / area / angle).

@@ -112,67 +112,6 @@
 
       <UnsupportedEntities v-if="unsupportedEntities.length > 0" :entities="unsupportedEntities" />
 
-      <div v-if="dxfData && dxfData.entities && dxfData.entities.length > 0" class="search-bar">
-        <svg
-          class="search-icon"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input
-          v-model="searchQuery"
-          type="search"
-          class="search-input"
-          placeholder="Search by text — TEXT · MTEXT · ATTRIB · DIMENSION · MULTILEADER"
-          aria-label="Search entities by text"
-          @keyup.enter="zoomToSearchResults"
-        />
-        <span v-if="searchQuery" class="search-count">
-          {{ searchResults.length }} {{ searchResults.length === 1 ? "match" : "matches" }}
-        </span>
-        <button
-          v-if="searchQuery && searchResults.length > 0"
-          class="search-zoom"
-          type="button"
-          title="Zoom to all matches (Enter)"
-          @click="zoomToSearchResults"
-        >
-          Zoom to all
-          <svg
-            class="search-zoom-icon"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <polyline points="9 10 4 15 9 20" />
-            <path d="M20 4v7a4 4 0 0 1-4 4H4" />
-          </svg>
-        </button>
-        <button
-          v-if="searchQuery"
-          class="search-clear"
-          type="button"
-          aria-label="Clear search"
-          @click="clearSearch"
-        >
-          ×
-        </button>
-      </div>
-
       <div id="viewer" class="viewer-container">
         <DXFViewer
           :key="aaMode"
@@ -220,7 +159,6 @@
           @reset-view="resetView"
           @file-dropped="handleFileDropped"
           @entity-hover="handleEntityHover"
-          @entity-click="handleEntityClick"
           @entities-select="handleEntitiesSelect"
           @measure="handleMeasureResult"
           @measure-area="handleMeasureAreaResult"
@@ -237,9 +175,88 @@
         </DXFViewer>
       </div>
 
+      <div v-if="dxfData && dxfData.entities && dxfData.entities.length > 0" class="search-bar">
+        <svg
+          class="search-icon"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input
+          v-model="searchQuery"
+          type="search"
+          class="search-input"
+          placeholder="Search by text — TEXT · ATTRIB · DIMENSION"
+          aria-label="Search entities by text"
+          @keyup.enter="zoomToSearchResults"
+        />
+        <span v-if="searchQuery" class="search-count">
+          {{ searchResults.length }} {{ searchResults.length === 1 ? "match" : "matches" }}
+        </span>
+        <button
+          v-if="searchQuery && searchResults.length > 0"
+          class="search-zoom"
+          type="button"
+          title="Zoom to all matches (Enter)"
+          @click="zoomToSearchResults"
+        >
+          Zoom to all
+          <svg
+            class="search-zoom-icon"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="9 10 4 15 9 20" />
+            <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+          </svg>
+        </button>
+        <button
+          v-if="searchQuery"
+          class="search-clear"
+          type="button"
+          aria-label="Clear search"
+          @click="clearSearch"
+        >
+          ×
+        </button>
+      </div>
+
       <section class="settings-panel" aria-label="Viewer settings">
         <header class="settings-header">
           <h3 class="settings-title">Settings</h3>
+          <!-- Scenario presets, centered in the header: guided one-click path;
+               manual tweaks → "Custom". Drops to its own row on mobile. -->
+          <div class="settings-presets" role="radiogroup" aria-label="Setting scenarios">
+            <button
+              v-for="preset in presetList"
+              :key="preset.id"
+              class="preset-btn"
+              type="button"
+              role="radio"
+              :aria-checked="activePreset === preset.id"
+              :class="{ active: activePreset === preset.id }"
+              :title="preset.hint"
+              @click="applyPreset(preset.id)"
+            >
+              {{ preset.label }}
+            </button>
+            <span v-if="activePreset === null" class="preset-custom">Custom</span>
+          </div>
           <button
             class="settings-reset"
             type="button"
@@ -250,158 +267,182 @@
           </button>
         </header>
 
-        <div class="settings-grid">
-          <div class="settings-cell">
-            <header class="settings-cell-header">
-              <span class="settings-cell-title">Overlays</span>
-            </header>
-            <p class="settings-cell-hint">
-              Click an empty cell to position, click the active (blue) cell to hide
-            </p>
-            <div class="overlay-rows">
-              <div v-for="row in overlayRows" :key="row.label" class="overlay-row">
-                <span class="overlay-label" :class="{ off: !row.isVisible() }">{{
-                  row.label
-                }}</span>
-                <div
-                  class="layout-mini-grid"
-                  role="radiogroup"
-                  :aria-label="`${row.label} position`"
-                >
-                  <button
-                    v-for="pos in overlayPositions"
-                    :key="pos"
-                    class="layout-cell"
-                    :class="{ active: row.isVisible() && row.getPosition() === pos }"
-                    :aria-label="pos"
-                    :title="
-                      row.isVisible() && row.getPosition() === pos ? `${pos} (click to hide)` : pos
-                    "
-                    @click="onCellClick(row, pos)"
+        <div class="settings-body">
+          <!-- LEFT: controls (the knobs you turn) -->
+          <div class="settings-controls">
+            <div class="control-group">
+              <span class="control-group-title">Rendering</span>
+              <label class="aa-row">
+                <span class="aa-label">Antialiasing</span>
+                <select v-model="aaMode" class="aa-select">
+                  <option value="none">None</option>
+                  <option value="msaa">MSAA (hardware, default)</option>
+                  <option value="smaa">SMAA</option>
+                  <option value="fxaa">FXAA</option>
+                  <option value="taa">TAA (jittered, idle-only)</option>
+                  <option value="ssaa">SSAA (high quality, slow)</option>
+                </select>
+              </label>
+              <p class="settings-cell-hint">{{ aaDescription }}</p>
+              <label class="picking-label">
+                <input type="checkbox" v-model="showRulers" />
+                <span>Show rulers</span>
+              </label>
+              <label class="aa-row">
+                <span class="aa-label">Units</span>
+                <select v-model="rulerUnits" class="aa-select" :disabled="!showRulers">
+                  <option value="dxf-units">DXF units (raw)</option>
+                  <option value="mm">Millimeters</option>
+                  <option value="inch">Inches</option>
+                </select>
+              </label>
+              <label class="picking-label">
+                <input type="checkbox" v-model="groupLayers" :disabled="!showLayerPanel" />
+                <span>Group layers by prefix</span>
+              </label>
+            </div>
+
+            <div class="control-group">
+              <span class="control-group-title">Tools</span>
+              <label class="picking-label">
+                <input type="checkbox" v-model="pickingEnabled" />
+                <span>Entity picking</span>
+              </label>
+              <div v-if="pickingEnabled" class="control-sub">
+                <label class="picking-label">
+                  <input type="checkbox" v-model="highlightOnHover" />
+                  <span>Highlight on hover</span>
+                </label>
+                <label class="picking-label">
+                  <input
+                    type="checkbox"
+                    v-model="highlightAssociated"
+                    :disabled="!highlightOnHover"
                   />
+                  <span>Highlight associated members</span>
+                </label>
+                <label class="picking-label">
+                  <input type="checkbox" v-model="rectangleSelection" />
+                  <span>Rectangle selection (Shift-drag)</span>
+                </label>
+                <label class="picking-label">
+                  <input type="checkbox" v-model="pickingDebug" />
+                  <span>Show picking bboxes (debug)</span>
+                </label>
+              </div>
+              <p class="settings-cell-hint">
+                Hover for live data, click for the snapshot in the inspector. Shift-drag selects:
+                left&rarr;right = window, right&rarr;left = crossing.
+              </p>
+
+              <!-- Measurement settings (Maximum only) — redundant with the canvas
+                   toolbar in normal use, so kept out of the everyday scenarios. -->
+              <template v-if="showMeasureControls">
+                <div class="control-field">
+                  <span class="aa-label">Measurement</span>
+                  <div class="segmented" role="radiogroup" aria-label="Measurement tool">
+                    <button
+                      type="button"
+                      class="segmented-btn"
+                      role="radio"
+                      :aria-checked="measureMode === 'none'"
+                      :class="{ active: measureMode === 'none' }"
+                      @click="measureMode = 'none'"
+                    >
+                      Off
+                    </button>
+                    <button
+                      type="button"
+                      class="segmented-btn"
+                      role="radio"
+                      :aria-checked="measureMode === 'distance'"
+                      :class="{ active: measureMode === 'distance' }"
+                      @click="measureMode = 'distance'"
+                    >
+                      Distance
+                    </button>
+                    <button
+                      type="button"
+                      class="segmented-btn"
+                      role="radio"
+                      :aria-checked="measureMode === 'area'"
+                      :class="{ active: measureMode === 'area' }"
+                      @click="measureMode = 'area'"
+                    >
+                      Area
+                    </button>
+                    <button
+                      type="button"
+                      class="segmented-btn"
+                      role="radio"
+                      :aria-checked="measureMode === 'angle'"
+                      :class="{ active: measureMode === 'angle' }"
+                      @click="measureMode = 'angle'"
+                    >
+                      Angle
+                    </button>
+                  </div>
+                </div>
+                <label class="picking-label">
+                  <input type="checkbox" v-model="snapToGeometry" />
+                  <span>Snap to geometry (endpoint / midpoint / center)</span>
+                </label>
+              </template>
+            </div>
+
+            <div class="control-group">
+              <span class="control-group-title">Layout</span>
+              <p class="settings-cell-hint">
+                Click an empty cell to position an overlay; click the active (blue) cell to hide it.
+              </p>
+              <div class="overlay-rows">
+                <div v-for="row in overlayRows" :key="row.label" class="overlay-row">
+                  <span class="overlay-label" :class="{ off: !row.isVisible() }">{{
+                    row.label
+                  }}</span>
+                  <div
+                    class="layout-mini-grid"
+                    role="radiogroup"
+                    :aria-label="`${row.label} position`"
+                  >
+                    <button
+                      v-for="pos in overlayPositions"
+                      :key="pos"
+                      class="layout-cell"
+                      :class="{ active: row.isVisible() && row.getPosition() === pos }"
+                      :aria-label="pos"
+                      :title="
+                        row.isVisible() && row.getPosition() === pos
+                          ? `${pos} (click to hide)`
+                          : pos
+                      "
+                      @click="onCellClick(row, pos)"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="settings-cell">
-            <header class="settings-cell-header">
-              <span class="settings-cell-title">Display</span>
-            </header>
-            <div class="display-split">
-              <div class="display-col">
-                <label class="aa-row">
-                  <span class="aa-label">Antialiasing</span>
-                  <select v-model="aaMode" class="aa-select">
-                    <option value="none">None</option>
-                    <option value="msaa">MSAA (hardware, default)</option>
-                    <option value="smaa">SMAA</option>
-                    <option value="fxaa">FXAA</option>
-                    <option value="taa">TAA (jittered, idle-only)</option>
-                    <option value="ssaa">SSAA (high quality, slow)</option>
-                  </select>
-                </label>
-                <p class="settings-cell-hint">{{ aaDescription }}</p>
-              </div>
-              <div class="display-col">
-                <label class="picking-label">
-                  <input type="checkbox" v-model="showRulers" />
-                  <span>Show rulers</span>
-                </label>
-                <label class="aa-row">
-                  <span class="aa-label">Units</span>
-                  <select v-model="rulerUnits" class="aa-select" :disabled="!showRulers">
-                    <option value="dxf-units">DXF units (raw)</option>
-                    <option value="mm">Millimeters</option>
-                    <option value="inch">Inches</option>
-                  </select>
-                </label>
-                <label class="picking-label">
-                  <input type="checkbox" v-model="groupLayers" :disabled="!showLayerPanel" />
-                  <span>Group layers by prefix</span>
-                </label>
-                <p class="settings-cell-hint">
-                  Rulers: adaptive tick step. Group layers: auto-bucket by name prefix
-                  (<code>A-WALL</code> + <code>A-DOOR</code> → group <code>A</code>).
-                </p>
-              </div>
-            </div>
-          </div>
+          <!-- RIGHT: inspector (what the viewer reports back) -->
+          <div class="settings-inspector">
+            <span class="control-group-title">Inspector</span>
 
-          <div class="settings-cell">
-            <header class="settings-cell-header">
-              <span class="settings-cell-title">Picking</span>
-            </header>
-            <label class="picking-label">
-              <input type="checkbox" v-model="pickingDebug" :disabled="!pickingEnabled" />
-              <span>Show picking bboxes (debug)</span>
-            </label>
-            <label class="picking-label">
-              <input type="checkbox" v-model="highlightOnHover" :disabled="!pickingEnabled" />
-              <span>Highlight on hover</span>
-            </label>
-            <label class="picking-label">
-              <input
-                type="checkbox"
-                v-model="highlightAssociated"
-                :disabled="!pickingEnabled || !highlightOnHover"
-              />
-              <span>Highlight associated members</span>
-            </label>
-            <p class="settings-cell-hint">
-              Toggle &laquo;Entity picking&raquo; in Overlays. Hover for live data; click for the
-              snapshot below.
+            <p v-if="inspectorIdle" class="inspector-empty">
+              Shift-drag to select entities — the list shows up here. Click a single entity to see
+              its full properties in the on-canvas panel.
             </p>
-            <div v-if="clickedEntity" class="picking-info">
-              <span class="picking-tag">{{ clickedEntity.type }}</span>
-              <span class="picking-meta"
-                >handle <code>{{ clickedEntity.handle }}</code></span
-              >
-              <span class="picking-meta"
-                >layer <code>{{ clickedEntity.layer }}</code></span
-              >
-              <span v-if="clickedEntity.text" class="picking-meta"
-                >text <code>{{ clickedEntity.text }}</code></span
-              >
-              <span v-if="clickedEntity.association" class="picking-meta">
-                association <code>{{ clickedEntity.association.kind }}</code> (<code>{{
-                  clickedEntity.association.members.length
-                }}</code>
-                members)
-              </span>
-            </div>
-          </div>
 
-          <div class="settings-cell">
-            <header class="settings-cell-header">
-              <span class="settings-cell-title">
-                Rectangle selection
-                <span v-if="selectedEntities.length > 0" class="settings-badge">{{
-                  selectedEntities.length
-                }}</span>
-              </span>
-              <button
-                v-if="selectedEntities.length > 0"
-                class="settings-cell-action"
-                type="button"
-                @click="clearRectangleSelection"
-              >
-                Clear
-              </button>
-            </header>
-            <label class="picking-label">
-              <input
-                type="checkbox"
-                v-model="rectangleSelection"
-                :disabled="!pickingEnabled"
-              />
-              <span>Enable rectangle selection</span>
-            </label>
-            <p class="settings-cell-hint">
-              Hold <kbd>Shift</kbd> and drag on the canvas. Left&rarr;right = window (solid blue),
-              right&rarr;left = crossing (dashed green). <kbd>Esc</kbd> cancels an in-progress drag.
-            </p>
-            <template v-if="selectedEntities.length > 0">
+            <div v-if="selectedEntities.length > 0" class="inspector-section">
+              <header class="settings-cell-header">
+                <span class="settings-cell-title">
+                  Selection
+                  <span class="settings-badge">{{ selectedEntities.length }}</span>
+                </span>
+                <button class="settings-cell-action" type="button" @click="clearRectangleSelection">
+                  Clear
+                </button>
+              </header>
               <div class="rect-selection-summary">
                 <span
                   v-for="[type, count] in selectionTypeCounts"
@@ -423,212 +464,129 @@
                   <span class="rect-selection-layer">{{ event.layer }}</span>
                   <span v-if="event.text" class="rect-selection-text">{{ event.text }}</span>
                 </li>
-                <li v-if="selectedEntities.length > selectedEntitiesPreview.length" class="rect-selection-more">
+                <li
+                  v-if="selectedEntities.length > selectedEntitiesPreview.length"
+                  class="rect-selection-more"
+                >
                   …and {{ selectedEntities.length - selectedEntitiesPreview.length }} more
                 </li>
               </ul>
-            </template>
-          </div>
+            </div>
 
-          <div class="settings-cell">
-            <header class="settings-cell-header">
-              <span class="settings-cell-title">
-                Measurement
-                <span v-if="measureMode !== 'none'" class="settings-badge">{{ measureMode }}</span>
-              </span>
-              <button
-                v-if="lastMeasureResult || lastAreaResult || lastAngleResult"
-                class="settings-cell-action"
-                type="button"
-                @click="clearMeasureResult"
-              >
-                Clear
-              </button>
-            </header>
-            <label class="picking-label">
-              <input
-                type="checkbox"
-                :checked="measureMode === 'distance'"
-                @change="setMeasureMode('distance')"
-              />
-              <span>Distance tool (linear ruler)</span>
-            </label>
-            <label class="picking-label">
-              <input
-                type="checkbox"
-                :checked="measureMode === 'area'"
-                @change="setMeasureMode('area')"
-              />
-              <span>Area tool (polygon)</span>
-            </label>
-            <label class="picking-label">
-              <input
-                type="checkbox"
-                :checked="measureMode === 'angle'"
-                @change="setMeasureMode('angle')"
-              />
-              <span>Angle tool (3-point)</span>
-            </label>
-            <label class="picking-label">
-              <input type="checkbox" v-model="snapToGeometry" />
-              <span>Snap to geometry (endpoint / midpoint / center / quadrant)</span>
-            </label>
-            <p class="settings-cell-hint">
-              Toggle the toolbar icons (top-right) or the checkboxes above; the tools
-              are mutually exclusive. Distance: click two points. Area: click vertices,
-              then close via double-click, a click on the first vertex, or
-              <kbd>Enter</kbd>. Angle: click the vertex, then two rays — move the cursor
-              to pick the angle or its reflex. <kbd>Backspace</kbd> undoes the last point,
-              <kbd>Esc</kbd> cancels. Length/area units follow the rulers
-              (<code>{{ rulerUnits }}</code>); angles are shown in degrees.
-            </p>
-            <div v-if="lastMeasureResult" class="measure-result">
-              <span class="measure-result-label">Distance:</span>
-              <code class="measure-result-value">{{ formattedMeasureValue }}</code>
-              <span class="measure-result-meta">
-                A&nbsp;({{ lastMeasureResult.p1.x.toFixed(2) }},
-                {{ lastMeasureResult.p1.y.toFixed(2) }}) &rarr;
-                B&nbsp;({{ lastMeasureResult.p2.x.toFixed(2) }},
-                {{ lastMeasureResult.p2.y.toFixed(2) }})
-              </span>
-            </div>
-            <div v-if="lastAreaResult" class="measure-result">
-              <span class="measure-result-label">Area:</span>
-              <code class="measure-result-value">{{ formattedAreaValue }}</code>
-              <span class="measure-result-meta">
-                Perimeter {{ formattedPerimeterValue }} ·
-                {{ lastAreaResult.points.length }} pts<template v-if="lastAreaResult.selfIntersecting">
-                  · ⚠ self-intersecting</template>
-              </span>
-            </div>
-            <div v-if="lastAngleResult" class="measure-result">
-              <span class="measure-result-label">Angle:</span>
-              <code class="measure-result-value">{{ formattedAngleValue }}</code>
-              <span class="measure-result-meta">
-                V&nbsp;({{ lastAngleResult.vertex.x.toFixed(2) }},
-                {{ lastAngleResult.vertex.y.toFixed(2) }})<template v-if="lastAngleResult.reflex">
-                  · reflex</template>
-              </span>
-            </div>
-          </div>
-
-          <div class="settings-cell">
-            <header class="settings-cell-header">
-              <span class="settings-cell-title">
-                Layer visibility (<code>v-model</code>)
-                <span v-if="hiddenLayers.length > 0" class="settings-badge">{{
-                  hiddenLayers.length
-                }}</span>
-              </span>
-              <button
-                v-if="hiddenLayers.length > 0"
-                class="settings-cell-action"
-                type="button"
-                @click="showAllLayersExternally"
-              >
-                Show all
-              </button>
-            </header>
-            <p class="settings-cell-hint">
-              <code>:hidden-layers</code> drives the layer panel from the parent. Toggle layers in
-              the panel and watch the array below update; click below and watch the panel update.
-            </p>
-            <div class="vmodel-actions">
-              <button
-                class="vmodel-btn"
-                type="button"
-                :disabled="allLayerNames.length === 0"
-                @click="hideFirstLayer"
-              >
-                Hide one more
-              </button>
-              <button
-                class="vmodel-btn"
-                type="button"
-                :disabled="allLayerNames.length === 0"
-                @click="hideHalfLayers"
-              >
-                Hide half
-              </button>
-            </div>
-            <div class="vmodel-state">
-              <span class="vmodel-label">hiddenLayers =</span>
-              <code v-if="hiddenLayers.length === 0" class="vmodel-empty">[]</code>
-              <template v-else>
-                <span
-                  v-for="name in hiddenLayers"
-                  :key="name"
-                  class="vmodel-chip"
-                >
-                  {{ name }}
+            <div class="inspector-section">
+              <header class="settings-cell-header">
+                <span class="settings-cell-title">
+                  Associations
+                  <span v-if="associations.length > 0" class="settings-badge">{{
+                    associations.length
+                  }}</span>
                 </span>
+                <button
+                  v-if="pickingEnabled && associations.length > 0"
+                  class="settings-cell-action"
+                  type="button"
+                  @click="clearAssociationHighlight"
+                >
+                  Clear
+                </button>
+              </header>
+              <template v-if="!pickingEnabled">
+                <p class="settings-cell-hint">
+                  Enable &laquo;Entity picking&raquo; to inspect associations.
+                </p>
+              </template>
+              <template v-else-if="associations.length === 0">
+                <p class="settings-cell-hint">
+                  No associations in this drawing. Try the <code>Floor Plan</code> sample — it has
+                  MLEADER, LEADER&rarr;TEXT, INSERT+ATTRIB and DIMENSION links.
+                </p>
+              </template>
+              <template v-else>
+                <p class="settings-cell-hint">Click a row to highlight and zoom to its members.</p>
+                <div class="associations-list">
+                  <button
+                    v-for="(group, kind) in groupedAssociations"
+                    :key="kind"
+                    class="associations-kind-btn"
+                    :class="{ active: activeKindFilter === kind }"
+                    @click="activeKindFilter = activeKindFilter === kind ? null : kind"
+                  >
+                    {{ kind }} <span class="associations-kind-count">({{ group.length }})</span>
+                  </button>
+                </div>
+                <div class="associations-rows">
+                  <button
+                    v-for="a in visibleAssociations"
+                    :key="a.id"
+                    class="association-row"
+                    :class="{ active: activeAssociationId === a.id }"
+                    @click="highlightAssociation(a)"
+                  >
+                    <span class="association-kind-tag">{{ a.kind }}</span>
+                    <code class="association-primary">#{{ a.primary }}</code>
+                    <span class="association-members">{{ a.members.length }} members</span>
+                    <span v-if="a.text" class="association-text">{{ a.text }}</span>
+                  </button>
+                </div>
               </template>
             </div>
-          </div>
 
-          <div class="settings-cell">
-            <header class="settings-cell-header">
-              <span class="settings-cell-title">
-                Associations
-                <span v-if="associations.length > 0" class="settings-badge">{{
-                  associations.length
-                }}</span>
-              </span>
-              <button
-                v-if="pickingEnabled && associations.length > 0"
-                class="settings-cell-action"
-                type="button"
-                @click="clearAssociationHighlight"
-              >
-                Clear
-              </button>
-            </header>
-            <template v-if="!pickingEnabled">
-              <p class="settings-cell-hint">
-                Enable &laquo;Entity picking&raquo; in Overlays to inspect associations.
-              </p>
-            </template>
-            <template v-else-if="associations.length === 0">
-              <p class="settings-cell-hint">
-                No associations in this drawing. Try the <code>Floor Plan</code> sample — it has
-                MLEADER, LEADER&rarr;TEXT, INSERT+ATTRIB and DIMENSION links.
-              </p>
-            </template>
-            <template v-else>
-              <p class="settings-cell-hint">Click a row to highlight and zoom to its members.</p>
-              <div class="associations-list">
+            <div v-if="showVModelDemo" class="inspector-section">
+              <header class="settings-cell-header">
+                <span class="settings-cell-title">
+                  Layer visibility (<code>v-model</code>)
+                  <span v-if="hiddenLayers.length > 0" class="settings-badge">{{
+                    hiddenLayers.length
+                  }}</span>
+                </span>
                 <button
-                  v-for="(group, kind) in groupedAssociations"
-                  :key="kind"
-                  class="associations-kind-btn"
-                  :class="{ active: activeKindFilter === kind }"
-                  @click="activeKindFilter = activeKindFilter === kind ? null : kind"
+                  v-if="hiddenLayers.length > 0"
+                  class="settings-cell-action"
+                  type="button"
+                  @click="showAllLayersExternally"
                 >
-                  {{ kind }} <span class="associations-kind-count">({{ group.length }})</span>
+                  Show all
+                </button>
+              </header>
+              <p class="settings-cell-hint">
+                <code>:hidden-layers</code> drives the layer panel from the parent — toggle in the
+                panel and watch the array update, or click below and watch the panel.
+              </p>
+              <div class="vmodel-actions">
+                <button
+                  class="vmodel-btn"
+                  type="button"
+                  :disabled="allLayerNames.length === 0"
+                  @click="hideFirstLayer"
+                >
+                  Hide one more
+                </button>
+                <button
+                  class="vmodel-btn"
+                  type="button"
+                  :disabled="allLayerNames.length === 0"
+                  @click="hideHalfLayers"
+                >
+                  Hide half
                 </button>
               </div>
-              <div class="associations-rows">
-                <button
-                  v-for="a in visibleAssociations"
-                  :key="a.id"
-                  class="association-row"
-                  :class="{ active: activeAssociationId === a.id }"
-                  @click="highlightAssociation(a)"
-                >
-                  <span class="association-kind-tag">{{ a.kind }}</span>
-                  <code class="association-primary">#{{ a.primary }}</code>
-                  <span class="association-members">{{ a.members.length }} members</span>
-                  <span v-if="a.text" class="association-text">{{ a.text }}</span>
-                </button>
+              <div class="vmodel-state">
+                <span class="vmodel-label">hiddenLayers =</span>
+                <code v-if="hiddenLayers.length === 0" class="vmodel-empty">[]</code>
+                <template v-else>
+                  <span v-for="name in hiddenLayers" :key="name" class="vmodel-chip">
+                    {{ name }}
+                  </span>
+                </template>
               </div>
-            </template>
+            </div>
           </div>
         </div>
       </section>
 
       <StatsSection />
-      <FrameworkTabs />
       <FeaturesSection />
+      <FrameworkTabs />
       <WhatsNewSection />
       <ExamplesSection />
 
@@ -672,6 +630,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from "vue";
+import type { Ref } from "vue";
 import { FileUploader, UnsupportedEntities, DXFViewer } from "dxf-vuer";
 import type {
   AntialiasingMode,
@@ -682,7 +641,6 @@ import type {
   AreaMeasureResult,
   AngleMeasureResult,
 } from "dxf-vuer";
-import { formatAreaValue, formatAngleValue } from "dxf-vuer";
 import "dxf-vuer/style.css";
 import type { DxfData, EntityAssociation } from "dxf-render";
 import { findEntitiesByText } from "dxf-render";
@@ -744,7 +702,6 @@ const lastAreaResult = ref<AreaMeasureResult | null>(null);
 const lastAngleResult = ref<AngleMeasureResult | null>(null);
 const hiddenLayers = ref<string[]>([]);
 const hoveredEntity = ref<PickingEvent | null>(null);
-const clickedEntity = ref<PickingEvent | null>(null);
 const associations = ref<EntityAssociation[]>([]);
 const activeKindFilter = ref<string | null>(null);
 const activeAssociationId = ref<string | null>(null);
@@ -790,10 +747,6 @@ const handleEntityHover = (event: PickingEvent | null) => {
   hoveredEntity.value = event;
 };
 
-const handleEntityClick = (event: PickingEvent) => {
-  clickedEntity.value = event;
-};
-
 const handleEntitiesSelect = (events: PickingEvent[]) => {
   selectedEntities.value = events;
   // Re-highlight via the imperative API so the selection survives the drag overlay vanishing.
@@ -837,42 +790,12 @@ const handleMeasureCancel = () => {
   // Don't clear the last readings — keep the previous values visible.
 };
 
-// Toggle a measurement mode (mutually exclusive); a second click turns it off.
-const setMeasureMode = (mode: MeasureMode) => {
-  measureMode.value = measureMode.value === mode ? "none" : mode;
-};
-
 const clearMeasureResult = () => {
   lastMeasureResult.value = null;
   lastAreaResult.value = null;
   lastAngleResult.value = null;
   dxfViewerRef.value?.clearMeasure();
 };
-
-const formattedMeasureValue = computed<string>(() => {
-  const r = lastMeasureResult.value;
-  if (!r) return "";
-  const value = Math.abs(r.value);
-  const fixed = value >= 100 ? r.value.toFixed(1) : r.value.toFixed(2);
-  if (r.units === "mm") return `${fixed} mm`;
-  if (r.units === "inch") return `${fixed} in`;
-  return fixed;
-});
-
-const formattedAreaValue = computed<string>(() => {
-  const r = lastAreaResult.value;
-  return r ? formatAreaValue(r.area, r.areaUnits) : "";
-});
-
-const formattedPerimeterValue = computed<string>(() => {
-  const r = lastAreaResult.value;
-  return r ? formatAreaValue(r.perimeter, r.lengthUnits) : "";
-});
-
-const formattedAngleValue = computed<string>(() => {
-  const r = lastAngleResult.value;
-  return r ? formatAngleValue(r.degrees, r.units) : "";
-});
 
 const zoomToSelectedEntity = (event: PickingEvent) => {
   dxfViewerRef.value?.zoomToEntity([event.handle]);
@@ -905,38 +828,9 @@ const clearAssociationHighlight = () => {
   if (dxfViewerRef.value) dxfViewerRef.value.clearHighlight();
 };
 
+// Reset = re-apply the "default" scenario (see PRESETS below).
 const resetSettings = () => {
-  aaMode.value = "msaa";
-  pickingEnabled.value = true;
-  pickingDebug.value = false;
-  highlightOnHover.value = true;
-  highlightAssociated.value = true;
-  rectangleSelection.value = true;
-  measureMode.value = "none";
-  lastMeasureResult.value = null;
-  lastAreaResult.value = null;
-  lastAngleResult.value = null;
-  showFileName.value = true;
-  showCoordinates.value = true;
-  showZoomLevel.value = true;
-  showDebugInfo.value = true;
-  showResetButton.value = true;
-  showFullscreenButton.value = true;
-  showExportButton.value = true;
-  showLayerPanel.value = true;
-  showPropertiesPanel.value = true;
-  showRulers.value = true;
-  rulerUnits.value = "mm";
-  groupLayers.value = true;
-  fileNamePosition.value = "top-left";
-  toolbarPosition.value = "top-right";
-  coordinatesPosition.value = "bottom-left";
-  debugPosition.value = "bottom-center";
-  layerPanelPosition.value = "bottom-right";
-  propertiesPanelPosition.value = "top-left";
-  pickingPosition.value = "top-center";
-  activeKindFilter.value = null;
-  clearAssociationHighlight();
+  applyPreset("default");
 };
 
 // Display option toggles (mirror DXFViewer prop defaults the demo overrides)
@@ -952,6 +846,12 @@ const showPropertiesPanel = ref(true);
 const showRulers = ref(true);
 const rulerUnits = ref<"dxf-units" | "mm" | "inch">("mm");
 const groupLayers = ref(true);
+
+// Demo-only meta flags (not DXFViewer props), both on only in the "Maximum"
+// scenario: the "Layer visibility (v-model)" developer demo, and the in-panel
+// measurement controls (redundant with the canvas toolbar in normal use).
+const showVModelDemo = ref(false);
+const showMeasureControls = ref(false);
 
 // Overlay positions
 const overlayPositions: OverlayPosition[] = [
@@ -1057,6 +957,191 @@ const aaDescriptions: Record<AntialiasingMode, string> = {
 };
 
 const aaDescription = computed(() => aaDescriptions[aaMode.value]);
+
+// ── Presets ────────────────────────────────────────────────────────────────
+// A scenario is a coherent snapshot of every viewer knob. Presets give first-time
+// visitors a guided path; fine-tuning the individual controls is still possible
+// (any manual tweak drops the panel into the "Custom" state — see activePreset).
+interface SettingsState {
+  aaMode: AntialiasingMode;
+  pickingEnabled: boolean;
+  pickingDebug: boolean;
+  highlightOnHover: boolean;
+  highlightAssociated: boolean;
+  rectangleSelection: boolean;
+  measureMode: MeasureMode;
+  snapToGeometry: boolean;
+  showRulers: boolean;
+  rulerUnits: "dxf-units" | "mm" | "inch";
+  groupLayers: boolean;
+  showFileName: boolean;
+  showCoordinates: boolean;
+  showZoomLevel: boolean;
+  showDebugInfo: boolean;
+  showResetButton: boolean;
+  showFullscreenButton: boolean;
+  showExportButton: boolean;
+  showLayerPanel: boolean;
+  showPropertiesPanel: boolean;
+  fileNamePosition: OverlayPosition;
+  toolbarPosition: OverlayPosition;
+  coordinatesPosition: OverlayPosition;
+  debugPosition: OverlayPosition;
+  layerPanelPosition: OverlayPosition;
+  propertiesPanelPosition: OverlayPosition;
+  pickingPosition: OverlayPosition;
+  // Demo meta (Maximum only): the "Layer visibility (v-model)" developer section
+  // and the in-panel measurement controls.
+  showVModelDemo: boolean;
+  showMeasureControls: boolean;
+}
+
+// The canonical "everything on, sensible defaults" state — also the Reset target.
+const DEFAULT_SETTINGS: SettingsState = {
+  aaMode: "msaa",
+  pickingEnabled: true,
+  pickingDebug: false,
+  highlightOnHover: true,
+  highlightAssociated: true,
+  rectangleSelection: true,
+  measureMode: "none",
+  snapToGeometry: true,
+  showRulers: true,
+  rulerUnits: "mm",
+  groupLayers: true,
+  showFileName: true,
+  showCoordinates: true,
+  showZoomLevel: true,
+  showDebugInfo: true,
+  showResetButton: true,
+  showFullscreenButton: true,
+  showExportButton: true,
+  showLayerPanel: true,
+  showPropertiesPanel: true,
+  fileNamePosition: "top-left",
+  toolbarPosition: "top-right",
+  coordinatesPosition: "bottom-left",
+  debugPosition: "bottom-center",
+  layerPanelPosition: "bottom-right",
+  propertiesPanelPosition: "top-left",
+  pickingPosition: "top-center",
+  showVModelDemo: false,
+  showMeasureControls: false,
+};
+
+type PresetId = "default" | "minimal" | "inspect" | "measure" | "maximum";
+
+const PRESETS: Record<PresetId, SettingsState> = {
+  // Sensible "all viewer features on" starting point — the Reset target.
+  default: DEFAULT_SETTINGS,
+  // A bare canvas: just the drawing + a toolbar to orient. No picking/rulers/panels.
+  minimal: {
+    ...DEFAULT_SETTINGS,
+    pickingEnabled: false,
+    rectangleSelection: false,
+    showRulers: false,
+    showCoordinates: false,
+    showZoomLevel: false,
+    showDebugInfo: false,
+    showLayerPanel: false,
+    showPropertiesPanel: false,
+  },
+  // Inspection: hover/click data + properties + associations, rulers/debug off.
+  inspect: {
+    ...DEFAULT_SETTINGS,
+    showRulers: false,
+    showDebugInfo: false,
+  },
+  // Measuring: start with the distance tool, snapping on, rulers (mm) visible.
+  measure: {
+    ...DEFAULT_SETTINGS,
+    measureMode: "distance",
+    rectangleSelection: false,
+    showDebugInfo: false,
+    showPropertiesPanel: false,
+  },
+  // Kitchen-sink: default + the developer-only extras (v-model demo + in-panel
+  // measurement controls).
+  maximum: {
+    ...DEFAULT_SETTINGS,
+    showVModelDemo: true,
+    showMeasureControls: true,
+  },
+};
+
+const presetList: { id: PresetId; label: string; hint: string }[] = [
+  { id: "default", label: "Default", hint: "Recommended starting point — all viewer features on" },
+  { id: "minimal", label: "Minimal", hint: "Clean canvas: just the drawing and a toolbar" },
+  { id: "inspect", label: "Inspect", hint: "Picking, properties and associations in focus" },
+  { id: "measure", label: "Measure", hint: "Distance tool + snapping + rulers" },
+  { id: "maximum", label: "Maximum", hint: "Everything, including the v-model layer demo" },
+];
+
+// Maps each SettingsState key to its backing ref so applyPreset / activePreset can
+// iterate generically instead of restating all 27 fields three times.
+const settingsRefs: { [K in keyof SettingsState]: Ref<SettingsState[K]> } = {
+  aaMode,
+  pickingEnabled,
+  pickingDebug,
+  highlightOnHover,
+  highlightAssociated,
+  rectangleSelection,
+  measureMode,
+  snapToGeometry,
+  showRulers,
+  rulerUnits,
+  groupLayers,
+  showFileName,
+  showCoordinates,
+  showZoomLevel,
+  showDebugInfo,
+  showResetButton,
+  showFullscreenButton,
+  showExportButton,
+  showLayerPanel,
+  showPropertiesPanel,
+  fileNamePosition,
+  toolbarPosition,
+  coordinatesPosition,
+  debugPosition,
+  layerPanelPosition,
+  propertiesPanelPosition,
+  pickingPosition,
+  showVModelDemo,
+  showMeasureControls,
+};
+
+const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof SettingsState)[];
+
+const applyPreset = (id: PresetId) => {
+  const snapshot = PRESETS[id];
+  for (const key of SETTINGS_KEYS) {
+    // Each entry is Ref<the matching field type>; the index dance keeps TS happy.
+    (settingsRefs[key] as Ref<SettingsState[typeof key]>).value = snapshot[key];
+  }
+  // Clear transient read-outs and viewer overlays so a scenario starts clean
+  // (otherwise e.g. switching to "Minimal" leaves a dangling highlight on canvas).
+  clearRectangleSelection();
+  clearMeasureResult();
+  activeKindFilter.value = null;
+  clearAssociationHighlight();
+};
+
+// The preset whose snapshot exactly matches the current state, or null ("Custom").
+const activePreset = computed<PresetId | null>(() => {
+  for (const { id } of presetList) {
+    const snapshot = PRESETS[id];
+    if (SETTINGS_KEYS.every((key) => settingsRefs[key].value === snapshot[key])) {
+      return id;
+    }
+  }
+  return null;
+});
+
+// ── Inspector state ──────────────────────────────────────────────────────────
+// No rectangle selection yet → show the "drag to select" hint. (Single-entity
+// properties live in the on-canvas panel; measurement read-outs on the canvas.)
+const inspectorIdle = computed(() => selectedEntities.value.length === 0);
 
 const samples = [
   { file: "/entities.dxf", label: "Basic Entities", size: "191 KB" },
@@ -1248,22 +1333,32 @@ const resetView = () => {
 .search-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: var(--spacing-sm);
-  padding: 6px 10px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
+  gap: 10px;
+  /* Centered, ~half width, prominent pill so it clearly reads as search.
+     Sits just below the canvas; settings-panel's top margin spaces it below. */
+  align-self: center;
+  width: 50%;
+  min-width: 340px;
+  max-width: 720px;
+  margin-top: var(--spacing-md);
+  padding: 10px 18px;
+  border: 1px solid var(--primary-color);
+  border-radius: 6px;
   background: white;
-  transition: border-color 0.15s;
+  box-shadow: 0 2px 10px rgba(74, 144, 217, 0.12);
+  transition:
+    box-shadow 0.15s,
+    border-color 0.15s;
 }
 
 .search-bar:focus-within {
   border-color: var(--primary-color);
+  box-shadow: 0 2px 16px rgba(74, 144, 217, 0.28);
 }
 
 .search-icon {
   flex-shrink: 0;
-  color: var(--text-secondary);
+  color: var(--primary-color);
 }
 
 .search-input {
@@ -1271,7 +1366,7 @@ const resetView = () => {
   min-width: 0;
   border: none;
   background: transparent;
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: var(--text-color);
   outline: none;
 }
@@ -1332,7 +1427,8 @@ const resetView = () => {
 
 .app.dark .search-bar {
   background: #1e1e1e;
-  border-color: #444;
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 10px rgba(74, 144, 217, 0.2);
 }
 
 .app.dark .search-clear:hover {
@@ -1350,20 +1446,22 @@ const resetView = () => {
 .settings-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
+  gap: 12px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border-color);
   background: rgba(0, 0, 0, 0.02);
 }
 
 .settings-title {
   margin: 0;
+  flex-shrink: 0;
   font-size: 0.9375rem;
   font-weight: 600;
   color: var(--text-color);
 }
 
 .settings-reset {
+  flex-shrink: 0;
   padding: 4px 12px;
   font-size: 0.75rem;
   border: 1px solid var(--border-color);
@@ -1379,58 +1477,155 @@ const resetView = () => {
   color: var(--primary-color);
 }
 
-.settings-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  /* Subtle dividers between cells via grid gap painted by panel background */
-}
-
-.settings-cell {
-  padding: 14px 16px;
+/* Scenario presets — guided one-click path, centered in the header */
+.settings-presets {
   display: flex;
-  flex-direction: column;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
   min-width: 0;
-  border-top: 1px solid transparent;
-  border-left: 1px solid transparent;
 }
 
-/* Right column (every even cell) gets a left divider */
-.settings-cell:nth-child(2n) {
-  border-left-color: var(--border-color);
+.preset-btn {
+  padding: 5px 14px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.15s;
 }
 
-/* Every cell past the first row gets a top divider */
-.settings-cell:nth-child(n + 3) {
-  border-top-color: var(--border-color);
+.preset-btn:hover:not(.active) {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
-/* When the total number of cells is odd, the last one would sit alone in the
-   left column with a dangling open right side. Span it across both columns
-   so it gets the right edge of the panel as its visual boundary. */
-.settings-cell:last-child:nth-child(odd) {
-  grid-column: 1 / -1;
+.preset-btn.active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
 }
 
-.display-split {
+.preset-custom {
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+/* Body: controls (input) on the left, inspector (output) on the right */
+.settings-body {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  min-width: 0;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
 }
 
-.display-col {
+.settings-controls {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 18px;
+  padding: 16px;
   min-width: 0;
-  padding-right: 8px;
 }
 
-.display-col + .display-col {
-  padding-right: 0;
-  padding-left: 8px;
+.settings-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  min-width: 0;
   border-left: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.015);
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-group-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-color);
+}
+
+.control-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Sub-options revealed under a master toggle (e.g. picking) */
+.control-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 22px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border-color);
+}
+
+/* Segmented control (measurement tool selector) */
+.segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segmented-btn {
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: none;
+  border-right: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-color);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.segmented-btn:last-child {
+  border-right: none;
+}
+
+.segmented-btn:hover:not(.active) {
+  color: var(--primary-color);
+}
+
+.segmented-btn.active {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* Inspector sections */
+.inspector-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inspector-section + .inspector-section {
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.inspector-empty {
+  margin: 0;
+  padding: 4px 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 .settings-cell-header {
@@ -1496,16 +1691,25 @@ const resetView = () => {
 }
 
 @media (max-width: 768px) {
-  .settings-grid {
+  /* Header wraps: title + Reset stay on row 1, scenarios drop to a full-width
+     row 2 (left-aligned) so they don't overflow narrow screens. */
+  .settings-header {
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  .settings-presets {
+    order: 1;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Inspector drops below the controls — swap its divider from left to top. */
+  .settings-body {
     grid-template-columns: 1fr;
   }
-  /* Single column on mobile — clear all left dividers, every cell after the
-     first gets a top divider so they stack with consistent separation. */
-  .settings-cell:nth-child(n) {
-    border-left-color: transparent;
-  }
-  .settings-cell:nth-child(n + 2) {
-    border-top-color: var(--border-color);
+  .settings-inspector {
+    border-left: none;
+    border-top: 1px solid var(--border-color);
   }
 }
 
@@ -1684,33 +1888,12 @@ const resetView = () => {
   cursor: pointer;
 }
 
-.picking-hint {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.picking-info {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  font-size: 0.75rem;
-  color: var(--text-color);
-}
-
 .picking-tag {
   background: var(--primary-color);
   color: white;
   padding: 2px 8px;
   border-radius: 3px;
   font-weight: 600;
-}
-
-.picking-meta code {
-  background: rgba(0, 0, 0, 0.06);
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-size: 0.7rem;
 }
 
 .rect-selection-summary {
@@ -1864,49 +2047,6 @@ const resetView = () => {
   white-space: nowrap;
 }
 
-.measure-result {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-  padding: 8px 10px;
-  background: rgba(255, 107, 26, 0.08);
-  border: 1px solid rgba(255, 107, 26, 0.3);
-  border-radius: 4px;
-  font-size: 0.75rem;
-}
-
-.measure-result-label {
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.measure-result-value {
-  background: rgba(0, 0, 0, 0.06);
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #c8501a;
-}
-
-.measure-result-meta {
-  color: var(--text-secondary);
-  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-  font-size: 0.7rem;
-}
-
-.app.dark .measure-result {
-  background: rgba(255, 107, 26, 0.12);
-  border-color: rgba(255, 107, 26, 0.45);
-}
-
-.app.dark .measure-result-value {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ff9555;
-}
-
 .app.dark .vmodel-state {
   background: rgba(255, 255, 255, 0.05);
 }
@@ -2032,10 +2172,6 @@ const resetView = () => {
   border-color: #444;
 }
 
-.app.dark .picking-meta code {
-  background: rgba(255, 255, 255, 0.08);
-}
-
 .app.dark .rect-selection-chip {
   background: rgba(96, 156, 255, 0.18);
   border-color: rgba(96, 156, 255, 0.4);
@@ -2149,11 +2285,26 @@ const resetView = () => {
   color: #aaa;
 }
 
-.app.dark .settings-cell:nth-child(2n) {
+.app.dark .preset-btn {
+  border-color: #444;
+  color: #ddd;
+}
+
+.app.dark .settings-inspector {
+  border-left-color: #444;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.app.dark .control-sub {
   border-left-color: #444;
 }
 
-.app.dark .settings-cell:nth-child(n + 3) {
+.app.dark .segmented,
+.app.dark .segmented-btn {
+  border-color: #444;
+}
+
+.app.dark .inspector-section + .inspector-section {
   border-top-color: #444;
 }
 
@@ -2167,7 +2318,7 @@ const resetView = () => {
 }
 
 @media (max-width: 768px) {
-  .app.dark .settings-cell:nth-child(n + 2) {
+  .app.dark .settings-inspector {
     border-top-color: #444;
   }
 }
@@ -2209,6 +2360,12 @@ const resetView = () => {
 
   .viewer-container {
     height: 50vh;
+  }
+
+  /* Search spans the full width on narrow screens instead of half. */
+  .search-bar {
+    width: 100%;
+    min-width: 0;
   }
 
   .aa-row {
