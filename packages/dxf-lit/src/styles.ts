@@ -186,6 +186,60 @@ export const viewerStyles = css`
     font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
   }
 
+  /* Toolbar (rendered inline in <dxf-viewer>, not a sub-element — so its styles
+     live here). Ported from dxf-react's ViewerToolbar.css; the crucial bit is
+     pointer-events: auto, since the overlay grid sets pointer-events: none. */
+  .dxfk-toolbar {
+    display: flex;
+    gap: 4px;
+    pointer-events: auto;
+  }
+
+  .dxfk-toolbar-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--dxfk-spacing-sm, 8px);
+    color: var(--dxfk-text-color, #212121);
+    border: 1px solid var(--dxfk-border-color, #e0e0e0);
+    border-radius: var(--dxfk-border-radius, 4px);
+    transition: all 0.2s;
+    user-select: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: rgba(255, 255, 255, 0.95);
+    cursor: pointer;
+  }
+
+  .dxfk-toolbar-button:hover {
+    border-color: rgb(from var(--dxfk-primary-color, #1040b0) r g b / 0.5);
+  }
+
+  .dxfk-toolbar-button:active {
+    transform: scale(0.94);
+  }
+
+  .dxfk-toolbar-button--active {
+    background-color: var(--dxfk-primary-color, #1040b0);
+    border-color: var(--dxfk-primary-color, #1040b0);
+    color: #fff;
+  }
+
+  .dxfk-toolbar-button--active:hover {
+    border-color: var(--dxfk-primary-color, #1040b0);
+  }
+
+  :host([dark-theme]) .dxfk-toolbar-button {
+    background-color: rgba(30, 30, 30, 0.95);
+    border-color: #444;
+    color: #e0e0e0;
+  }
+
+  :host([dark-theme]) .dxfk-toolbar-button--active {
+    background-color: var(--dxfk-primary-color, #1040b0);
+    border-color: var(--dxfk-primary-color, #1040b0);
+    color: #fff;
+  }
+
   .dxfk-message-overlay {
     position: absolute;
     top: 0;
@@ -434,6 +488,15 @@ export const viewerStyles = css`
 
     .dxfk-message-text {
       font-size: 0.9rem;
+    }
+
+    .dxfk-toolbar-button {
+      padding: 6px;
+    }
+
+    .dxfk-toolbar-button svg {
+      width: 18px;
+      height: 18px;
     }
   }
 `;

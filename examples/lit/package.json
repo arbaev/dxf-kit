@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "dxf-lit": "^0.1.0",
-    "dxf-render": "^1.6.0",
+    "dxf-render": "^1.7.0",
     "lit": "^3.0.0",
     "three": "^0.182.0"
   },
