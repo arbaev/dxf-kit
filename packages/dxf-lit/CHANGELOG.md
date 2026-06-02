@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+### Bug Fixes
+
+- **Toolbar buttons** — restored the toolbar styles (`.dxfk-toolbar` / `.dxfk-toolbar-button`) that were missing from the Shadow-DOM stylesheet when porting from dxf-react. Without `pointer-events: auto` the toolbar inherited `pointer-events: none` from the overlay grid, so the reset / fullscreen / measure / export buttons were unclickable (and rendered unstyled). They now work and match the dxf-vuer / dxf-react toolbar, including the dark-theme and small-screen variants.
+
 ## 0.1.0
 
 Initial release — a Web Component (`<dxf-viewer>`) wrapper for
