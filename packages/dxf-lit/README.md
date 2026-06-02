@@ -15,7 +15,7 @@ framework at all.
 
 - **One tag, any framework** — `<dxf-viewer url="…">` is a standard Custom Element.
 - **Client-side** — parsing + rendering happen in the browser; no server round-trips.
-- **21 entity types**, vector text (opentype.js), layers, and a built-in DXF parser.
+- **22 entity types**, vector text (opentype.js), layers, and a built-in DXF parser.
 - **Interactive** — picking, precise highlight, rectangle selection, distance / area /
   angle measurement with geometry snap, rulers, pan/zoom, fullscreen.
 - **Shadow DOM** isolates styles; theme with `--dxfk-*` CSS variables and `::part()`.

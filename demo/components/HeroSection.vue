@@ -54,7 +54,7 @@
       </button>
     </div>
     <p class="hero-stack-link">
-      <a href="#stack">↓ Use it with your framework — Vue, React, or vanilla JS</a>
+      <a href="#stack">↓ Use it with your stack — Vue, React, Web Components, or vanilla JS</a>
     </p>
   </section>
 </template>

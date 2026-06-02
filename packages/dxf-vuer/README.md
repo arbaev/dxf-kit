@@ -16,7 +16,7 @@
 
 - **One tag** — drop in `<DXFViewer>` with reactive props, `v-model`, and slots
 - **Runs in the browser** — DXF is parsed client-side in a Web Worker; no backend, no AutoCAD, nothing uploaded
-- **21 entity types** — lines, arcs, splines, hatches, dimensions, leaders, multilines, and block inserts with attributes
+- **22 entity types** — lines, arcs, splines, hatches, dimensions, leaders, multilines, regions, and block inserts with attributes
 - **Crisp vector text** — triangulated opentype.js glyphs stay sharp at any zoom
 - **Interactive** — pan, zoom, layer toggles, measure tools, dark theme, and PNG export
 - **TypeScript-native** — fully typed props with `entity-hover` / `entity-click` events over the [dxf-render](https://www.npmjs.com/package/dxf-render) engine
@@ -27,7 +27,12 @@
 npm install dxf-vuer dxf-render three
 ```
 
-Peer dependencies: `vue >= 3.4`, `three >= 0.160`, `dxf-render >= 1.0.0`.
+Peer dependencies: `vue >= 3.4`, `three >= 0.160`, `dxf-render >= 1.7.0`.
+
+> **Upgrading from v2.x?** v3.0's only breaking change renames every public CSS
+> class to the `.dxfk-*` prefix and every CSS variable to `--dxfk-*` (shared now
+> with `dxf-react` / `dxf-lit`). See [Migration from v2.x](#migration-from-v2x)
+> for the full rename table.
 
 ## Quick Start
 
@@ -55,10 +60,11 @@ async function loadFile(file) {
 
 | Component             | Description                                                                                        |
 | --------------------- | -------------------------------------------------------------------------------------------------- |
-| `DXFViewer`           | Main viewer: Three.js scene, layer panel, toolbar, error display, drag-and-drop, dark theme, slots |
-| `ViewerToolbar`       | Toolbar with export, fit-to-view, fullscreen buttons. Has `#extra` slot for custom buttons         |
+| `DXFViewer`           | Main viewer: Three.js scene, layer panel, toolbar, rulers, measurement, properties panel, drag-and-drop, dark theme, slots |
+| `ViewerToolbar`       | Toolbar with export, fit-to-view, fullscreen + measurement buttons. Has `#extra` slot for custom buttons |
 | `FileUploader`        | File input button. Emits `file-selected` with `File`                                               |
-| `LayerPanel`          | Collapsible layer visibility panel with color indicators                                           |
+| `LayerPanel`          | Collapsible layer-visibility panel with color indicators + prefix grouping                         |
+| `PropertiesPanel`     | Read-only property inspector for the entity selected via picking                                   |
 | `UnsupportedEntities` | Collapsible list of unsupported entity types                                                       |
 | `DXFStatistics`       | File statistics (entities, layers, blocks, AutoCAD version)                                        |
 

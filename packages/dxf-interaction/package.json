@@ -1,7 +1,7 @@
 {
   "name": "dxf-interaction",
   "version": "0.1.0",
-  "description": "Framework-agnostic DXF viewer interaction controllers (measure / snap / picking / highlight / rectangle-select) built on dxf-render + Three.js. Shared by dxf-vuer and dxf-react.",
+  "description": "Framework-agnostic DXF viewer interaction controllers (measure / snap / picking / highlight / rectangle-select) built on dxf-render + Three.js. Shared by dxf-vuer, dxf-react and dxf-lit.",
   "type": "module",
   "license": "MIT",
   "author": "Timur Arbaev",
@@ -49,7 +49,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "dxf-render": ">=1.6.0",
+    "dxf-render": "^1.7.0",
     "three": ">=0.160.0"
   },
   "peerDependenciesMeta": {

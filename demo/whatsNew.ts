@@ -1,7 +1,12 @@
 // Shared "What's New" changelog data. The home page (WhatsNewSection) shows
 // only the latest release wave; the full history lives on the /changelog page.
 
-export type Pkg = "dxf-render" | "dxf-vuer";
+export type Pkg =
+  | "dxf-render"
+  | "dxf-interaction"
+  | "dxf-vuer"
+  | "dxf-react"
+  | "dxf-lit";
 
 export interface WhatsNewItem {
   pkg: Pkg;
@@ -11,6 +16,36 @@ export interface WhatsNewItem {
 
 export const whatsNew: WhatsNewItem[] = [
   {
+    pkg: "dxf-react",
+    version: "0.1.0",
+    text: "New package dxf-react — a React 18+ wrapper at feature parity with dxf-vuer. <DXFViewer> plus toolbar / layer panel / properties panel, standalone hooks, render-props, a forwardRef imperative handle, and controlled measureMode / hiddenLayers. Works on React 18 and 19.",
+  },
+  {
+    pkg: "dxf-lit",
+    version: "0.1.0",
+    text: "New package dxf-lit — a <dxf-viewer> Web Component (built on Lit) that works in any stack: Angular, Svelte, plain HTML, or no framework. Attributes / properties in, Custom Events + methods out, Shadow-DOM theming via --dxfk-* variables and ::part().",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "3.0.0",
+    text: "Measurement tools — distance, area (+ perimeter) and a 3-point directed angle, selected via v-model:measure-mode. Geometry snap (endpoint / midpoint / center / quadrant / node) with an AutoCAD-style marker keeps clicks on real geometry; labels are $INSUNITS-aware.",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "3.0.0",
+    text: "Rectangle selection — hold a modifier and drag to select many entities at once; AutoCAD direction-based mode (L→R window solid blue, R→L crossing dashed green). New entities-select / selection-start / selection-end events.",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "3.0.0",
+    text: "Rulers and a properties panel — opt-in DPI-aware rulers (zoom-adaptive ticks, mm / inch / dxf-units) and a read-only <PropertiesPanel> for the picked entity (General + per-type Geometry + Text). getEntityProperties() exported for custom layouts.",
+  },
+  {
+    pkg: "dxf-vuer",
+    version: "3.0.0",
+    text: "Layer power-ups — auto-grouping by name prefix (A-WALL, A-DOOR → group A) with batch toggles, controlled v-model:hidden-layers, layer-row hover highlight, and a precise geometric highlight that traces the entity outline instead of a bounding box.",
+  },
+  {
     pkg: "dxf-vuer",
     version: "3.0.0",
     text: "classes prop on <DXFViewer> — Headless UI-style class map for ~10 root elements (root, toolbar, layerPanel, fileNameOverlay, coordinatesOverlay, debugOverlay, loadingOverlay, errorOverlay, dropOverlay, emptyStateOverlay). Tailwind / utility-CSS finally first-class, no :deep() workarounds.",
@@ -19,6 +54,26 @@ export const whatsNew: WhatsNewItem[] = [
     pkg: "dxf-vuer",
     version: "3.0.0",
     text: "Stable .dxfk-* hook classes — every overlay and component root has a single-class, low-specificity selector (specificity 0,1,0) safe for plain CSS overrides and Tailwind @apply. Documented in README → Customizing styles. Breaking: classes and CSS variables renamed (.dxf-viewer → .dxfk-viewer, --dxf-vuer-* → --dxfk-*), child components own their dark-theme styles via a darkTheme prop instead of parent :deep() — see migration table.",
+  },
+  {
+    pkg: "dxf-render",
+    version: "1.7.0",
+    text: "Interaction primitives — buildHighlightGeometry (precise entity outlines), findSnapPoint / getEntitySnapPoints (CAD object snap), and findEntriesInRect (window / crossing rectangle test). Framework-agnostic building blocks behind the new measurement, snap and rectangle-selection tools.",
+  },
+  {
+    pkg: "dxf-render",
+    version: "1.7.0",
+    text: "Measurement & layer utilities — measureDistance / measureArea / measurePerimeter / measureAngle / measureDirectedAngle (+ polygonSelfIntersects), groupLayersByPrefix for layer-panel auto-grouping, and getUnitsToMmFactor($INSUNITS) for unit-aware labels.",
+  },
+  {
+    pkg: "dxf-render",
+    version: "1.7.0",
+    text: "ACAD_GROUP support — the OBJECTS parser now reads named GROUP records (new DxfGroup type), and buildAssociations emits 'group' links so picking a grouped entity can highlight the whole group.",
+  },
+  {
+    pkg: "dxf-interaction",
+    version: "0.1.0",
+    text: "New package dxf-interaction — the framework-agnostic interaction controllers (measure / snap / picking / highlight / rectangle-select) shared by dxf-vuer, dxf-react and dxf-lit. Install it directly only when building your own wrapper over dxf-render; otherwise it ships transitively.",
   },
   {
     pkg: "dxf-render",
@@ -169,7 +224,13 @@ export const whatsNew: WhatsNewItem[] = [
 
 // The most recent release wave, shown on the home page. Everything else is
 // archived on the /changelog page.
-const LATEST_VERSIONS = new Set(["dxf-vuer@3.0.0", "dxf-render@1.6.0"]);
+const LATEST_VERSIONS = new Set([
+  "dxf-react@0.1.0",
+  "dxf-lit@0.1.0",
+  "dxf-vuer@3.0.0",
+  "dxf-render@1.7.0",
+  "dxf-interaction@0.1.0",
+]);
 
 export const latestWhatsNew: WhatsNewItem[] = whatsNew.filter((item) =>
   LATEST_VERSIONS.has(`${item.pkg}@${item.version}`),

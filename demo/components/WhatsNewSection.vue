@@ -92,6 +92,36 @@ import { latestWhatsNew } from "../whatsNew";
   background: #1b3a1f;
 }
 
+.whats-new-version.pkg-dxf-react {
+  color: #0b7285;
+  background: #e3f7fb;
+}
+
+.app.dark .whats-new-version.pkg-dxf-react {
+  color: #61dafb;
+  background: #0b2a33;
+}
+
+.whats-new-version.pkg-dxf-lit {
+  color: #5b21b6;
+  background: #f1e9fe;
+}
+
+.app.dark .whats-new-version.pkg-dxf-lit {
+  color: #c4b5fd;
+  background: #2a1b46;
+}
+
+.whats-new-version.pkg-dxf-interaction {
+  color: #b45309;
+  background: #fef3e2;
+}
+
+.app.dark .whats-new-version.pkg-dxf-interaction {
+  color: #fbbf24;
+  background: #3a2a10;
+}
+
 .whats-new-pkg {
   opacity: 0.85;
 }

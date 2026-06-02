@@ -24,7 +24,9 @@ export function trackEvent(
 ): void;
 export function trackEvent(
   name: "external-link",
-  props: { target: "github" | "github-releases" | "npm-render" | "npm-vuer" | "npm-react" },
+  props: {
+    target: "github" | "github-releases" | "npm-render" | "npm-vuer" | "npm-react" | "npm-lit";
+  },
 ): void;
 export function trackEvent(
   name: "dxf-error",

@@ -58,10 +58,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "dxf-interaction": "workspace:*"
+    "dxf-interaction": "workspace:^"
   },
   "peerDependencies": {
-    "dxf-render": "^1.6.0",
+    "dxf-render": "^1.7.0",
     "lit": "^3.0.0",
     "three": ">=0.160.0"
   },

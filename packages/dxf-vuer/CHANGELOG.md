@@ -2,21 +2,74 @@
 
 ## 3.0.0
 
+This release adds a full interaction layer (measurement tools, geometry snap,
+rectangle selection, rulers, a properties panel, layer grouping) on top of a
+breaking CSS rename that unifies the styling surface with the new `dxf-react` and
+`dxf-lit` wrappers.
+
 ### Breaking changes
 
-- **All public CSS classes renamed to a unified `.dxfk-*` prefix.** The old names (`.dxf-viewer`, `.viewer-toolbar`, `.toolbar-button`, `.layer-panel`, `.layer-panel-header`, `.layer-item`, `.file-uploader`, `.file-button`, `.dxf-statistics`, `.unsupported-entities`, etc.) are gone. The new prefix is framework-neutral so the planned `dxf-react` and web-component wrappers share the same class surface. Rename one-to-one in your overrides — see [README → Migration from v2.x](./README.md#migration-from-v2x) for the full table.
+- **All public CSS classes renamed to a unified `.dxfk-*` prefix.** The old names (`.dxf-viewer`, `.viewer-toolbar`, `.toolbar-button`, `.layer-panel`, `.layer-panel-header`, `.layer-item`, `.file-uploader`, `.file-button`, `.dxf-statistics`, `.unsupported-entities`, etc.) are gone. The new prefix is framework-neutral so the `dxf-react` and `dxf-lit` wrappers share the same class surface. Rename one-to-one in your overrides — see [README → Migration from v2.x](./README.md#migration-from-v2x) for the full table.
 - **CSS custom properties renamed `--dxf-vuer-*` → `--dxfk-*`.** Same motivation: framework-neutral surface across wrappers. Internal `var(--dxfk-X, fallback)` ensures components still work without `import "dxf-vuer/style.css"`.
 - **Dark-theme overrides moved out of `DXFViewer`.** Previously the viewer reached into `ViewerToolbar` and `LayerPanel` via 15 `::v-deep` (`:deep()`) selectors. Those are removed; each child now accepts a `darkTheme` boolean prop and owns its own dark styles locally. If you used `<ViewerToolbar>` or `<LayerPanel>` standalone with `:deep(.toolbar-button)` from a parent, switch to passing `:dark-theme` directly.
 
 ### Features
 
+#### Measurement tools
+
+- **Distance / area / angle measurement** — three mutually-exclusive on-canvas tools selected via a single `v-model:measure-mode` (`"none" | "distance" | "area" | "angle"`, default `"none"`). **Distance:** click two points for the Euclidean distance, shown as an HTML label above the midpoint. **Area:** click N vertices for a polygon (live outline + translucent fill + vertex markers) with live area + perimeter at the centroid — closes on double-click, a click on the first vertex, or <kbd>Enter</kbd> (≥3 vertices); <kbd>Backspace</kbd> removes the last vertex; self-intersecting polygons are measured as-is with `selfIntersecting: true`. **Angle:** a 3-point directed angle swept counter-clockwise `[0°, 360°)` with a live ray + arc preview. <kbd>Esc</kbd> cancels any tool. Pan/zoom stay usable; picking and rectangle-selection auto-suspend while a tool is active. New props `showMeasureButton` / `showMeasureAreaButton` / `showMeasureAngleButton`, `measureUnits`, `measureAreaUnits` (`AreaUnits`), `measureAngleUnits` (`AngleUnits` — `deg` / `rad` / `dms`), `measureColor`. New events `measure` / `measure-area` / `measure-angle` / `measure-cancel` + `update:measureMode`. New methods `clearMeasure()` / `setMeasureMode(mode)`. New `ViewerClasses` label slots (`measureLabel` / `measureAreaLabel` / `measureAngleLabel`) and `--dxfk-measure-color`. New types `MeasureMode`, `AreaUnits`, `AngleUnits`, `MeasureResult`, `AreaMeasureResult`, `AngleMeasureResult`.
+- **Snap-to-geometry for measurements** — new `snapToGeometry` prop (default `true`). While any measurement mode is active, clicks snap to the nearest endpoint / midpoint / center / quadrant / point-node, and an AutoCAD-style marker glyph (square / triangle / circle / diamond / cross, tinted with `measureColor`) tracks the cursor. Active only during measurement; works with or without `pickingEnabled`. Backed by `findSnapPoint` from `dxf-render`.
+
+#### Selection & highlight
+
+- **Rectangle selection** — new props `rectangleSelection` (default `false`), `rectangleSelectionModifier` (`shift` / `ctrl` / `alt`), `rectangleSelectionMode` (`auto` / `window` / `crossing`). Hold the modifier and drag to select multiple entities; AutoCAD direction-based mode (L→R = window, solid blue; R→L = crossing, dashed green). <kbd>Esc</kbd> cancels. New events `entities-select` / `selection-start` / `selection-end`, new `ViewerClasses.selectionRect`, and `--dxfk-selection-rect-*` CSS custom properties (dark-theme defaults).
+- **Precise geometric highlight** — `useHighlight` now traces the visible geometry of the hovered / highlighted entity (line, circle, arc, polyline with bulge, spline, hatch contour, INSERT children) instead of a single bounding box; falls back to bbox edges for TEXT / MTEXT / DIMENSION / ATTRIB / ATTDEF / POINT. `highlight(handles)` / `clearHighlight()` signatures unchanged.
+
+#### Rulers & properties
+
+- **Rulers** — `showRulers` (default `false`), `rulerUnits` (`dxf-units` / `mm` / `inch`). Horizontal + vertical rulers with zoom-adaptive tick step, a cursor position marker, and a corner unit badge. DPI-aware `<canvas>` synced to pan/zoom. New `ViewerClasses` keys `rulerHorizontal` / `rulerVertical` / `rulerCorner`; `RulerUnits` type exported.
+- **`<PropertiesPanel>`** — optional read-only properties panel for the entity selected via picking. New props `showPropertiesPanel` (default `false`) and `propertiesPanelPosition`; new `clearSelection()` method and `ViewerClasses.propertiesPanel` slot. Groups properties into General + per-type Geometry + Text. The pure `getEntityProperties(entity)` helper plus `PropertyRow` / `PropertySection` types are exported so consumers can render a custom layout.
+
+#### Layers
+
+- **Controlled layer visibility — `v-model:hidden-layers`** — optional `hiddenLayers` prop + `update:hiddenLayers` emit. When provided, the viewer is controlled (parent owns the state; `persistLayersKey` is ignored); when omitted, behavior is unchanged. Frozen layers never appear in the array, unknown names are ignored, and the initial state on load is not emitted.
+- **Layer auto-grouping by prefix** — new `groupLayers?: boolean | GroupLayersByPrefixOptions` prop on `<DXFViewer>` / `<LayerPanel>` (default `false`). Buckets layers by common prefix (`A-WALL`, `A-DOOR` → group `A`) with a collapsible group header, a `visible / total · entities` counter, and a four-state batch eye-toggle. New `.dxfk-layer-group*` hook classes; dark theme supported.
+- **Highlight-on-layer-hover** — hovering a `<LayerPanel>` row highlights every entity on that layer via the precise highlight overlay. New `layer-hover(layerName | null)` event (forwarded from `<DXFViewer>`); active when `highlightOnHover` + `pickingEnabled` are on.
+
+#### Styling
+
 - **Stable hook classes documented.** Every overlay and component root carries a single-class, low-specificity `.dxfk-*` selector — safe for plain CSS overrides and Tailwind `@apply`. See [README → Customizing styles](./README.md#customizing-styles).
-- **`classes` prop on `DXFViewer`** (Headless UI-style): `:classes="{ root, toolbar, layerPanel, fileNameOverlay, coordinatesOverlay, debugOverlay, loadingOverlay, errorOverlay, dropOverlay, emptyStateOverlay }"`. Each key concatenates onto the matching `.dxfk-*` root. New `ViewerClasses` type exported from the package entry.
-- **Flattened nested selectors.** Removed `.warning-header svg`, `.stat-section h4`, `.message-content.error svg` in favour of single-class selectors (`.dxfk-unsupported-icon`, `.dxfk-statistics-section-title`, `.dxfk-message-icon--error`). All selectors are now specificity `0,1,0`, so Tailwind utility classes can win without `!important`.
+- **`classes` prop on `DXFViewer`** (Headless UI-style): a map of `.dxfk-*` root slots (`root`, `toolbar`, `layerPanel`, `propertiesPanel`, `rulerHorizontal` / `rulerVertical` / `rulerCorner`, `selectionRect`, `measureLabel` / `measureAreaLabel` / `measureAngleLabel`, overlays). Each key concatenates onto the matching root. New `ViewerClasses` type exported.
+- **Flattened nested selectors.** Removed `.warning-header svg`, `.stat-section h4`, `.message-content.error svg` in favour of single-class selectors. All selectors are now specificity `0,1,0`, so Tailwind utility classes can win without `!important`.
+
+#### Composables
+
+- New composables exported for headless integrations: `useMeasurement`, `useAreaMeasurement`, `useAngleMeasurement`, `useSnap`, `useRectangleSelection`. Pure helpers `resolveSelectionMode` / `normaliseScreenRect` / `buildWorldRect` and formatters `formatMeasureValue` / `formatAreaValue` / `formatAngleValue` exported alongside. `useLayers` gains controlled mode (`getControlledHidden` / `onChange` options + `setHiddenLayers` + `hiddenLayerNames`). New `#toolbar` slot scope bindings wire all three measurement tools from a custom toolbar.
+
+### Bug Fixes
+
+- **Layer-panel entity counts now include entities defined inside blocks.** Counts use the flat entity index (`findEntitiesByLayer`), so a layer whose entities live only in block definitions no longer shows `0`.
+- **Hidden / frozen layers are no longer interactive.** Entities on a layer turned off (or frozen) can no longer be picked, caught by rectangle selection, or used as snap targets. Programmatic `highlight(handles)` / `zoomToEntity` still work on any layer.
+- **Measurement overlays are cleared when a new DXF is loaded.** A completed measurement no longer lingers over the next drawing.
+- **Measurement HTML labels follow pan/zoom.** Labels re-project on every `controls.change` instead of freezing at their initial screen position.
+- **Standalone `:url` load clears the empty-state overlay** and keeps pan/zoom working. `hasDXFData` now derives from any active source (`dxfData` prop OR data loaded via `url` / `loadDXFFromText` / drag-and-drop) instead of only `props.dxfData`.
+
+### Refactored
+
+- The interaction state machines (pointer-tool base, distance/area/angle measurement, snap, rectangle selection, picking, highlight) were extracted to the new **`dxf-interaction`** package; the composables are now thin Vue bindings over its `createX(...)` factories. No public API change — same composables, exports, types, formatters and reactive surfaces. `dxf-interaction` is added as a regular dependency so it installs transitively (invisible to consumers).
+- `DXFViewer.vue` decomposed into focused internal composables (`useViewerUnits`, `useMeasureLabels`, `useCursorCoordinates`, `useDragAndDrop`, `useFullscreen`); the three measurement composables now share an internal `usePointerTool` base (~600 fewer lines). No change to props, emits, slots, methods or behavior.
+
+### Documentation
+
+- README now leads with "Vue 3 DXF viewer component" and a "Why dxf-vuer?" feature list; new "Customizing styles" section (hook-class table, CSS-override / Tailwind / `classes` examples) and a v2.x → v3.0 migration table. npm keywords extended (`vue-dxf`, `vue-dxf-viewer`, `vue-component`, `dxf-vuer`).
 
 ### Migration
 
 Drop-in for most projects — only style overrides need rewriting. See the rename table in [README → Migration from v2.x](./README.md#migration-from-v2x).
+
+### Dependencies
+
+- Requires `dxf-render` ≥ 1.7.0 (highlight geometry, geometry snap, rectangle-select, measurement & layer-grouping utilities, ACAD_GROUP associations, shared interaction constants).
 
 ## 2.6.0
 

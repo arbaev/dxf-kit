@@ -617,6 +617,14 @@
         >
         &middot;
         <a
+          href="https://www.npmjs.com/package/dxf-lit"
+          target="_blank"
+          rel="noopener noreferrer"
+          @click="trackEvent('external-link', { target: 'npm-lit' })"
+          >dxf-lit</a
+        >
+        &middot;
+        <a
           href="https://github.com/arbaev/dxf-kit"
           target="_blank"
           rel="noopener noreferrer"

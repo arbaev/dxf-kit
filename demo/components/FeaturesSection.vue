@@ -13,7 +13,7 @@ const features = [
   {
     title: "Built-in Parser",
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
-    body: "Custom DXF parser with zero external dependencies. 21 entity types including dimensions, hatches, splines, multilines, construction lines, and block attributes. Async parsing in a Web Worker keeps the UI responsive.",
+    body: "Custom DXF parser with zero external dependencies. 22 entity types including dimensions, hatches, splines, multilines, construction lines, regions, and block attributes. Async parsing in a Web Worker keeps the UI responsive.",
   },
   {
     title: "Vector Text",
@@ -31,19 +31,24 @@ const features = [
     body: "Geometry merging cuts draw calls by 78%. Block template caching, time-sliced rendering with progress bar. Text batched as geometry with all other entities.",
   },
   {
-    title: "21 Entity Types",
+    title: "22 Entity Types",
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
-    body: "Lines, arcs, splines, multilines, construction lines, hatches with 25 AutoCAD patterns, architectural dimensions, block inserts with attributes, leader/multileader. Variable-width polylines with per-vertex tapering, arrows, and donuts. Linetypes, OCS transforms, and paper space filtering.",
+    body: "Lines, arcs, splines, multilines, construction lines, hatches with 29 AutoCAD patterns, architectural dimensions, block inserts with attributes, leader/multileader. Variable-width polylines with per-vertex tapering, arrows, and donuts. Linetypes, OCS transforms, and paper space filtering.",
   },
   {
     title: "Picking & Associations",
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7 18 2-8 8-2z"/><line x1="13" y1="13" x2="21" y2="21"/></svg>',
-    body: "Hover and click individual entities with raycasting. Built-in highlight overlay plus <code>entity-hover</code> / <code>entity-click</code> events for external UI sync (AG Grid, side panels). Highlight a whole semantic group automatically — MLEADER, LEADER&rarr;TEXT (DXF code 340), INSERT+ATTRIB, DIMENSION — through the pure-data <code>buildAssociations()</code> API.",
+    body: "Hover and click individual entities with raycasting. Built-in highlight overlay plus <code>entity-hover</code> / <code>entity-click</code> events for external UI sync (AG Grid, side panels). Highlight a whole semantic group automatically — MLEADER, LEADER&rarr;TEXT (DXF code 340), INSERT+ATTRIB, DIMENSION, ACAD_GROUP — through the pure-data <code>buildAssociations()</code> API.",
   },
   {
-    title: "Framework Flexible",
+    title: "Measure & Interact",
+    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg>',
+    body: "Measure distances, polygon areas (with perimeter) and 3-point angles with CAD-style geometry snap. Plus rectangle window/crossing selection, a read-only properties panel for the picked entity, DPI-aware rulers, and layer auto-grouping by prefix &mdash; shared across the Vue, React and Web Component wrappers.",
+  },
+  {
+    title: "Vue, React & Web Components",
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
-    body: 'Vue 3 component via dxf-vuer, or use <a href="https://www.npmjs.com/package/dxf-render" target="_blank" rel="noopener noreferrer">dxf-render</a> standalone with React, Svelte, or vanilla JS. Parser-only mode for Node.js. Full TypeScript support.',
+    body: 'Drop-in components for <a href="https://www.npmjs.com/package/dxf-vuer" target="_blank" rel="noopener noreferrer">Vue</a>, <a href="https://www.npmjs.com/package/dxf-react" target="_blank" rel="noopener noreferrer">React</a>, and any stack via the <a href="https://www.npmjs.com/package/dxf-lit" target="_blank" rel="noopener noreferrer">&lt;dxf-viewer&gt; Web Component</a> &mdash; all on one engine. Or use <a href="https://www.npmjs.com/package/dxf-render" target="_blank" rel="noopener noreferrer">dxf-render</a> standalone with Svelte, Angular, or vanilla JS, parser-only in Node.js. Full TypeScript.',
   },
 ];
 </script>

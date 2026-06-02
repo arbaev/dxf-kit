@@ -94,7 +94,8 @@ const stackblitzFramework = computed(
     (active.value.id === "vanilla" ? "vanilla-ts" : active.value.id) as
       | "vanilla-ts"
       | "react"
-      | "vue",
+      | "vue"
+      | "lit",
 );
 
 const copied = ref(false);

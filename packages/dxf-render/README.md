@@ -11,7 +11,7 @@ Framework-agnostic **AutoCAD DXF parser and Three.js/WebGL renderer** for the br
 
 Try it now on StackBlitz: [Vanilla TS](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vanilla-ts?file=src/main.ts&title=dxf-render+Vanilla+TS) | [React](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/react?file=src/App.tsx&title=dxf-render+React) | [Vue](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vue?file=src/App.vue&title=dxf-vuer+Vue+3) | [Web Component](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/lit?file=index.html&title=dxf-lit+Web+Component) | [Leaflet + DXF](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/leaflet-dxf?file=src/main.ts&title=dxf-render+Leaflet) | [DXF to PDF](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/dxf-to-pdf?file=src/main.ts&title=dxf-render+PDF+Export)
 
-For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer) package.
+For ready-made viewer components, see the framework wrappers: [dxf-vuer](https://www.npmjs.com/package/dxf-vuer) (Vue 3), [dxf-react](https://www.npmjs.com/package/dxf-react) (React), and [dxf-lit](https://www.npmjs.com/package/dxf-lit) (the `<dxf-viewer>` Web Component) — all built on this engine and the shared [dxf-interaction](https://www.npmjs.com/package/dxf-interaction) controllers.
 
 ## Why dxf-render?
 
@@ -20,7 +20,7 @@ For Vue 3 components, see the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer)
 - **Accurate rendering** — linetype patterns, OCS transforms, hatch patterns, proper color resolution
 - **Picking & associations** — bbox-based raycast index plus DXF-driven entity links (LEADER↔TEXT, INSERT+ATTRIB, MLEADER, DIMENSION, ACAD_GROUP)
 - **Two entry points** — full renderer or parser-only (zero deps, works in Node.js)
-- **Battle-tested** — 1141 tests covering parser, renderer, and utilities
+- **Battle-tested** — 1299 tests covering parser, renderer, and utilities
 - **Modern stack** — TypeScript native, ES modules, tree-shakeable, Vite-built
 - **Framework-agnostic** — works with React, Svelte, Angular, vanilla JS, or any framework
 
@@ -464,7 +464,7 @@ Notes:
 
 ### Rectangle selection
 
-`findEntriesInRect(pickingIndex, rect, options?)` returns every `PickingEntry` whose bounding box satisfies a window- or crossing-style rectangle test. Pure data — no DOM events, no Three.js raycasting. The same helper powers the `entities-select` event in `dxf-vuer` and is intended for the React/Lit wrappers to reuse 1:1.
+`findEntriesInRect(pickingIndex, rect, options?)` returns every `PickingEntry` whose bounding box satisfies a window- or crossing-style rectangle test. Pure data — no DOM events, no Three.js raycasting. The same helper powers the `entities-select` event in `dxf-vuer`, `dxf-react` and `dxf-lit` (reused 1:1 via `dxf-interaction`).
 
 ```ts
 import { findEntriesInRect, type WorldRect } from "dxf-render";
@@ -723,13 +723,13 @@ Names are matched case-insensitively, with an optional leading underscore. Unkno
 | All dimension types       | ✅ 7 types                  | linear only  | —          | ❌        |
 | Standard arrowhead blocks | ✅ 18 kinds (DIMBLK)        | ❌           | —          | ❌        |
 | LEADER / MULTILEADER      | ✅                          | ❌           | —          | ❌        |
-| HATCH patterns            | ✅ 25 built-in              | ✅           | —          | ❌        |
+| HATCH patterns            | ✅ 29 built-in              | ✅           | —          | ❌        |
 | OCS (Arbitrary Axis)      | ✅ full                     | Z-flip only  | —          | ❌        |
 | Vector text (opentype.js) | ✅                          | ✅           | —          | ❌        |
 | Geometry merging          | ✅                          | ✅           | —          | ❌        |
 | Dark theme                | ✅ instant switch           | bg only      | —          | ❌        |
 | TypeScript                | ✅ native                   | .d.ts        | ✅         | ❌        |
-| Tests                     | 1141 tests                  | 0            | ✅         | 0         |
+| Tests                     | 1299 tests                  | 0            | ✅         | 0         |
 | Web Worker parsing        | ✅                          | ✅           | ❌         | ❌        |
 | Parser-only entry         | ✅ zero deps                | ❌           | ✅         | ❌        |
 | Framework                 | agnostic                    | agnostic     | —          | agnostic  |

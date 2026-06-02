@@ -32,4 +32,4 @@ at feature parity with [dxf-vuer](https://www.npmjs.com/package/dxf-vuer).
 
 ### Stats
 
-- 99 unit tests (pure helpers, layer state, formatters, smoke).
+- 67 unit tests (pure helpers, layer state, formatters, smoke).

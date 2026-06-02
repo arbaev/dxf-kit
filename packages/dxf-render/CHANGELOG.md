@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.7.0
+
+### Features
+
+- **Precise highlight geometry — `buildHighlightGeometry(entity, worldMatrix)`.** Pure helper that traces the visible outline of a DXF entity (LINE, CIRCLE, ARC, ELLIPSE, POLYLINE/LWPOLYLINE with bulge, SPLINE, SOLID, 3DFACE, HATCH, REGION, MLINE, LEADER, MULTILEADER) as polyline point arrays. Returns `fallbackToBBox: true` for types without a meaningful outline (TEXT, MTEXT, ATTRIB, ATTDEF, DIMENSION, POINT, INSERT). `HighlightGeometry` type exported alongside.
+- **Geometry snapping — `findSnapPoint()` / `getEntitySnapPoints()`.** `getEntitySnapPoints(entity, worldMatrix)` returns the characteristic object-snap points of a single entity (endpoints/midpoints of LINE/POLYLINE/MLINE/LEADER/MULTILEADER straight segments, centers + quadrants + arc midpoints of CIRCLE/ARC/ELLIPSE, corner endpoints of SOLID/3DFACE, SPLINE end fit-points, POINT nodes) in world coordinates. `findSnapPoint(pickingIndex, entityIndex, worldPos, tolerance, options?)` finds the best snap near a world position — bbox-culls via the picking index, resolves block instances through their `worldMatrix`, and picks the highest-priority candidate within tolerance (endpoint > midpoint > center = node > quadrant, nearest breaks ties). Planar (2D) proximity, so entities at non-zero z still snap. `FindSnapOptions.visibleLayers?: Set<string> | null` skips entities whose layer is hidden so snapping respects layer visibility. `SnapType`, `SnapPoint`, `SnapResult`, `FindSnapOptions` exported. (Bulge-segment midpoints and entity-intersection snaps are not yet included.)
+- **Rectangle selection — `findEntriesInRect(pickingIndex, rect, options?)`.** Returns every `PickingEntry` whose bbox satisfies a window- or crossing-style rectangle test. Options: `mode: "window" | "crossing"` (default `"crossing"`), `granularity: "aggregate" | "leaf"` (default `"aggregate"` — INSERT instances returned as a single aggregate entry). `WorldRect` and `FindInRectOptions` exported alongside.
+- **Measurement utilities.** `measureDistance(p1, p2)` (Euclidean 2D/3D), `measureArea(points)` / `measureSignedArea(points)` (Shoelace, absolute and signed), `measurePerimeter(points)` (closed-polygon perimeter), `measureAngle(vertex, p1, p2)` (unsigned `[0, π]`), `measureDirectedAngle(vertex, from, to)` (CCW-directed `[0, 2π)`), `polygonSelfIntersects(points)` (O(n²) self-intersection predicate), plus `toDegrees` / `toRadians`. Shared `MeasurePoint = { x, y, z? }` type. Framework-agnostic primitives behind the distance / area / angle measurement tools.
+- **Layer auto-grouping — `groupLayersByPrefix(layers, options?)`.** Groups layers sharing a common name prefix (`A-WALL`, `A-DOOR` → group `A`). Accepts `string[]` or `{ name: string }[]`. Options: `separator: RegExp | string = /[-_]/` (AutoCAD / AIA convention), `minGroupSize: number = 2` (single-prefix layers fall into the synthetic `""` ungrouped bucket, always sorted last). `LayerGroup<T>` and `GroupLayersByPrefixOptions` exported.
+- **ACAD_GROUP parsing.** The OBJECTS-section parser now extracts `GROUP` records and resolves their names via the `ACAD_GROUP` dictionary. New `DxfGroup` type and `DxfObjects.groups?: Record<string, DxfGroup>` field. Each group carries its handle, optional name/description, `isUnnamed` / `isSelectable` flags, and the ordered list of member entity handles.
+- **Group associations.** `buildAssociations` now emits `kind: "group"` / `source: "group-dict"` associations for every ACAD_GROUP with at least one resolvable member. For `kind: "group"`, `primary` is the GROUP object's handle (not a real entity) and `members` contains only member entity handles — `primary` is not included, since the GROUP handle cannot be raycast or highlighted. Other association kinds keep their previous invariant (`members` includes `primary`).
+- **`PickingEntry.worldMatrix?: THREE.Matrix4`** — composed local→world transform for entries inside INSERT chains / under OCS, so consumers can project raw entity geometry into world coordinates without rebuilding the transform.
+- **`PickingEntry.childIds?: string[]`** — for INSERT aggregate entries, the unique pick ids of all child entries emitted for that instance, so an aggregate can be expanded without scanning the full entries list.
+- **`getUnitsToMmFactor(insUnits)`** — conversion factor from DXF `$INSUNITS` to millimetres; returns 0 for unitless / out-of-range codes.
+- **Shared interaction tuning constants** — `CLICK_DISTANCE_THRESHOLD_PX`, `DOUBLE_CLICK_MS`, `DOUBLE_CLICK_DISTANCE_PX`, `ORIGIN_SNAP_RADIUS_PX`, `SNAP_TOLERANCE_PX`, `SNAP_MARKER_PX`, `ANGLE_ARC_RADIUS_FRACTION`, `ANGLE_ARC_MIN_PX`, `ANGLE_ARC_MAX_PX`, `ANGLE_ARC_SEGMENTS_PER_TURN`, `MEASUREMENT_OVERLAY_RENDER_ORDER`, `SNAP_OVERLAY_RENDER_ORDER`. One shared source of pixel / timing budgets for the pointer tools across every wrapper.
+
+### Bug Fixes
+
+- **MTEXT pick bbox** no longer collapses tall-and-narrow when a short single-word label (e.g. `"X-29"`) is authored with a narrow `width` reference. Lines with no whitespace cannot word-wrap and now render at their full overflow width, matching how the text actually displays.
+
+### Documentation
+
+- README intro reworded for discoverability ("AutoCAD DXF parser and Three.js/WebGL renderer for the browser, in TypeScript") plus a parser-only-in-Node note; fixed the React StackBlitz link (`src/DxfViewer.tsx` → `src/App.tsx`); `dxf-render` and `opentype` added to npm keywords.
+
 ## 1.6.0
 
 ### Features

@@ -13,7 +13,7 @@
 
 - **One tag** — drop in `<DXFViewer>` with typed props, refs, and callbacks
 - **Runs in the browser** — DXF is parsed client-side in a Web Worker; no backend, no AutoCAD, nothing uploaded
-- **21 entity types** — lines, arcs, splines, hatches, dimensions, leaders, multilines, and block inserts with attributes
+- **22 entity types** — lines, arcs, splines, hatches, dimensions, leaders, multilines, regions, and block inserts with attributes
 - **Crisp vector text** — triangulated opentype.js glyphs stay sharp at any zoom
 - **Interactive** — pan, zoom, layer toggles, measure tools, dark theme, and PNG export
 - **TypeScript-native** — fully typed props with `onEntityHover` / `onEntityClick` callbacks over the [dxf-render](https://www.npmjs.com/package/dxf-render) engine
@@ -24,7 +24,7 @@
 npm install dxf-react dxf-render three
 ```
 
-Peer dependencies: `react >= 18`, `react-dom >= 18`, `three >= 0.160`, `dxf-render >= 1.6.0`.
+Peer dependencies: `react >= 18`, `react-dom >= 18`, `three >= 0.160`, `dxf-render >= 1.7.0`.
 
 ## Quick Start
 

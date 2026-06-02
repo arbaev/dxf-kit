@@ -65,11 +65,15 @@ export interface FrameworkInfo {
 const ENGINE_FEATURES: FeatureItem[] = [
   {
     title: "Pan, zoom, layers & export",
-    body: "Toggle layer visibility, measure distances, areas and angles, pan and zoom, switch to a dark theme, and export the view to PNG.",
+    body: "Pan and zoom, toggle layer visibility (with auto-grouping by prefix), switch to a dark theme, and export the view to PNG.",
   },
   {
-    title: "21 DXF entity types",
-    body: "Lines, arcs, circles, splines, hatches, dimensions, leaders, multilines and block inserts with attributes — rendered accurately from the DXF.",
+    title: "Measure, snap & select",
+    body: "Measure distances, areas and angles with CAD-style geometry snap, rectangle-select entities (window / crossing), inspect the picked entity in a properties panel, and read off DPI-aware rulers.",
+  },
+  {
+    title: "22 DXF entity types",
+    body: "Lines, arcs, circles, splines, hatches, dimensions, leaders, multilines, regions and block inserts with attributes — rendered accurately from the DXF.",
   },
   {
     title: "Crisp vector text",
@@ -180,7 +184,7 @@ import "dxf-vuer/style.css";
       },
       {
         q: "Which DXF entities are supported?",
-        a: "21 entity types, including lines, arcs, circles, splines, hatches, dimensions, leaders, multilines and block inserts with attributes — rendered by the shared dxf-render engine.",
+        a: "22 entity types, including lines, arcs, circles, splines, hatches, dimensions, leaders, multilines, regions and block inserts with attributes — rendered by the shared dxf-render engine.",
       },
       {
         q: "Is dxf-vuer written in TypeScript?",
@@ -231,7 +235,7 @@ export default function Viewer() {
       },
       {
         q: "Which DXF entities are supported?",
-        a: "21 entity types, including lines, arcs, circles, splines, hatches, dimensions, leaders, multilines and block inserts with attributes — rendered by the shared dxf-render engine.",
+        a: "22 entity types, including lines, arcs, circles, splines, hatches, dimensions, leaders, multilines, regions and block inserts with attributes — rendered by the shared dxf-render engine.",
       },
       {
         q: "Is dxf-react written in TypeScript?",
