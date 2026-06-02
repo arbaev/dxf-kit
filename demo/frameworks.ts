@@ -258,7 +258,7 @@ export default function Viewer() {
   picking-enabled
   dark-theme
 ></dxf-viewer>`,
-    stackblitzUrl: null,
+    stackblitzUrl: `${STACKBLITZ_BASE}/lit?file=index.html&title=dxf-lit+Web+Component`,
     route: "/lit",
     icon: ICON_LIT,
     blurb:

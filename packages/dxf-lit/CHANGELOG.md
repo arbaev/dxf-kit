@@ -34,6 +34,10 @@ Initial release — a Web Component (`<dxf-viewer>`) wrapper for
   built-in UI as fallback.
 - Shadow-DOM theming via the shared `--dxfk-*` CSS variables (they pierce the boundary) and
   `::part()` for key nodes — no separate `style.css` is shipped.
+- TypeScript types — Custom Event payload types (`PickingEvent`, `MeasureResult`,
+  `AreaMeasureResult`, `AngleMeasureResult`, `RectSelectionResolvedMode` / `RectSelectionMode`
+  / `RectSelectionModifier`) are re-exported so event handlers can be typed; all of
+  `dxf-render` is re-exported too.
 
 ### Stats
 

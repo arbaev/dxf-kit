@@ -16,7 +16,7 @@ export function trackEvent(name: "file-upload", props: { source: "button" | "dra
 export function trackEvent(name: "sample-load", props: { name: string }): void;
 export function trackEvent(
   name: "stackblitz-open",
-  props: { framework: "vanilla-ts" | "react" | "vue" | "leaflet-dxf" | "dxf-to-pdf" },
+  props: { framework: "vanilla-ts" | "react" | "vue" | "lit" | "leaflet-dxf" | "dxf-to-pdf" },
 ): void;
 export function trackEvent(
   name: "framework-demo",
@@ -24,7 +24,7 @@ export function trackEvent(
 ): void;
 export function trackEvent(
   name: "external-link",
-  props: { target: "github" | "npm-render" | "npm-vuer" | "npm-react" },
+  props: { target: "github" | "github-releases" | "npm-render" | "npm-vuer" | "npm-react" },
 ): void;
 export function trackEvent(
   name: "dxf-error",

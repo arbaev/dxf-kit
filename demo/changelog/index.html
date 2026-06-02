@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Set the dark background before the app bundle loads so full-page
+      // navigations don't flash white in dark mode (mirrors useDarkTheme.ts).
+      (function () {
+        try {
+          var v = localStorage.getItem("dxf-vuer-demo:dark-theme");
+          if (v === "1" || (v === null && matchMedia("(prefers-color-scheme: dark)").matches)) {
+            document.documentElement.style.backgroundColor = "#121212";
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <title>Changelog — dxf-kit</title>
+    <meta
+      name="description"
+      content="Changelog for the dxf-kit packages (dxf-render, dxf-vuer, dxf-react, dxf-lit) — notable features and fixes across releases."
+    />
+    <meta
+      name="keywords"
+      content="dxf-kit changelog, dxf-render changelog, dxf-vuer changelog, dxf viewer releases"
+    />
+    <link rel="canonical" href="https://dxf-kit.netlify.app/changelog" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Changelog — dxf-kit" />
+    <meta
+      property="og:description"
+      content="Notable features and fixes across the dxf-kit package releases."
+    />
+    <meta property="og:url" content="https://dxf-kit.netlify.app/changelog" />
+    <meta property="og:image" content="https://dxf-kit.netlify.app/og-image.png" />
+    <meta property="og:site_name" content="dxf-kit" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Changelog — dxf-kit" />
+    <meta
+      name="twitter:description"
+      content="Notable features and fixes across the dxf-kit package releases."
+    />
+    <meta name="twitter:image" content="https://dxf-kit.netlify.app/og-image.png" />
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="dxf-kit" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Umami analytics (proxied through Netlify, see netlify.toml) -->
+    <script
+      defer
+      src="/script.js"
+      data-website-id="717922e7-0a26-45bf-9b01-2e78ef3e0db2"
+      data-host-url="https://dxf-kit.netlify.app"
+    ></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/changelog-main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "dxf-lit-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build"
+  },
+  "dependencies": {
+    "dxf-lit": "^0.1.0",
+    "dxf-render": "^1.6.0",
+    "lit": "^3.0.0",
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.182.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  }
+}

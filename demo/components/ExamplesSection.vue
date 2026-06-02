@@ -31,14 +31,6 @@ const STACKBLITZ_BASE = "https://stackblitz.com/github/arbaev/dxf-kit/tree/main/
 
 const examples = [
   {
-    framework: "vanilla-ts",
-    title: "Vanilla TypeScript",
-    description:
-      "Minimal setup with dxf-render and Three.js — parse, render, and display a DXF file.",
-    url: `${STACKBLITZ_BASE}/vanilla-ts?file=src/main.ts&title=dxf-render+Vanilla+TS`,
-    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>',
-  },
-  {
     framework: "react",
     title: "React",
     description: "Drop-in DXF viewer using the dxf-react component — dark theme, layers, and export.",
@@ -52,6 +44,22 @@ const examples = [
       "Drop-in DXF viewer using the dxf-vuer component — dark theme, layers, and export.",
     url: `${STACKBLITZ_BASE}/vue?file=src/App.vue&title=dxf-vuer+Vue+3`,
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3l10 19L22 3"/><path d="M6.5 3L12 14.5 17.5 3"/></svg>',
+  },
+  {
+    framework: "lit",
+    title: "Lit / Web Component",
+    description:
+      "Drop-in <dxf-viewer> Web Component from dxf-lit — works in any framework or none: dark theme, layers, and export.",
+    url: `${STACKBLITZ_BASE}/lit?file=index.html&title=dxf-lit+Web+Component`,
+    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2c1.2 3.6 4.8 5 4.8 8.6A4.8 4.8 0 0 1 7.2 10.6c0-1.4.6-2.4 1.2-3 .4 1.8 1.8 2.3 1.8 2.3C9 7 12 5 12 2z"/></svg>',
+  },
+  {
+    framework: "vanilla-ts",
+    title: "Vanilla TypeScript",
+    description:
+      "Minimal setup with dxf-render and Three.js — parse, render, and display a DXF file.",
+    url: `${STACKBLITZ_BASE}/vanilla-ts?file=src/main.ts&title=dxf-render+Vanilla+TS`,
+    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>',
   },
   {
     framework: "leaflet-dxf",

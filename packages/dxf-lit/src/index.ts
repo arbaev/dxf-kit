@@ -20,6 +20,20 @@ export type {
   LoadingPhase,
 } from "./types";
 
+// Interaction event / result types surfaced through Custom Events (entity-hover,
+// entity-click, entities-select, measure, measure-area, measure-angle,
+// selection-start). Re-exported so consumers can type their event handlers —
+// parity with the dxf-vuer / dxf-react wrappers.
+export type {
+  PickingEvent,
+  MeasureResult,
+  AreaMeasureResult,
+  AngleMeasureResult,
+  RectSelectionResolvedMode,
+  RectSelectionMode,
+  RectSelectionModifier,
+} from "dxf-interaction";
+
 /** Register a custom element once. Guarded against double registration. */
 function defineElement(tag: string, ctor: CustomElementConstructor): void {
   if (typeof customElements !== "undefined" && !customElements.get(tag)) {

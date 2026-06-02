@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dxf-lit — Web Component Example</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; }
+    #toolbar { padding: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    #toolbar label,
+    #toolbar button {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 16px; background: #fff; border: 1px solid #ccc;
+      border-radius: 6px; cursor: pointer; font-size: 14px; font: inherit;
+    }
+    #toolbar label:hover,
+    #toolbar button:hover { border-color: #888; }
+    #status { font-size: 14px; color: #666; }
+
+    /* dxf-lit ships no stylesheet — the Shadow DOM is themed with --dxfk-* */
+    dxf-viewer {
+      display: block;
+      width: 100%;
+      height: calc(100vh - 64px);
+      --dxfk-primary-color: #2563eb;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <label>
+      <input type="file" accept=".dxf" id="file-input" hidden />
+      Open DXF file
+    </label>
+    <button id="theme-btn" type="button">Toggle dark theme</button>
+    <span id="status">Loading sample…</span>
+  </div>
+
+  <!--
+    <dxf-viewer> is a standard Custom Element registered by importing "dxf-lit".
+    Everything below is declarative: attributes drive the built-in UI, the
+    drawing loads itself from the `url`, and state flows back out via events.
+  -->
+  <dxf-viewer
+    id="viewer"
+    url="/sample.dxf"
+    file-name="sample.dxf"
+    show-rulers
+    show-layer-panel
+    show-coordinates
+    show-reset-button
+    picking-enabled
+  ></dxf-viewer>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

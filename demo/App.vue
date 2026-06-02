@@ -587,8 +587,8 @@
       <StatsSection />
       <FeaturesSection />
       <FrameworkTabs />
-      <WhatsNewSection />
       <ExamplesSection />
+      <WhatsNewSection />
 
       <footer class="app-footer">
         MIT License &middot;

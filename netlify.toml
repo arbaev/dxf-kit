@@ -44,6 +44,11 @@
   to = "/lit/index.html"
   status = 200
 
+[[redirects]]
+  from = "/changelog"
+  to = "/changelog/index.html"
+  status = 200
+
 # Unknown paths → branded 404 page with a real 404 status. No SPA fallback:
 # this is a multi-page site, not a client-routed app, so rewriting everything to
 # index.html would create soft-404s that hurt SEO. Real files and the framework

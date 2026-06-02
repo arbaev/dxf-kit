@@ -9,6 +9,8 @@ behind [dxf-vuer](https://www.npmjs.com/package/dxf-vuer) (Vue) and
 One custom element works in **any stack** — Lit, Angular, Svelte, plain HTML, or no
 framework at all.
 
+[Live Demo](https://dxf-kit.netlify.app/lit) | [GitHub](https://github.com/arbaev/dxf-kit) | [Open in StackBlitz](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/lit?file=index.html&title=dxf-lit+Web+Component)
+
 ## Why dxf-lit?
 
 - **One tag, any framework** — `<dxf-viewer url="…">` is a standard Custom Element.
@@ -75,6 +77,20 @@ viewer.addEventListener("dxf-loaded", (e) => console.log(e.detail)); // boolean
 Other events: `dxf-data`, `error`, `unsupported-entities`, `entity-hover`,
 `layer-hover`, `selection-start`, `selection-end`, `measure-area`, `measure-angle`,
 `measure-cancel`, `reset-view`, `file-dropped`.
+
+In TypeScript the payload types are re-exported from `dxf-lit`, so handlers can be
+typed by casting the event:
+
+```ts
+import type { PickingEvent, MeasureResult } from "dxf-lit";
+
+viewer.addEventListener("entity-click", (e) => {
+  const pick = (e as CustomEvent<PickingEvent>).detail;
+  console.log(pick.type, pick.layer);
+});
+```
+
+(`AreaMeasureResult`, `AngleMeasureResult`, `RectSelectionResolvedMode` are exported too.)
 
 ### Methods
 

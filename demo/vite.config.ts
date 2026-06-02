@@ -13,7 +13,7 @@ import { arraybufferPlugin } from "../packages/dxf-render/vite-plugins/arraybuff
 // `vite build` emits the framework pages via rollupOptions.input and copies
 // 404.html from publicDir, so this plugin does nothing at build time.
 function frameworkRoutes(): Plugin {
-  const routes = ["vue", "react", "lit"];
+  const routes = ["vue", "react", "lit", "changelog"];
   const notFoundPath = path.resolve(__dirname, "../public/404.html");
   const rewrite = (req: { url?: string }) => {
     const pathname = (req.url ?? "").split("?")[0];
@@ -114,6 +114,7 @@ export default defineConfig(({ command }) => {
           vue: path.resolve(__dirname, "vue/index.html"),
           react: path.resolve(__dirname, "react/index.html"),
           lit: path.resolve(__dirname, "lit/index.html"),
+          changelog: path.resolve(__dirname, "changelog/index.html"),
         },
         output: {
           manualChunks: {
