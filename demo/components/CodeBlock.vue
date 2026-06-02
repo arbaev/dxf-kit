@@ -1,15 +1,20 @@
 <template>
   <div class="code-block">
     <span class="code-lang">{{ lang }}</span>
-    <pre><code>{{ code }}</code></pre>
+    <pre><code v-html="highlighted"></code></pre>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
+import { highlight } from "../utils/highlight";
+
 // Read-only code presentation shared by the framework landing pages and the
-// "Works with your stack" tabs. No syntax highlighting (dependency-free) — just
-// a monospaced block with a language label.
-defineProps<{ code: string; lang: string }>();
+// "Works with your stack" tabs. Highlighting is done by a tiny, dependency-free
+// tokenizer (utils/highlight.ts) — just enough colour to read, no library.
+const props = defineProps<{ code: string; lang: string }>();
+
+const highlighted = computed(() => highlight(props.code));
 </script>
 
 <style scoped>
@@ -45,5 +50,52 @@ defineProps<{ code: string; lang: string }>();
   line-height: 1.6;
   color: var(--text-color);
   white-space: pre;
+}
+
+/* Token palette — light theme (GitHub-light inspired). */
+.code-block :deep(.tok-cm) {
+  color: #6e7781;
+  font-style: italic;
+}
+.code-block :deep(.tok-st) {
+  color: #0a3069;
+}
+.code-block :deep(.tok-kw) {
+  color: #cf222e;
+}
+.code-block :deep(.tok-tg) {
+  color: #116329;
+}
+.code-block :deep(.tok-pn) {
+  color: #6e7781;
+}
+.code-block :deep(.tok-fn) {
+  color: #8250df;
+}
+.code-block :deep(.tok-nm) {
+  color: #0550ae;
+}
+
+/* Token palette — dark theme (GitHub-dark inspired). */
+.dark .code-block :deep(.tok-cm) {
+  color: #8b949e;
+}
+.dark .code-block :deep(.tok-st) {
+  color: #a5d6ff;
+}
+.dark .code-block :deep(.tok-kw) {
+  color: #ff7b72;
+}
+.dark .code-block :deep(.tok-tg) {
+  color: #7ee787;
+}
+.dark .code-block :deep(.tok-pn) {
+  color: #8b949e;
+}
+.dark .code-block :deep(.tok-fn) {
+  color: #d2a8ff;
+}
+.dark .code-block :deep(.tok-nm) {
+  color: #79c0ff;
 }
 </style>
