@@ -276,6 +276,24 @@ export default function Viewer() {
       title: "Framework-agnostic Web Component",
       body: "One <dxf-viewer> custom element for any stack — Lit, plain HTML, or no framework at all.",
     }),
+    faq: [
+      {
+        q: "How do I view a DXF file with a Web Component?",
+        a: "Install dxf-lit, import it once to register the <dxf-viewer> custom element, then add the tag with a url attribute (or load text through its methods). Pan, zoom, layers and measurement work out of the box — no build step or framework required.",
+      },
+      {
+        q: "Can I use dxf-lit without a framework, or with Angular and Svelte?",
+        a: "Yes. <dxf-viewer> is a standard Custom Element, so it drops into plain HTML and into any framework — Angular, Svelte, Vue, React, or none at all. Attributes drive the built-in UI and state flows back out through DOM Custom Events.",
+      },
+      {
+        q: "Does dxf-lit need a backend or AutoCAD?",
+        a: "No. The DXF is parsed and rendered entirely in the browser with WebGL — nothing is uploaded to a server, and AutoCAD is not required.",
+      },
+      {
+        q: "Which DXF entities are supported?",
+        a: "22 entity types, including lines, arcs, circles, splines, hatches, dimensions, leaders, multilines, regions and block inserts with attributes — rendered by the shared dxf-render engine.",
+      },
+    ],
   },
 ];
 
