@@ -541,7 +541,7 @@ A few rules to keep in mind:
 - **Unknown names are ignored.** Names that don't match any layer in the current DXF won't trigger an error — handy when switching files.
 - **No initial `update:hiddenLayers` is emitted on DXF load.** The viewer only emits in response to genuine user actions. If you want to mirror the file's own `frozen` / `visible` flags into the parent, read them off `dxf-data` after `dxf-loaded`.
 
-The symmetric pattern is used by the upcoming `dxf-react` and `dxf-lit` wrappers — same `string[]` shape, the binding mechanism is the only thing that differs (`hiddenLayers + onHiddenLayersChange` / `hidden-layers` property + `hidden-layers-change` event).
+The symmetric pattern is used by the `dxf-react` and `dxf-lit` wrappers — same `string[]` shape, the binding mechanism is the only thing that differs (`hiddenLayers + onHiddenLayersChange` / `hidden-layers` property + `hidden-layers-change` event).
 
 ## Rulers
 

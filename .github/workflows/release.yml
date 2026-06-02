@@ -6,6 +6,7 @@ on:
       - "dxf-render@*"
       - "dxf-vuer@*"
       - "dxf-react@*"
+      - "dxf-lit@*"
 
 permissions:
   contents: write

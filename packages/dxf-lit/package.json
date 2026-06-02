@@ -1,0 +1,79 @@
+{
+  "name": "dxf-lit",
+  "version": "0.1.0",
+  "description": "Web Component DXF viewer — render AutoCAD DXF drawings in any stack (or none) via a <dxf-viewer> custom element. Built on a Three.js/WebGL engine with a built-in parser and vector text rendering.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Timur Arbaev",
+  "homepage": "https://dxf-kit.netlify.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arbaev/dxf-kit.git",
+    "directory": "packages/dxf-lit"
+  },
+  "bugs": {
+    "url": "https://github.com/arbaev/dxf-kit/issues"
+  },
+  "keywords": [
+    "web-component",
+    "custom-element",
+    "lit",
+    "dxf",
+    "dxf-viewer",
+    "dxf-lit",
+    "dxf-renderer",
+    "dxf-parser",
+    "dxf-three",
+    "viewer",
+    "parser",
+    "cad",
+    "cad-viewer",
+    "autocad",
+    "threejs",
+    "three.js",
+    "webgl",
+    "engineering",
+    "drawing",
+    "technical-drawing",
+    "blueprint",
+    "typescript"
+  ],
+  "main": "./dist/dxf-lit-index.es.js",
+  "module": "./dist/dxf-lit-index.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/dxf-lit-index.es.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "dxf-interaction": "workspace:*"
+  },
+  "peerDependencies": {
+    "dxf-render": "^1.6.0",
+    "lit": "^3.0.0",
+    "three": ">=0.160.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.182.0",
+    "dxf-render": "workspace:*",
+    "jsdom": "^26.0.0",
+    "lit": "^3.0.0",
+    "three": "^0.182.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.0.18"
+  }
+}

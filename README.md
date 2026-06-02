@@ -5,13 +5,13 @@
 
 Parse and render AutoCAD DXF files in the browser. Custom parser, Three.js rendering, 21 entity types, vector text, hatch patterns.
 
-#### [Core engine `dxf-render`](packages/dxf-render/) | [Vue 3 `dxf-vuer`](packages/dxf-vuer/) | [React `dxf-react`](packages/dxf-react/) | [Live Demo Viewer](https://dxf-kit.netlify.app)
+#### [Core engine `dxf-render`](packages/dxf-render/) | [Vue 3 `dxf-vuer`](packages/dxf-vuer/) | [React `dxf-react`](packages/dxf-react/) | [Web Component `dxf-lit`](packages/dxf-lit/) | [Live Demo Viewer](https://dxf-kit.netlify.app)
 
 ![screenshot](https://raw.githubusercontent.com/arbaev/dxf-kit/main/docs/dxf-kit-house-plan.jpg)
 
 ## Packages
 
-This monorepo publishes three packages for consumers — choose the one that fits your stack. (A fourth, [`dxf-interaction`](packages/dxf-interaction/), is a shared internal layer the Vue/React wrappers pull in automatically; you won't install it directly.)
+This monorepo publishes four packages for consumers — choose the one that fits your stack. (A fifth, [`dxf-interaction`](packages/dxf-interaction/), is a shared internal layer the Vue/React/Lit wrappers pull in automatically; you won't install it directly.)
 
 ### [`dxf-render`](packages/dxf-render/) — framework-agnostic engine
 
@@ -111,6 +111,36 @@ export default function App() {
 ```
 
 [Full documentation →](packages/dxf-react/)
+
+---
+
+### [`dxf-lit`](packages/dxf-lit/) — Web Component
+
+[![npm](https://img.shields.io/npm/v/dxf-lit)](https://www.npmjs.com/package/dxf-lit)
+[![npm downloads](https://img.shields.io/npm/dm/dxf-lit)](https://www.npmjs.com/package/dxf-lit)
+
+A framework-agnostic `<dxf-viewer>` custom element built on `dxf-render` — a 1:1 port of `dxf-vuer` over the same engine. Use it in any stack (Angular, Svelte, plain HTML, or no framework). Same layer panel, dark theme, drag-and-drop, PNG export, picking, measurement tools, and rulers; Vue's `v-model` / scoped slots become properties + Custom Events + flat named slots, and styling is via `--dxfk-*` CSS variables + `::part()` (Shadow DOM).
+
+```bash
+npm install dxf-lit dxf-render three
+```
+
+```html
+<script type="module">
+  import "dxf-lit";
+</script>
+
+<dxf-viewer
+  url="/drawing.dxf"
+  show-rulers
+  show-layer-panel
+  picking-enabled
+  dark-theme
+  style="height: 600px;"
+></dxf-viewer>
+```
+
+[Full documentation →](packages/dxf-lit/)
 
 ## Features
 

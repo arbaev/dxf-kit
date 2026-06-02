@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    // Lit 3 decorators via the legacy/experimental path: the standard TC39
+    // `accessor` form does not survive Vite's Rollup parser, while esbuild
+    // lowers experimental decorators natively. `useDefineForClassFields: false`
+    // is required so class fields don't clobber the accessors Lit installs.
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts"]
+}

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "pnpm --filter dxf-vuer-demo dev",
     "dev:react": "pnpm --filter dxf-react-playground dev",
-    "build": "pnpm --filter dxf-render build && pnpm --filter dxf-interaction build && pnpm --filter dxf-vuer build && pnpm --filter dxf-react build",
+    "build": "pnpm --filter dxf-render build && pnpm --filter dxf-interaction build && pnpm --filter dxf-vuer build && pnpm --filter dxf-react build && pnpm --filter dxf-lit build",
     "build:demo": "pnpm --filter dxf-vuer-demo build",
     "build:site": "pnpm build:demo",
     "preview": "pnpm --filter dxf-vuer-demo preview",

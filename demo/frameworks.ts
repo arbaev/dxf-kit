@@ -1,7 +1,7 @@
 // Single source of truth for every framework wrapper of the dxf-render engine.
 // Consumed by the "Works with your stack" tabs on the neutral landing, the
 // per-framework landing pages, and the footer npm links. Adding a new wrapper
-// (e.g. promoting Lit from "coming-soon" to "stable") means editing data here —
+// (or promoting one from "coming-soon" to "stable") means editing data here —
 // no markup changes.
 
 export type FrameworkId = "vanilla" | "vue" | "react" | "lit";
@@ -242,17 +242,22 @@ export default function Viewer() {
   {
     id: "lit",
     label: "Lit / Web Component",
-    status: "coming-soon",
+    status: "stable",
     npmPackage: "dxf-lit",
-    npmUrl: null,
+    npmUrl: "https://www.npmjs.com/package/dxf-lit",
     install: "npm install dxf-lit dxf-render three",
     lang: "html",
-    snippet: `<!-- Coming soon: a framework-agnostic Web Component -->
-<script type="module">
+    snippet: `<script type="module">
   import "dxf-lit";
 <\/script>
 
-<dxf-viewer url="/drawing.dxf" show-rulers dark-theme></dxf-viewer>`,
+<dxf-viewer
+  url="/drawing.dxf"
+  show-rulers
+  show-layer-panel
+  picking-enabled
+  dark-theme
+></dxf-viewer>`,
     stackblitzUrl: null,
     route: "/lit",
     icon: ICON_LIT,
@@ -261,11 +266,11 @@ export default function Viewer() {
     meta: {
       title: "DXF Viewer Web Component (Lit) — dxf-lit | dxf-kit",
       description:
-        "A framework-agnostic <dxf-viewer> Web Component for AutoCAD DXF drawings, built on a Three.js/WebGL engine. Coming soon.",
+        "A framework-agnostic <dxf-viewer> Web Component for AutoCAD DXF drawings, built on a Three.js/WebGL engine.",
     },
     features: featuresWith({
       title: "Framework-agnostic Web Component",
-      body: "One <dxf-viewer> custom element for any stack — Lit, plain HTML, or no framework at all. (Coming soon.)",
+      body: "One <dxf-viewer> custom element for any stack — Lit, plain HTML, or no framework at all.",
     }),
   },
 ];

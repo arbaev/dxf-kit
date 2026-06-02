@@ -5,6 +5,7 @@
     { "path": "./packages/dxf-interaction" },
     { "path": "./packages/dxf-vuer" },
     { "path": "./packages/dxf-react" },
+    { "path": "./packages/dxf-lit" },
     { "path": "./demo" }
   ]
 }

@@ -406,7 +406,7 @@ INSERT aggregates return `fallbackToBBox: true` here — to highlight the conten
 
 ### Snap to geometry
 
-Two pure helpers implement CAD-style **object snap** — finding the characteristic points of nearby geometry (endpoint, midpoint, center, quadrant, point-node) so a measurement / drawing tool can make clicks "stick" to real geometry. No Three.js / DOM dependencies; they back the measurement snap in `dxf-vuer` and are reused 1:1 by future React/Lit wrappers.
+Two pure helpers implement CAD-style **object snap** — finding the characteristic points of nearby geometry (endpoint, midpoint, center, quadrant, point-node) so a measurement / drawing tool can make clicks "stick" to real geometry. No Three.js / DOM dependencies; they back the measurement snap in `dxf-vuer` and are reused 1:1 by the React/Lit wrappers.
 
 ```ts
 import {
@@ -464,7 +464,7 @@ Notes:
 
 ### Rectangle selection
 
-`findEntriesInRect(pickingIndex, rect, options?)` returns every `PickingEntry` whose bounding box satisfies a window- or crossing-style rectangle test. Pure data — no DOM events, no Three.js raycasting. The same helper powers the `entities-select` event in `dxf-vuer` and is intended for future React/Lit wrappers to reuse 1:1.
+`findEntriesInRect(pickingIndex, rect, options?)` returns every `PickingEntry` whose bounding box satisfies a window- or crossing-style rectangle test. Pure data — no DOM events, no Three.js raycasting. The same helper powers the `entities-select` event in `dxf-vuer` and is intended for the React/Lit wrappers to reuse 1:1.
 
 ```ts
 import { findEntriesInRect, type WorldRect } from "dxf-render";
@@ -588,7 +588,7 @@ findEntitiesByType(dxf, "DIMENSION");
 
 ### Measurements
 
-Framework-agnostic geometry math for CAD measurement tools (linear ruler, area, angle). No Three.js / DOM dependencies — these back the distance / area / angle measurement tools in `dxf-vuer` and are reused 1:1 by future React/Lit wrappers.
+Framework-agnostic geometry math for CAD measurement tools (linear ruler, area, angle). No Three.js / DOM dependencies — these back the distance / area / angle measurement tools in `dxf-vuer` and are reused 1:1 by the React/Lit wrappers.
 
 ```ts
 import {
