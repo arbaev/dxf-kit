@@ -1,10 +1,14 @@
 # dxf-lit
 
+[![CI](https://github.com/arbaev/dxf-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/arbaev/dxf-kit/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/dxf-lit)](https://www.npmjs.com/package/dxf-lit)
+[![license](https://img.shields.io/npm/l/dxf-lit)](https://github.com/arbaev/dxf-kit/blob/main/LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
+
 A framework-agnostic **`<dxf-viewer>` Web Component** for rendering AutoCAD **DXF**
 drawings in the browser. Built on the [dxf-render](https://www.npmjs.com/package/dxf-render)
-Three.js/WebGL engine and the shared `dxf-interaction` controllers — the same core
-behind [dxf-vuer](https://www.npmjs.com/package/dxf-vuer) (Vue) and
-[dxf-react](https://www.npmjs.com/package/dxf-react) (React).
+Three.js/WebGL engine and the shared
+[dxf-interaction](https://www.npmjs.com/package/dxf-interaction) controllers.
 
 One custom element works in **any stack** — Lit, Angular, Svelte, plain HTML, or no
 framework at all.
@@ -27,7 +31,7 @@ framework at all.
 npm install dxf-lit dxf-render three
 ```
 
-`dxf-render`, `three` and `lit` are peer dependencies.
+Peer dependencies: `lit >= 3`, `three >= 0.160`, `dxf-render >= 1.7.0`.
 
 ## Usage
 

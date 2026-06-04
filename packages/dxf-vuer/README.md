@@ -921,7 +921,7 @@ Standalone components (`FileUploader`, `UnsupportedEntities`, `DXFStatistics`, `
 
 ### Migration from v2.x
 
-In v3.0 every public class was renamed from `dxf-*` / `viewer-*` / `layer-*` to a unified `.dxfk-*` prefix, and CSS variables moved from `--dxf-vuer-*` to `--dxfk-*`. The prefix is framework-neutral so future `dxf-react` / web-component wrappers share the same surface. Rename one-to-one in your overrides:
+In v3.0 every public class was renamed from `dxf-*` / `viewer-*` / `layer-*` to a unified `.dxfk-*` prefix, and CSS variables moved from `--dxf-vuer-*` to `--dxfk-*`. The prefix is framework-neutral so the `dxf-react` and `dxf-lit` wrappers share the same surface. Rename one-to-one in your overrides:
 
 | v2.x                       | v3.0                            |
 | -------------------------- | ------------------------------- |

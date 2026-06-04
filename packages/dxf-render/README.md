@@ -305,7 +305,7 @@ function render() {
 
 ### Picking primitives
 
-Framework-agnostic primitives for building hover/click interactivity. The Vue wrapper (`dxf-vuer`) is implemented on top of these.
+Framework-agnostic primitives for building hover/click interactivity. The official wrappers (`dxf-vuer` / `dxf-react` / `dxf-lit`) are implemented on top of these.
 
 ```ts
 import {

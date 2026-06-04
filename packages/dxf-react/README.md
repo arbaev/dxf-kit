@@ -5,7 +5,7 @@
 [![license](https://img.shields.io/npm/l/dxf-react)](https://github.com/arbaev/dxf-kit/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
-**React DXF viewer component** — render AutoCAD DXF drawings in the browser. A thin, fully typed wrapper around [dxf-render](https://www.npmjs.com/package/dxf-render), the framework-agnostic Three.js/WebGL engine that also powers [dxf-vuer](https://www.npmjs.com/package/dxf-vuer).
+**React DXF viewer component** — render AutoCAD DXF drawings in the browser. A thin, fully typed wrapper around [dxf-render](https://www.npmjs.com/package/dxf-render), the framework-agnostic Three.js/WebGL engine.
 
 [Live Demo](https://dxf-kit.netlify.app/react) | [GitHub](https://github.com/arbaev/dxf-kit) | [Open in StackBlitz](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/react?file=src/App.tsx&title=dxf-react+React)
 
