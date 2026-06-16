@@ -16,6 +16,11 @@ export interface WhatsNewItem {
 
 export const whatsNew: WhatsNewItem[] = [
   {
+    pkg: "dxf-render",
+    version: "1.7.1",
+    text: "Fix — TEXT and MTEXT now render out of the box. createThreeObjectsFromDXF falls back to the embedded default font when no font option is passed, so text no longer silently disappears. Pass options.font only to override with a custom font. (#13)",
+  },
+  {
     pkg: "dxf-react",
     version: "0.1.0",
     text: "New package dxf-react — a React 18+ wrapper at feature parity with dxf-vuer. <DXFViewer> plus toolbar / layer panel / properties panel, standalone hooks, render-props, a forwardRef imperative handle, and controlled measureMode / hiddenLayers. Works on React 18 and 19.",
@@ -225,6 +230,7 @@ export const whatsNew: WhatsNewItem[] = [
 // The most recent release wave, shown on the home page. Everything else is
 // archived on the /changelog page.
 const LATEST_VERSIONS = new Set([
+  "dxf-render@1.7.1",
   "dxf-react@0.1.0",
   "dxf-lit@0.1.0",
   "dxf-vuer@3.0.0",

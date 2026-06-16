@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.1
+
+### Bug Fixes
+
+- **TEXT/MTEXT now render without an explicit font.** `createThreeObjectsFromDXF` falls back to the embedded default font (Liberation Sans) when `options.font` is omitted, instead of silently dropping all text. `options.font` stays as an override for custom fonts. ([#13](https://github.com/arbaev/dxf-kit/issues/13))
+
+### Documentation
+
+- Fixed the README examples that called `createThreeObjectsFromDXF(dxf)` without passing a font (so text never rendered); removed the now-unnecessary manual `loadDefaultFont()` calls and corrected the `loadDefaultFont()` signature (synchronous `Font`, not `Promise<Font>`).
+- Restructured the README for a faster first read — compact header, a single Quick Start example (framework users are pointed to the wrappers instead of inlined React/Svelte boilerplate), "Supported entities" and "Comparison" moved up, and the full API reference collapsed under `<details>`. No content removed.
+
 ## 1.7.0
 
 ### Features

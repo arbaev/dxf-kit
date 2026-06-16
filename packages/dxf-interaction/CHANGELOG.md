@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+### Documentation
+
+- Added a prominent "this isn't a viewer" banner at the top of the README with a framework→package table (dxf-vuer / dxf-react / dxf-lit / dxf-render), so visitors who land here from search are routed to the right package.
+
 ## 0.1.0
 
 Initial release — framework-agnostic interaction controllers for DXF viewers
