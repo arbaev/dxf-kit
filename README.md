@@ -32,10 +32,9 @@ npm install dxf-render three
 ```
 
 ```ts
-import { parseDxf, createThreeObjectsFromDXF, loadDefaultFont } from "dxf-render";
+import { parseDxf, createThreeObjectsFromDXF } from "dxf-render";
 
 const dxf = parseDxf(dxfText);
-await loadDefaultFont();
 const { group } = await createThreeObjectsFromDXF(dxf);
 scene.add(group);
 ```

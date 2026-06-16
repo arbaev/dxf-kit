@@ -20,7 +20,7 @@ import {
   buildSharedBlockGeo,
 } from "./blockTemplateCache";
 import { classifyFont } from "./text/fontClassifier";
-import { loadSerifFont } from "./text/fontManager";
+import { loadDefaultFont, loadSerifFont } from "./text/fontManager";
 import { clearGlyphCache } from "./text/glyphCache";
 import { clearMeasureTextCache } from "./text/vectorTextBuilder";
 import {
@@ -42,6 +42,11 @@ export interface CreateDXFSceneOptions {
   signal?: AbortSignal;
   onProgress?: (fraction: number) => void;
   darkTheme?: boolean;
+  /**
+   * Font used to render TEXT/MTEXT glyphs. Optional — when omitted, the embedded
+   * default font (Liberation Sans) is loaded automatically. Supply a custom font
+   * (e.g. from `loadFont(url)`) to override it.
+   */
   font?: import("opentype.js").Font;
 }
 
@@ -87,7 +92,10 @@ export async function createThreeObjectsFromDXF(
   const signal = options?.signal;
   const onProgress = options?.onProgress;
   const darkTheme = options?.darkTheme;
-  const font = options?.font;
+  // Fall back to the embedded default font when none is supplied, so TEXT/MTEXT
+  // render out of the box. loadDefaultFont() is synchronous and cached, so this
+  // is cheap; `options.font` stays as an override for custom fonts (loadFont()).
+  const font = options?.font ?? loadDefaultFont();
 
   const group = new THREE.Group();
 

@@ -42,7 +42,6 @@ npm install dxf-render
 import {
   parseDxf,
   createThreeObjectsFromDXF,
-  loadDefaultFont,
   useCamera,
   useControls,
 } from "dxf-render";
@@ -51,10 +50,8 @@ import * as THREE from "three";
 // Parse DXF text
 const dxf = parseDxf(dxfText);
 
-// Load embedded font for text rendering
-await loadDefaultFont();
-
-// Create Three.js objects
+// Create Three.js objects. TEXT/MTEXT use the embedded default font
+// automatically — no manual font loading required.
 const { group, materials } = await createThreeObjectsFromDXF(dxf);
 
 // Set up scene
@@ -119,7 +116,6 @@ import * as THREE from "three";
 import {
   parseDxf,
   createThreeObjectsFromDXF,
-  loadDefaultFont,
   useCamera,
   useControls,
 } from "dxf-render";
@@ -154,7 +150,6 @@ export function DxfViewer({ dxfText }: { dxfText: string }) {
     let disposed = false;
 
     (async () => {
-      await loadDefaultFont();
       const dxf = parseDxf(dxfText);
       const { group } = await createThreeObjectsFromDXF(dxf);
       if (disposed) return;
@@ -186,7 +181,6 @@ export function DxfViewer({ dxfText }: { dxfText: string }) {
   import {
     parseDxf,
     createThreeObjectsFromDXF,
-    loadDefaultFont,
     useCamera,
     useControls,
   } from "dxf-render";
@@ -216,7 +210,6 @@ export function DxfViewer({ dxfText }: { dxfText: string }) {
     const { fitCameraToBox } = useCamera();
     const { initControls } = useControls();
 
-    await loadDefaultFont();
     const dxf = parseDxf(dxfText);
     const { group } = await createThreeObjectsFromDXF(dxf);
 
@@ -255,7 +248,7 @@ export function DxfViewer({ dxfText }: { dxfText: string }) {
   - `options.signal` — `AbortSignal` for cancellation
   - `options.onProgress` — progress callback (0–1)
   - `options.darkTheme` — dark theme mode
-  - `options.font` — custom opentype.js Font object
+  - `options.font` — custom opentype.js Font object (optional; the embedded default font is used automatically when omitted)
 - `MaterialCacheStore` — material cache with `switchTheme()` for instant dark mode
 
 ### Scene helpers
@@ -674,9 +667,9 @@ import {
 
 ### Fonts
 
-- `loadDefaultFont(): Promise<Font>` — load embedded Liberation Sans Regular
+- `loadDefaultFont(): Font` — load (and cache) the embedded Liberation Sans Regular. Synchronous — the font is inlined in the bundle. Called automatically by `createThreeObjectsFromDXF`; only needed directly for advanced cases.
 - `loadFont(url: string): Promise<Font>` — load custom .ttf/.otf font
-- `getDefaultFont(): Font | null` — get loaded default font
+- `getDefaultFont(): Font | null` — get the loaded default font (null until first load)
 
 ### Utils
 
