@@ -5,29 +5,31 @@
 
 Parse and render AutoCAD DXF files in the browser. Custom parser, Three.js rendering, 22 entity types, vector text, hatch patterns.
 
-#### [Core engine `dxf-render`](packages/dxf-render/) | [Vue 3 `dxf-vuer`](packages/dxf-vuer/) | [React `dxf-react`](packages/dxf-react/) | [Web Component `dxf-lit`](packages/dxf-lit/)
-
 Just want to look at a DXF file? Open it in the [Live Demo Viewer](https://dxf-kit.netlify.app) — no install, no upload, everything stays in your browser.
+
+**Try it on StackBlitz:** [Vanilla TS](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vanilla-ts?file=src/main.ts&title=dxf-render+Vanilla+TS) · [React](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/react?file=src/App.tsx&title=dxf-render+React) · [Vue](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vue?file=src/App.vue&title=dxf-vuer+Vue+3) · [Web Component](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/lit?file=index.html&title=dxf-lit+Web+Component) · [Leaflet + DXF](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/leaflet-dxf?file=src/main.ts&title=dxf-render+Leaflet) · [DXF → PDF](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/dxf-to-pdf?file=src/main.ts&title=dxf-render+PDF+Export) · [all examples →](https://github.com/arbaev/dxf-kit/tree/main/examples)
 
 ![screenshot](https://raw.githubusercontent.com/arbaev/dxf-kit/main/docs/dxf-kit-house-plan.jpg)
 
-**[dxf-kit by the numbers](STATS.md)** — tests, commits, and lines of code at a glance.
+[dxf-kit by the numbers](STATS.md) — tests, commits, and lines of code at a glance.
 
-**Contents:** [Packages](#packages) · [Features](#features) · [Browser support](#browser-support) · [Acknowledgements](#acknowledgements) · [License](#license)
+**Contents:** [Packages](#packages) · [Quick Start](#quick-start) · [Features](#features) · [Browser support](#browser-support) · [Acknowledgements](#acknowledgements) · [License](#license)
 
 ## Packages
 
-This monorepo publishes four packages for consumers — choose the one that fits your stack.
+This monorepo publishes **four packages** to install — pick the one that fits your stack. A fifth, `dxf-interaction`, is shared internal plumbing the wrappers pull in automatically — you don't install it directly.
 
-> **Note:** a fifth package, [`dxf-interaction`](packages/dxf-interaction/), is a shared **internal** layer that the Vue/React/Lit wrappers pull in automatically — **not a viewer you install directly.** If you landed on it from search, use `dxf-render` (vanilla) or one of the wrappers above instead.
+| Package                                        | Description                                                                        | Version                                                                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| [`dxf-render`](packages/dxf-render/)           | Core engine — DXF parser + Three.js/WebGL renderer (parser-only entry for Node.js) | [![npm](https://img.shields.io/npm/v/dxf-render.svg)](https://www.npmjs.com/package/dxf-render)           |
+| [`dxf-vuer`](packages/dxf-vuer/)               | Vue 3 `<DXFViewer>` component + composables                                        | [![npm](https://img.shields.io/npm/v/dxf-vuer.svg)](https://www.npmjs.com/package/dxf-vuer)               |
+| [`dxf-react`](packages/dxf-react/)             | React 18+ `<DXFViewer>` component + hooks                                          | [![npm](https://img.shields.io/npm/v/dxf-react.svg)](https://www.npmjs.com/package/dxf-react)             |
+| [`dxf-lit`](packages/dxf-lit/)                 | `<dxf-viewer>` Web Component — works in any stack                                  | [![npm](https://img.shields.io/npm/v/dxf-lit.svg)](https://www.npmjs.com/package/dxf-lit)                 |
+| [`dxf-interaction`](packages/dxf-interaction/) | Shared interaction controllers — **internal**, used by the wrappers                | [![npm](https://img.shields.io/npm/v/dxf-interaction.svg)](https://www.npmjs.com/package/dxf-interaction) |
 
-### [`dxf-render`](packages/dxf-render/) — framework-agnostic engine
+## Quick Start
 
-[![npm](https://img.shields.io/npm/v/dxf-render)](https://www.npmjs.com/package/dxf-render)
-[![npm downloads](https://img.shields.io/npm/dm/dxf-render)](https://www.npmjs.com/package/dxf-render)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/dxf-render)](https://bundlephobia.com/package/dxf-render)
-
-DXF parser + Three.js renderer. Use with **React, Svelte, vanilla JS**, or as a **parser-only** library in Node.js (zero Three.js dependency).
+### dxf-render — engine (vanilla or any framework)
 
 ```bash
 npm install dxf-render three
@@ -50,14 +52,10 @@ const dxf = parseDxf(dxfText);
 
 [Full documentation →](packages/dxf-render/)
 
----
+<details>
+<summary><b>Vue 3 — <code>dxf-vuer</code></b></summary>
 
-### [`dxf-vuer`](packages/dxf-vuer/) — Vue 3 component
-
-[![npm](https://img.shields.io/npm/v/dxf-vuer)](https://www.npmjs.com/package/dxf-vuer)
-[![npm downloads](https://img.shields.io/npm/dm/dxf-vuer)](https://www.npmjs.com/package/dxf-vuer)
-
-Thin Vue 3 wrapper around `dxf-render`. Drop-in `<DXFViewer>` component with layer panel, dark theme, drag-and-drop, export to PNG, zoom level, error display, debug overlay.
+<br>
 
 ```bash
 npm install dxf-vuer dxf-render three
@@ -85,14 +83,12 @@ async function loadFile(file) {
 
 [Full documentation →](packages/dxf-vuer/)
 
----
+</details>
 
-### [`dxf-react`](packages/dxf-react/) — React component
+<details>
+<summary><b>React 18+ — <code>dxf-react</code></b></summary>
 
-[![npm](https://img.shields.io/npm/v/dxf-react)](https://www.npmjs.com/package/dxf-react)
-[![npm downloads](https://img.shields.io/npm/dm/dxf-react)](https://www.npmjs.com/package/dxf-react)
-
-React 18+ wrapper around `dxf-render` — a 1:1 port of `dxf-vuer` over the same engine. Drop-in `<DXFViewer>` with the same layer panel, dark theme, drag-and-drop, PNG export, picking, measurement tools, and rulers; Vue's `v-model` / scoped slots become controlled props + render-props.
+<br>
 
 ```bash
 npm install dxf-react dxf-render three
@@ -125,14 +121,12 @@ export default function App() {
 
 [Full documentation →](packages/dxf-react/)
 
----
+</details>
 
-### [`dxf-lit`](packages/dxf-lit/) — Web Component
+<details>
+<summary><b>Web Component — <code>dxf-lit</code></b></summary>
 
-[![npm](https://img.shields.io/npm/v/dxf-lit)](https://www.npmjs.com/package/dxf-lit)
-[![npm downloads](https://img.shields.io/npm/dm/dxf-lit)](https://www.npmjs.com/package/dxf-lit)
-
-A framework-agnostic `<dxf-viewer>` custom element built on `dxf-render` — a 1:1 port of `dxf-vuer` over the same engine. Use it in any stack (Angular, Svelte, plain HTML, or no framework). Same layer panel, dark theme, drag-and-drop, PNG export, picking, measurement tools, and rulers; Vue's `v-model` / scoped slots become properties + Custom Events + flat named slots, and styling is via `--dxfk-*` CSS variables + `::part()` (Shadow DOM).
+<br>
 
 ```bash
 npm install dxf-lit dxf-render three
@@ -154,6 +148,8 @@ npm install dxf-lit dxf-render three
 ```
 
 [Full documentation →](packages/dxf-lit/)
+
+</details>
 
 ## Features
 

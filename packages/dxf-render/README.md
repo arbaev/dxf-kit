@@ -5,13 +5,11 @@
 [![license](https://img.shields.io/npm/l/dxf-render)](https://github.com/arbaev/dxf-kit/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
-Framework-agnostic **AutoCAD DXF parser and Three.js/WebGL renderer** for the browser, written in TypeScript. Use it standalone with React, Vue, Svelte, vanilla JS, or any framework — or parser-only in Node.js.
+Framework-agnostic **AutoCAD DXF parser and Three.js/WebGL renderer** for the browser, written in TypeScript — or parser-only in Node.js (zero dependencies).
 
-[Live Demo](https://dxf-kit.netlify.app) — upload your DXF and see the rendering quality.
+**[Live Demo](https://dxf-kit.netlify.app)** — upload a DXF and see the rendering quality. **Run on StackBlitz:** [Vanilla TS](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vanilla-ts?file=src/main.ts&title=dxf-render+Vanilla+TS) · [React](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/react?file=src/App.tsx&title=dxf-render+React) · [Vue](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vue?file=src/App.vue&title=dxf-vuer+Vue+3) · [Web Component](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/lit?file=index.html&title=dxf-lit+Web+Component) · [Leaflet + DXF](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/leaflet-dxf?file=src/main.ts&title=dxf-render+Leaflet) · [DXF → PDF](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/dxf-to-pdf?file=src/main.ts&title=dxf-render+PDF+Export)
 
-Try it now on StackBlitz: [Vanilla TS](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vanilla-ts?file=src/main.ts&title=dxf-render+Vanilla+TS) | [React](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/react?file=src/App.tsx&title=dxf-render+React) | [Vue](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/vue?file=src/App.vue&title=dxf-vuer+Vue+3) | [Web Component](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/lit?file=index.html&title=dxf-lit+Web+Component) | [Leaflet + DXF](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/leaflet-dxf?file=src/main.ts&title=dxf-render+Leaflet) | [DXF to PDF](https://stackblitz.com/github/arbaev/dxf-kit/tree/main/examples/dxf-to-pdf?file=src/main.ts&title=dxf-render+PDF+Export)
-
-For ready-made viewer components, see the framework wrappers: [dxf-vuer](https://www.npmjs.com/package/dxf-vuer) (Vue 3), [dxf-react](https://www.npmjs.com/package/dxf-react) (React), and [dxf-lit](https://www.npmjs.com/package/dxf-lit) (the `<dxf-viewer>` Web Component) — all built on this engine and the shared [dxf-interaction](https://www.npmjs.com/package/dxf-interaction) controllers.
+> **Want a ready-made viewer component?** Use a framework wrapper — [dxf-vuer](https://www.npmjs.com/package/dxf-vuer) (Vue 3), [dxf-react](https://www.npmjs.com/package/dxf-react) (React) or [dxf-lit](https://www.npmjs.com/package/dxf-lit) (the `<dxf-viewer>` Web Component). All are built on this engine and the shared [dxf-interaction](https://www.npmjs.com/package/dxf-interaction) controllers.
 
 ## Why dxf-render?
 
@@ -39,12 +37,7 @@ npm install dxf-render
 ### Parse and render
 
 ```ts
-import {
-  parseDxf,
-  createThreeObjectsFromDXF,
-  useCamera,
-  useControls,
-} from "dxf-render";
+import { parseDxf, createThreeObjectsFromDXF, useCamera, useControls } from "dxf-render";
 import * as THREE from "three";
 
 // Parse DXF text
@@ -108,126 +101,71 @@ const dxf = await parseDxfAsync(dxfText);
 terminateParserWorker();
 ```
 
-### React example
+### Using React, Vue or Web Components?
 
-```tsx
-import { useEffect, useRef } from "react";
-import * as THREE from "three";
-import {
-  parseDxf,
-  createThreeObjectsFromDXF,
-  useCamera,
-  useControls,
-} from "dxf-render";
+Skip the manual scene setup above — drop in a ready-made viewer component instead:
+**[dxf-react](https://www.npmjs.com/package/dxf-react)** (React) ·
+**[dxf-vuer](https://www.npmjs.com/package/dxf-vuer)** (Vue 3) ·
+**[dxf-lit](https://www.npmjs.com/package/dxf-lit)** (`<dxf-viewer>` Web Component, works anywhere).
 
-export function DxfViewer({ dxfText }: { dxfText: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+For raw-engine integrations — vanilla TS, a Leaflet overlay, PDF export — see the runnable [examples](https://github.com/arbaev/dxf-kit/tree/main/examples).
 
-  useEffect(() => {
-    const canvas = canvasRef.current!;
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    const aspect = width / height;
-    const frustumSize = 100;
+## Supported entities
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setSize(width, height);
+22 rendered entity types: LINE, CIRCLE, ARC, ELLIPSE, POINT, POLYLINE, LWPOLYLINE, SPLINE, TEXT, MTEXT, DIMENSION, INSERT, SOLID, 3DFACE, HATCH, LEADER, MULTILEADER, MLINE, XLINE, RAY, ATTDEF, REGION, plus ATTRIB within INSERT blocks and HELIX via SPLINE.
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xffffff);
+REGION entities are rendered without decoding their ACIS modeler data: when a HATCH lists the REGION as a source object via DXF codes 97/330, the REGION borrows that HATCH's already-parsed boundary edges (lines, arcs, ellipses, splines, polyline vertices) for its visible contour. Color, layer and linetype come from the REGION itself; OCS from the HATCH. REGIONs with no HATCH referencing them are silently skipped.
 
-    const camera = new THREE.OrthographicCamera(
-      (frustumSize * aspect) / -2,
-      (frustumSize * aspect) / 2,
-      frustumSize / 2,
-      frustumSize / -2,
-      0.1,
-      1000,
-    );
+POLYLINE/LWPOLYLINE support includes per-vertex variable width (tapering), constant-width segments, arrows, donuts, and bulge arcs — all rendered as triangle-strip mesh geometry with proper miter joins at corners.
 
-    const { fitCameraToBox } = useCamera();
-    const { initControls } = useControls();
-    let disposed = false;
+### Dimension & leader arrowheads
 
-    (async () => {
-      const dxf = parseDxf(dxfText);
-      const { group } = await createThreeObjectsFromDXF(dxf);
-      if (disposed) return;
+DIMENSION endpoints and LEADER tips honour the DXF block referenced by the DIMSTYLE (codes 342 / 341 for DIMBLK / DIMLDRBLK) or by the header `$DIMBLK`. All 18 standard AutoCAD block names are recognised and rendered with the correct shape:
 
-      scene.add(group);
-      initControls(camera, canvas);
+- **Arrow-shaped**: `_ClosedFilled` (AutoCAD default), `_Closed` / `_ClosedBlank`, `_Open` / `_Open30` / `_OpenArrow`, `_DatumFilled` / `_DatumBlank`
+- **Ticks**: `_ArchTick`, `_Oblique`, `_Small`, `_Tick`
+- **Dots**: `_Dot`, `_DotSmall`, `_DotBlank`, `_DotSmallBlank`
+- **Rings**: `_Origin`, `_Origin2`
+- **Boxes**: `_Box`, `_BoxFilled`
+- **Other**: `_Integral`, `_None`
 
-      const box = new THREE.Box3().setFromObject(group);
-      fitCameraToBox(box, camera);
-      renderer.render(scene, camera);
-    })();
+Names are matched case-insensitively, with an optional leading underscore. Unknown DIMBLK names fall back to `_ClosedFilled` (matching AutoCAD's default), but for LEADERs an unknown DIMLDRBLK name first tries to render the user-defined block geometry. `DIMTSZ > 0` forces tick rendering regardless of DIMBLK. The "outside arrows" flip for short dim lines only applies to direction-dependent arrow-shape kinds — dots, ticks, boxes and origin rings always sit at the endpoint.
 
-    return () => {
-      disposed = true;
-      renderer.dispose();
-    };
-  }, [dxfText]);
+## Comparison
 
-  return <canvas ref={canvasRef} style={{ width: "100%", height: "500px" }} />;
-}
-```
+| Feature                   | dxf-render                  | dxf-viewer   | dxf-parser | three-dxf |
+| ------------------------- | --------------------------- | ------------ | ---------- | --------- |
+| DXF parsing               | ✅                          | ✅           | ✅         | ✅        |
+| Three.js rendering        | ✅                          | ✅           | ❌         | ✅        |
+| Entity types              | 22 rendered                 | ~15          | ~15 parsed | ~8        |
+| Variable-width polylines  | ✅ tapering, arrows, donuts | ❌           | —          | ❌        |
+| Linetype patterns         | ✅ DASHED, CENTER, DOT...   | ❌ all solid | —          | ❌        |
+| All dimension types       | ✅ 7 types                  | linear only  | —          | ❌        |
+| Standard arrowhead blocks | ✅ 18 kinds (DIMBLK)        | ❌           | —          | ❌        |
+| LEADER / MULTILEADER      | ✅                          | ❌           | —          | ❌        |
+| HATCH patterns            | ✅ 29 built-in              | ✅           | —          | ❌        |
+| OCS (Arbitrary Axis)      | ✅ full                     | Z-flip only  | —          | ❌        |
+| Vector text (opentype.js) | ✅                          | ✅           | —          | ❌        |
+| Geometry merging          | ✅                          | ✅           | —          | ❌        |
+| Dark theme                | ✅ instant switch           | bg only      | —          | ❌        |
+| TypeScript                | ✅ native                   | .d.ts        | ✅         | ❌        |
+| Tests                     | 1299 tests                  | 0            | ✅         | 0         |
+| Web Worker parsing        | ✅                          | ✅           | ❌         | ❌        |
+| Parser-only entry         | ✅ zero deps                | ❌           | ✅         | ❌        |
+| Framework                 | agnostic                    | agnostic     | —          | agnostic  |
+| Bundle size               | ~960KB                      | ~1.2MB       | ~50KB      | ~30KB     |
+| Last updated              | 2026                        | 2024         | 2023       | 2019      |
 
-### Svelte example
+## API reference
 
-```svelte
-<script>
-  import { onMount, onDestroy } from "svelte";
-  import * as THREE from "three";
-  import {
-    parseDxf,
-    createThreeObjectsFromDXF,
-    useCamera,
-    useControls,
-  } from "dxf-render";
+The full surface is large — most apps only need `parseDxf` + `createThreeObjectsFromDXF` from the Quick Start above. Expand for everything else.
 
-  export let dxfText;
+<details>
+<summary><b>Click to expand the full API reference</b></summary>
 
-  let canvas;
-  let renderer;
+<br>
 
-  onMount(async () => {
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    const aspect = width / height;
-    const frustumSize = 100;
-
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setSize(width, height);
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xffffff);
-
-    const camera = new THREE.OrthographicCamera(
-      (frustumSize * aspect) / -2, (frustumSize * aspect) / 2,
-      frustumSize / 2, frustumSize / -2, 0.1, 1000,
-    );
-
-    const { fitCameraToBox } = useCamera();
-    const { initControls } = useControls();
-
-    const dxf = parseDxf(dxfText);
-    const { group } = await createThreeObjectsFromDXF(dxf);
-
-    scene.add(group);
-    initControls(camera, canvas);
-
-    const box = new THREE.Box3().setFromObject(group);
-    fitCameraToBox(box, camera);
-    renderer.render(scene, camera);
-  });
-
-  onDestroy(() => renderer?.dispose());
-</script>
-
-<canvas bind:this={canvas} style="width: 100%; height: 500px;" />
-```
-
-## API
+**Jump to:** [Parser](#parser) · [Renderer](#renderer) · [Scene helpers](#scene-helpers) · [Antialiasing](#antialiasing) · [Picking primitives](#picking-primitives) · [Highlight geometry](#highlight-geometry) · [Snap to geometry](#snap-to-geometry) · [Rectangle selection](#rectangle-selection) · [Associations](#associations) · [Text search](#text-search) · [Measurements](#measurements) · [Interaction constants](#interaction-constants) · [Fonts](#fonts) · [Utils](#utils) · [Types](#types)
 
 ### Entry points
 
@@ -418,9 +356,9 @@ const points: SnapPoint[] = getEntitySnapPoints(entity, entry.worldMatrix ?? nul
 // High level: the best snap near a world position, across the whole drawing.
 const snap: SnapResult | null = findSnapPoint(
   pickingIndex,
-  entityIndex,        // from buildEntityIndex(dxf)
+  entityIndex, // from buildEntityIndex(dxf)
   { x: 104.1, y: 0 }, // cursor in DXF world coords (add originOffset back first)
-  0.5,                // tolerance in world units (convert from a pixel aperture)
+  0.5, // tolerance in world units (convert from a pixel aperture)
 );
 
 if (snap) {
@@ -439,13 +377,13 @@ endpoint  <  midpoint  <  center = node  <  quadrant
 
 Per-entity coverage of `getEntitySnapPoints`:
 
-| Snap | Entities |
-| ---- | -------- |
+| Snap       | Entities                                                                                                                                                |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `endpoint` | LINE, POLYLINE/LWPOLYLINE & MLINE & LEADER & MULTILEADER vertices, ARC/ELLIPSE arc ends, SOLID/3DFACE corners, SPLINE first/last fit (or control) point |
-| `midpoint` | LINE, straight POLYLINE/MLINE/LEADER/MULTILEADER segments, ARC arc-midpoint |
-| `center` | CIRCLE, ARC, ELLIPSE |
-| `quadrant` | CIRCLE (0/90/180/270°), ARC (only cardinals within the sweep), ELLIPSE (axis tips within the sweep) |
-| `node` | POINT |
+| `midpoint` | LINE, straight POLYLINE/MLINE/LEADER/MULTILEADER segments, ARC arc-midpoint                                                                             |
+| `center`   | CIRCLE, ARC, ELLIPSE                                                                                                                                    |
+| `quadrant` | CIRCLE (0/90/180/270°), ARC (only cardinals within the sweep), ELLIPSE (axis tips within the sweep)                                                     |
+| `node`     | POINT                                                                                                                                                   |
 
 Notes:
 
@@ -463,8 +401,10 @@ Notes:
 import { findEntriesInRect, type WorldRect } from "dxf-render";
 
 const rect: WorldRect = {
-  minX: 100, minY: 200,
-  maxX: 500, maxY: 600,
+  minX: 100,
+  minY: 200,
+  maxX: 500,
+  maxY: 600,
 };
 
 // AutoCAD convention: window = bbox fully inside, crossing = bbox overlaps.
@@ -603,18 +543,22 @@ measureDistance({ x: 0, y: 0, z: 0 }, { x: 1, y: 2, z: 2 }); // → 3
 
 // Polygon area via Shoelace; z is ignored
 const square: MeasurePoint[] = [
-  { x: 0, y: 0 }, { x: 10, y: 0 },
-  { x: 10, y: 10 }, { x: 0, y: 10 },
+  { x: 0, y: 0 },
+  { x: 10, y: 0 },
+  { x: 10, y: 10 },
+  { x: 0, y: 10 },
 ];
-measureArea(square);        // → 100
-measureSignedArea(square);  // → +100 (CCW); negative for CW winding
-measurePerimeter(square);   // → 40 (closed loop, includes the last → first edge)
+measureArea(square); // → 100
+measureSignedArea(square); // → +100 (CCW); negative for CW winding
+measurePerimeter(square); // → 40 (closed loop, includes the last → first edge)
 
 // Self-intersection test (proper crossings only)
 polygonSelfIntersects(square); // → false
 polygonSelfIntersects([
-  { x: 0, y: 0 }, { x: 2, y: 2 },
-  { x: 2, y: 0 }, { x: 0, y: 2 }, // bow-tie
+  { x: 0, y: 0 },
+  { x: 2, y: 2 },
+  { x: 2, y: 0 },
+  { x: 0, y: 2 }, // bow-tie
 ]); // → true
 
 // Unsigned angle at the vertex between two rays, in radians [0, π]
@@ -638,7 +582,7 @@ Degenerate inputs are handled safely:
 - `measureDistance` returns `0` for identical points and for any non-finite coordinate.
 - `measureArea` / `measureSignedArea` return `0` for fewer than 3 points, for collinear polygons, and for non-finite coordinates. Open polygons (last vertex ≠ first) and closed polygons (last vertex == first) yield the same value.
 - `measurePerimeter` returns `0` for fewer than 2 points or non-finite coordinates; it always adds the closing edge, so open and closed inputs yield the same value.
-- `polygonSelfIntersects` returns `false` for fewer than 4 vertices and for non-finite coordinates. Only *proper* edge crossings count — edges that merely share a polygon vertex (or touch collinearly) are not flagged.
+- `polygonSelfIntersects` returns `false` for fewer than 4 vertices and for non-finite coordinates. Only _proper_ edge crossings count — edges that merely share a polygon vertex (or touch collinearly) are not flagged.
 - `measureAngle` clamps the cosine into `[-1, 1]` to absorb floating-point noise that would otherwise push `Math.acos` out of its domain, and returns `0` when `vertex` coincides with `p1` or `p2`.
 - `measureDirectedAngle` returns the directed counter-clockwise sweep in `[0, 2π)` (2D — `z` ignored). It preserves direction, so `measureDirectedAngle(v, b, a)` equals `2π − measureDirectedAngle(v, a, b)` (off the `0`/`2π` boundary) — use it when the sweep direction matters (e.g. an angle tool that distinguishes an angle from its reflex). Returns `0` for a coincident vertex or non-finite coordinates.
 
@@ -648,18 +592,18 @@ Framework-agnostic pixel / timing budgets for pointer tools (picking, rectangle 
 
 ```ts
 import {
-  CLICK_DISTANCE_THRESHOLD_PX,   // 4  — px move above which a press is a pan, not a click
-  DOUBLE_CLICK_MS,               // 350 — max gap between taps for a double-click
-  DOUBLE_CLICK_DISTANCE_PX,      // 6  — max px gap between taps for a double-click
-  ORIGIN_SNAP_RADIUS_PX,         // 12 — px radius to click-close an area polygon on its first vertex
-  SNAP_TOLERANCE_PX,             // 12 — object-snap aperture
-  SNAP_MARKER_PX,                // 11 — on-screen snap marker glyph size
-  ANGLE_ARC_RADIUS_FRACTION,     // 0.4 — angle arc radius as a fraction of the shorter ray
-  ANGLE_ARC_MIN_PX,              // 24 — arc radius lower clamp (px)
-  ANGLE_ARC_MAX_PX,              // 80 — arc radius upper clamp (px)
-  ANGLE_ARC_SEGMENTS_PER_TURN,   // 64 — arc tessellation per full turn
+  CLICK_DISTANCE_THRESHOLD_PX, // 4  — px move above which a press is a pan, not a click
+  DOUBLE_CLICK_MS, // 350 — max gap between taps for a double-click
+  DOUBLE_CLICK_DISTANCE_PX, // 6  — max px gap between taps for a double-click
+  ORIGIN_SNAP_RADIUS_PX, // 12 — px radius to click-close an area polygon on its first vertex
+  SNAP_TOLERANCE_PX, // 12 — object-snap aperture
+  SNAP_MARKER_PX, // 11 — on-screen snap marker glyph size
+  ANGLE_ARC_RADIUS_FRACTION, // 0.4 — angle arc radius as a fraction of the shorter ray
+  ANGLE_ARC_MIN_PX, // 24 — arc radius lower clamp (px)
+  ANGLE_ARC_MAX_PX, // 80 — arc radius upper clamp (px)
+  ANGLE_ARC_SEGMENTS_PER_TURN, // 64 — arc tessellation per full turn
   MEASUREMENT_OVERLAY_RENDER_ORDER, // 999  — measurement overlay renderOrder
-  SNAP_OVERLAY_RENDER_ORDER,        // 1000 — snap marker renderOrder (above measurement)
+  SNAP_OVERLAY_RENDER_ORDER, // 1000 — snap marker renderOrder (above measurement)
 } from "dxf-render";
 ```
 
@@ -677,57 +621,14 @@ import {
 - `resolveEntityLinetype()` — resolve entity linetype
 - `collectDXFStatistics()` — collect file statistics
 - `getInsUnitsScale()` — unit conversion factor
-- `measureDistance()` / `measureArea()` / `measureSignedArea()` / `measurePerimeter()` / `polygonSelfIntersects()` / `measureAngle()` — see [Measurements](#measurements)
+
+Geometry-measurement helpers (`measureDistance`, `measureArea`, …) have their own section above — see [Measurements](#measurements).
 
 ### Types
 
 Full TypeScript types exported: `DxfData`, `DxfEntity`, `DxfLayer`, `DxfHeader`, and 25+ entity-specific types with type guards (`isLineEntity`, `isCircleEntity`, etc.).
 
-## Supported entities
-
-22 rendered entity types: LINE, CIRCLE, ARC, ELLIPSE, POINT, POLYLINE, LWPOLYLINE, SPLINE, TEXT, MTEXT, DIMENSION, INSERT, SOLID, 3DFACE, HATCH, LEADER, MULTILEADER, MLINE, XLINE, RAY, ATTDEF, REGION, plus ATTRIB within INSERT blocks and HELIX via SPLINE.
-
-REGION entities are rendered without decoding their ACIS modeler data: when a HATCH lists the REGION as a source object via DXF codes 97/330, the REGION borrows that HATCH's already-parsed boundary edges (lines, arcs, ellipses, splines, polyline vertices) for its visible contour. Color, layer and linetype come from the REGION itself; OCS from the HATCH. REGIONs with no HATCH referencing them are silently skipped.
-
-POLYLINE/LWPOLYLINE support includes per-vertex variable width (tapering), constant-width segments, arrows, donuts, and bulge arcs — all rendered as triangle-strip mesh geometry with proper miter joins at corners.
-
-### Dimension & leader arrowheads
-
-DIMENSION endpoints and LEADER tips honour the DXF block referenced by the DIMSTYLE (codes 342 / 341 for DIMBLK / DIMLDRBLK) or by the header `$DIMBLK`. All 18 standard AutoCAD block names are recognised and rendered with the correct shape:
-
-- **Arrow-shaped**: `_ClosedFilled` (AutoCAD default), `_Closed` / `_ClosedBlank`, `_Open` / `_Open30` / `_OpenArrow`, `_DatumFilled` / `_DatumBlank`
-- **Ticks**: `_ArchTick`, `_Oblique`, `_Small`, `_Tick`
-- **Dots**: `_Dot`, `_DotSmall`, `_DotBlank`, `_DotSmallBlank`
-- **Rings**: `_Origin`, `_Origin2`
-- **Boxes**: `_Box`, `_BoxFilled`
-- **Other**: `_Integral`, `_None`
-
-Names are matched case-insensitively, with an optional leading underscore. Unknown DIMBLK names fall back to `_ClosedFilled` (matching AutoCAD's default), but for LEADERs an unknown DIMLDRBLK name first tries to render the user-defined block geometry. `DIMTSZ > 0` forces tick rendering regardless of DIMBLK. The "outside arrows" flip for short dim lines only applies to direction-dependent arrow-shape kinds — dots, ticks, boxes and origin rings always sit at the endpoint.
-
-## Comparison
-
-| Feature                   | dxf-render                  | dxf-viewer   | dxf-parser | three-dxf |
-| ------------------------- | --------------------------- | ------------ | ---------- | --------- |
-| DXF parsing               | ✅                          | ✅           | ✅         | ✅        |
-| Three.js rendering        | ✅                          | ✅           | ❌         | ✅        |
-| Entity types              | 22 rendered                 | ~15          | ~15 parsed | ~8        |
-| Variable-width polylines  | ✅ tapering, arrows, donuts | ❌           | —          | ❌        |
-| Linetype patterns         | ✅ DASHED, CENTER, DOT...   | ❌ all solid | —          | ❌        |
-| All dimension types       | ✅ 7 types                  | linear only  | —          | ❌        |
-| Standard arrowhead blocks | ✅ 18 kinds (DIMBLK)        | ❌           | —          | ❌        |
-| LEADER / MULTILEADER      | ✅                          | ❌           | —          | ❌        |
-| HATCH patterns            | ✅ 29 built-in              | ✅           | —          | ❌        |
-| OCS (Arbitrary Axis)      | ✅ full                     | Z-flip only  | —          | ❌        |
-| Vector text (opentype.js) | ✅                          | ✅           | —          | ❌        |
-| Geometry merging          | ✅                          | ✅           | —          | ❌        |
-| Dark theme                | ✅ instant switch           | bg only      | —          | ❌        |
-| TypeScript                | ✅ native                   | .d.ts        | ✅         | ❌        |
-| Tests                     | 1299 tests                  | 0            | ✅         | 0         |
-| Web Worker parsing        | ✅                          | ✅           | ❌         | ❌        |
-| Parser-only entry         | ✅ zero deps                | ❌           | ✅         | ❌        |
-| Framework                 | agnostic                    | agnostic     | —          | agnostic  |
-| Bundle size               | ~960KB                      | ~1.2MB       | ~50KB      | ~30KB     |
-| Last updated              | 2026                        | 2024         | 2023       | 2019      |
+</details>
 
 ## Bundle sizes
 
