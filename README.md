@@ -17,7 +17,9 @@ Just want to look at a DXF file? Open it in the [Live Demo Viewer](https://dxf-k
 
 ## Packages
 
-This monorepo publishes four packages for consumers — choose the one that fits your stack. (A fifth, [`dxf-interaction`](packages/dxf-interaction/), is a shared internal layer the Vue/React/Lit wrappers pull in automatically; you won't install it directly.)
+This monorepo publishes four packages for consumers — choose the one that fits your stack.
+
+> **Note:** a fifth package, [`dxf-interaction`](packages/dxf-interaction/), is a shared **internal** layer that the Vue/React/Lit wrappers pull in automatically — **not a viewer you install directly.** If you landed on it from search, use `dxf-render` (vanilla) or one of the wrappers above instead.
 
 ### [`dxf-render`](packages/dxf-render/) — framework-agnostic engine
 
