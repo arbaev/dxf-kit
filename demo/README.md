@@ -7,8 +7,8 @@ Demo application for the [dxf-vuer](https://www.npmjs.com/package/dxf-vuer) libr
 From the repository root:
 
 ```bash
-yarn install
-yarn dev
+pnpm install
+pnpm dev
 ```
 
 Opens at `http://localhost:5173`.
@@ -16,7 +16,7 @@ Opens at `http://localhost:5173`.
 ## Building
 
 ```bash
-yarn build:demo
+pnpm build:demo
 ```
 
 Output goes to `dist-demo/`.
