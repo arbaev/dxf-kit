@@ -1,3 +1,5 @@
+
+
 # dxf-kit
 
 [![license](https://img.shields.io/npm/l/dxf-render)](https://github.com/arbaev/dxf-kit/blob/main/LICENSE)
@@ -58,7 +60,7 @@ const dxf = parseDxf(dxfText);
 <br>
 
 ```bash
-npm install dxf-vuer dxf-render three
+npm install dxf-vuer dxf-render three vue
 ```
 
 ```vue
