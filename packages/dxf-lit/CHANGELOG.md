@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2
+
+### Bug Fixes
+
+- **Type declarations now resolve under `"moduleResolution": "node16"` / `"nodenext"`.** Previously the extensionless relative imports in the published `.d.ts` made the element class and helpers degrade to `any` for `node16` / `nodenext` consumers. Declarations are now rolled up into a single `index.d.ts` with no relative imports; nothing changes for `bundler` users, and the set of exports is identical. ([#15](https://github.com/arbaev/dxf-kit/issues/15))
+- `dxf-render` peer range raised to `^1.7.2`, the first version whose declarations resolve under `node16` / `nodenext` (this package's types import from it).
+
 ## 0.1.1
 
 ### Bug Fixes

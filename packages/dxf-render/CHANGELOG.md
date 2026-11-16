@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.2
+
+### Bug Fixes
+
+- **Type declarations now resolve under `"moduleResolution": "node16"` / `"nodenext"`.** The packages are ESM (`"type": "module"`), but the published `.d.ts` used extensionless relative imports (`from './parser'`), which TypeScript rejects in ESM declarations under `node16` / `nodenext`. With `skipLibCheck: true` every export of `dxf-render` and `dxf-render/parser` silently degraded to `any` and `export *` members such as `CAMERA_NEAR_PLANE` went missing (TS2305); with `skipLibCheck: false` it failed with TS2834. Declarations are now rolled up into one file per entry point (`index.d.ts`, `parser-entry.d.ts`) with no relative imports. Nothing changes for `bundler` users, and the set of exports is identical. ([#15](https://github.com/arbaev/dxf-kit/issues/15))
+- **Font API types no longer degrade to `any`.** `loadFont`, `loadDefaultFont`, `loadSerifFont`, `getDefaultFont`, `getSerifFont` and `CreateDXFSceneOptions.font` expose opentype.js's `Font` type, but `@types/opentype.js` was only a dev dependency, so consumers got `any` (or TS7016 under `skipLibCheck: false`) unless they installed the types themselves. It is now a regular dependency.
+
 ## 1.7.1
 
 ### Bug Fixes

@@ -17,6 +17,11 @@ export interface WhatsNewItem {
 export const whatsNew: WhatsNewItem[] = [
   {
     pkg: "dxf-render",
+    version: "1.7.2",
+    text: "Fix — TypeScript types now work under moduleResolution node16 / nodenext in all five packages (dxf-render 1.7.2, dxf-interaction 0.1.2, dxf-vuer 3.0.1, dxf-react 0.1.1, dxf-lit 0.1.2). Exports no longer silently degrade to any; declarations ship as one bundled .d.ts per entry point. The font API (loadFont, getDefaultFont, …) is now typed out of the box too. (#15)",
+  },
+  {
+    pkg: "dxf-render",
     version: "1.7.1",
     text: "Fix — TEXT and MTEXT now render out of the box. createThreeObjectsFromDXF falls back to the embedded default font when no font option is passed, so text no longer silently disappears. Pass options.font only to override with a custom font. (#13)",
   },
@@ -230,6 +235,7 @@ export const whatsNew: WhatsNewItem[] = [
 // The most recent release wave, shown on the home page. Everything else is
 // archived on the /changelog page.
 const LATEST_VERSIONS = new Set([
+  "dxf-render@1.7.2",
   "dxf-render@1.7.1",
   "dxf-react@0.1.0",
   "dxf-lit@0.1.0",
