@@ -192,13 +192,13 @@ importers:
 
   packages/dxf-render:
     dependencies:
+      '@types/opentype.js':
+        specifier: ^1.3.9
+        version: 1.3.9
       opentype.js:
         specifier: ^1.3.4
         version: 1.3.4
     devDependencies:
-      '@types/opentype.js':
-        specifier: ^1.3.9
-        version: 1.3.9
       '@types/three':
         specifier: ^0.182.0
         version: 0.182.0
