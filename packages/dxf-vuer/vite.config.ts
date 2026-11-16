@@ -9,6 +9,7 @@ export default defineConfig({
     dts({
       tsconfigPath: "./tsconfig.build.json",
       outDir: "dist",
+      rollupTypes: true,
     }),
   ],
   resolve: {

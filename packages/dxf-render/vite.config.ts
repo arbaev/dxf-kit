@@ -9,6 +9,9 @@ export default defineConfig({
     dts({
       tsconfigPath: "./tsconfig.build.json",
       outDir: "dist",
+      // Bundle declarations into one .d.ts per entry: no relative imports left,
+      // so types resolve under moduleResolution node16/nodenext (issue #15)
+      rollupTypes: true,
     }),
   ],
   resolve: {
@@ -21,10 +24,14 @@ export default defineConfig({
     lib: {
       entry: {
         index: path.resolve(__dirname, "src/index.ts"),
-        parser: path.resolve(__dirname, "src/parser-entry.ts"),
+        // Key must not be "parser": with rollupTypes it emits a dist/parser.d.ts stub
+        // that shadows the parser/ directory and makes api-extractor recurse forever
+        "parser-entry": path.resolve(__dirname, "src/parser-entry.ts"),
       },
       formats: ["es"],
-      fileName: (format, entryName) => `dxf-render-${entryName}.${format}.js`,
+      // Keep the published JS file name dxf-render-parser.es.js for the parser entry
+      fileName: (format, entryName) =>
+        `dxf-render-${entryName === "parser-entry" ? "parser" : entryName}.${format}.js`,
     },
     rollupOptions: {
       external: [/^three/],
